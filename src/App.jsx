@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { Analytics } from '@vercel/analytics/react'
 import { supabase } from './lib/supabase'
 import { createCheckoutSession } from './lib/stripe'
 import { sendWelcomeEmail, sendResultsEmail } from './lib/email'
@@ -9,6 +10,8 @@ import PricingTable from './components/PricingTable'
 import NameGenerator from './components/NameGenerator'
 import LeadsDashboard from './components/LeadsDashboard'
 import GrowthScorecard from './components/GrowthScorecard';
+import PrivacyPolicy from './components/PrivacyPolicy';
+import TermsOfService from './components/TermsOfService';
 import { popularNiches } from './lib/niches'
 
 function App() {
@@ -25,6 +28,7 @@ function App() {
   const [history, setHistory] = useState([]) // Array of lead records for the user
   const [leadsFeed, setLeadsFeed] = useState([]) // Growth leads for Experts
   const [usageCount, setUsageCount] = useState(0) // Validation count for free tier
+  const [currentLeadId, setCurrentLeadId] = useState(null); // ID for sharing
 
   useEffect(() => {
     // 1. Initial State Sync (Consolidated)
@@ -45,6 +49,21 @@ function App() {
     // 2. Fetch Critical Data (Spots + State recovery)
     const fetchData = async () => {
       try {
+        // Increment Website Hits (Non-blocking)
+        const hasCounted = sessionStorage.getItem('vibe_session_counted');
+        if (!hasCounted) {
+          supabase.rpc('increment_hits').then(() => {
+            sessionStorage.setItem('vibe_session_counted', 'true');
+          }).catch(() => {
+            // Fallback for legacy app_settings if RPC isn't available
+            supabase.from('app_settings').select('value').eq('key', 'website_hits').single().then(({ data }) => {
+              if (data) {
+                supabase.from('app_settings').update({ value: (data.value || 0) + 1 }).eq('key', 'website_hits');
+              }
+            });
+          });
+        }
+
         const currentEmail = viewEmail || savedEmail || email;
 
         const [counterResponse, leadResponse] = await Promise.all([
@@ -218,6 +237,12 @@ function App() {
     } else if (path === '/admin/leads') {
       setStep('admin-leads')
       document.title = 'Commander Center - Growth Leads | MarketVibe'
+    } else if (path === '/privacy') {
+      setStep('privacy')
+      document.title = 'Privacy Policy | MarketVibe'
+    } else if (path === '/terms') {
+      setStep('terms')
+      document.title = 'Terms of Service | MarketVibe'
     }
 
     return () => {
@@ -322,6 +347,7 @@ function App() {
 
       localStorage.setItem('marketvibe_lead_email', email)
       setResults(report)
+      setCurrentLeadId(targetId);
 
       // Update history state instantly
       setHistory(prev => [
@@ -423,7 +449,10 @@ function App() {
           }}
           style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white', cursor: 'pointer' }}
         >
-          MarketVibe
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <img src="/logo.svg" alt="MarketVibe Logo" style={{ width: '32px', height: '32px' }} />
+            MarketVibe
+          </div>
         </div>
 
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
@@ -583,10 +612,14 @@ function App() {
             loading={submitting}
             leads={leadsFeed}
             usageCount={usageCount}
+            leadId={currentLeadId}
           />
           {errorMessage && <p className="error-text" style={{ textAlign: 'center', marginTop: '1rem' }}>{errorMessage}</p>}
         </section>
       )}
+
+      {step === 'privacy' && <PrivacyPolicy />}
+      {step === 'terms' && <TermsOfService />}
 
       <section className="features">
         <div className="feature-card">
@@ -640,9 +673,15 @@ function App() {
         </div>
 
         <div style={{ textAlign: 'center', color: '#64748b', fontSize: '0.875rem' }}>
+          <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+            <a href="/privacy" style={{ color: '#475569', textDecoration: 'none' }}>Privacy Policy</a>
+            <a href="/terms" style={{ color: '#475569', textDecoration: 'none' }}>Terms of Service</a>
+            <a href="mailto:support@marketvibe1.com" style={{ color: '#6366f1', textDecoration: 'none', fontWeight: 'bold' }}>Support: support@marketvibe1.com</a>
+          </div>
           &copy; 2026 MarketVibe. Built for builders who want to win.
         </div>
       </footer>
+      <Analytics />
     </div>
   )
 }

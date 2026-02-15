@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { generateScorecard } from '../lib/scorecard';
 
-const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = 'founder', leads = [], usageCount = 0 }) => {
+const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = 'founder', leads = [], usageCount = 0, leadId = null }) => {
     // Add safe defaults for old data migration
     const {
         landingPage = { headline: '', subheadline: '', features: [], cta: '', socialProof: '' },
@@ -367,7 +367,8 @@ const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = '
                 <button
                     onClick={() => {
                         const revenue = revenueForecast.estimatedAnnualRevenue;
-                        const text = `I just validated a $${revenue}/yr business idea on @MarketVibe in 60 seconds! 🚀\n\nMy 30-day roadmap is ready. Stop guessing, start building. 💎\n\nCheck it out: https://www.marketvibe1.com`;
+                        const shareUrl = leadId ? `https://www.marketvibe1.com/og-preview/${leadId}` : `https://www.marketvibe1.com`;
+                        const text = `I just validated a $${revenue}/yr business idea on @MarketVibe in 60 seconds! 🚀\n\nMy 30-day roadmap is ready. Stop guessing, start building. 💎\n\nView my Growth Scorecard: ${shareUrl}`;
                         const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
                         window.open(twitterUrl, '_blank');
                     }}
@@ -387,8 +388,9 @@ const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = '
                 <button
                     onClick={() => {
                         const revenue = revenueForecast.estimatedAnnualRevenue;
-                        const title = `I just used AI to validate a $${revenue}/yr business idea in 60 seconds.`;
-                        const redditUrl = `https://www.reddit.com/submit?title=${encodeURIComponent(title)}&url=${encodeURIComponent('https://www.marketvibe1.com')}`;
+                        const shareUrl = leadId ? `https://www.marketvibe1.com/og-preview/${leadId}` : `https://www.marketvibe1.com`;
+                        const title = `I just used AI to validate a $${revenue}/yr business idea in 60 seconds. My 30-day roadmap is ready.`;
+                        const redditUrl = `https://www.reddit.com/submit?title=${encodeURIComponent(title)}&url=${encodeURIComponent(shareUrl)}`;
                         window.open(redditUrl, '_blank');
                     }}
                     className="btn-primary"
