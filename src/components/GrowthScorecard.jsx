@@ -20,9 +20,9 @@ const GrowthScorecard = ({ leadId }) => {
     }, [leadId]);
 
     if (loading) return <div style={{ color: 'white', textAlign: 'center', padding: '10rem' }}>Generating Social Scorecard...</div>;
-    if (!lead) return <div style={{ color: 'white', textAlign: 'center', padding: '10rem' }}>Lead not found.</div>;
+    if (!supabase) return <div style={{ color: 'white', textAlign: 'center', padding: '10rem' }}>Database connection not available.</div>;
 
-    const report = lead.teaser_report;
+    const report = lead?.teaser_report;
 
     return (
         <div style={{

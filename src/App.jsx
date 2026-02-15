@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react'
-import { Analytics } from '@vercel/analytics/react'
 import { supabase } from './lib/supabase'
 import { createCheckoutSession } from './lib/stripe'
 import { sendWelcomeEmail, sendResultsEmail } from './lib/email'
@@ -122,6 +121,7 @@ function App() {
 
     // 3. Defer Non-Critical Tasks (RequestIdleCallback for low-priority)
     const handleDeferredTasks = () => {
+      if (!supabase) return;
       // Secret reset logic
       if (resetValue) {
         supabase.from('app_settings')
@@ -156,15 +156,17 @@ function App() {
     }
 
     // 4. Real-Time Tracking & Counter (FOMO)
-    const subscription = supabase
-      .channel('app_settings_changes')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'app_settings' }, payload => {
-        if (payload.new.key === 'lifetime_deals_remaining') {
-          setSpots(payload.new.value)
-        }
-      })
-      .subscribe()
-
+    let subscription = null;
+    if (supabase) {
+      subscription = supabase
+        .channel('app_settings_changes')
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'app_settings' }, payload => {
+          if (payload.new.key === 'lifetime_deals_remaining') {
+            setSpots(payload.new.value)
+          }
+        })
+        .subscribe()
+    }
     // 4.1 Track Website Hit (Silent & Filtered)
     const trackHit = async () => {
       try {
@@ -250,7 +252,9 @@ function App() {
     }
 
     return () => {
-      supabase.removeChannel(subscription)
+      if (supabase && subscription) {
+        supabase.removeChannel(subscription)
+      }
     }
   }, [])
 

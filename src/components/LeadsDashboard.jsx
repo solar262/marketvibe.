@@ -97,6 +97,8 @@ const LeadsDashboard = () => {
         handleUpdateStatus(lead.id, 'contacted');
     };
 
+    if (!supabase) return <div style={{ color: '#94a3b8', padding: '10rem', textAlign: 'center' }}>Database connection not available.</div>;
+
     return (
         <div style={{ color: 'white', maxWidth: '1000px', margin: '0 auto', position: 'relative' }}>
             {/* Feedback Toast */}
