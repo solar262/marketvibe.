@@ -16,21 +16,25 @@ const LeadsDashboard = () => {
     }, [filter]);
 
     const fetchStats = async () => {
-        const { data: appData } = await supabase.from('app_settings').select('value').eq('key', 'website_hits').single();
-        const { count: total } = await supabase.from('growth_leads').select('*', { count: 'exact', head: true });
-        const { count: pending } = await supabase.from('growth_leads').select('*', { count: 'exact', head: true }).eq('status', 'pending');
-        const { count: qualified } = await supabase.from('growth_leads').select('*', { count: 'exact', head: true }).eq('status', 'qualified');
-        const { count: contacted } = await supabase.from('growth_leads').select('*', { count: 'exact', head: true }).eq('status', 'contacted');
-        const { count: closed } = await supabase.from('growth_leads').select('*', { count: 'exact', head: true }).eq('status', 'closed');
+        try {
+            const { data: appData } = await supabase.from('app_settings').select('value').eq('key', 'website_hits').single();
+            const { count: total } = await supabase.from('growth_leads').select('*', { count: 'exact', head: true });
+            const { count: pending } = await supabase.from('growth_leads').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+            const { count: qualified } = await supabase.from('growth_leads').select('*', { count: 'exact', head: true }).eq('status', 'qualified');
+            const { count: contacted } = await supabase.from('growth_leads').select('*', { count: 'exact', head: true }).eq('status', 'contacted');
+            const { count: closed } = await supabase.from('growth_leads').select('*', { count: 'exact', head: true }).eq('status', 'closed');
 
-        setStats({
-            hits: appData?.value || 0,
-            totalLeads: total || 0,
-            pendingLeads: pending || 0,
-            qualifiedLeads: qualified || 0,
-            contactedLeads: contacted || 0,
-            closedLeads: closed || 0
-        });
+            setStats({
+                hits: appData?.value || 0,
+                totalLeads: total || 0,
+                pendingLeads: pending || 0,
+                qualifiedLeads: qualified || 0,
+                contactedLeads: contacted || 0,
+                closedLeads: closed || 0
+            });
+        } catch (err) {
+            console.error('Stats fetch error:', err);
+        }
     };
 
     const showFeedback = (message, type = 'info') => {

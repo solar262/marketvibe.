@@ -93,13 +93,11 @@ function App() {
             setPlanType(anyPaidRecord?.plan_type || 'founder'); // Default to founder if undefined
 
             // 2.1 Fetch Expert Fuel (Live Leads) if applicable
-            if (anyPaidRecord?.plan_type === 'expert') {
-              supabase.from('growth_leads')
-                .select('*')
-                .order('created_at', { ascending: false })
-                .limit(5)
-                .then(({ data }) => setLeadsFeed(data || []));
-            }
+            const { data: feed } = await supabase.from('growth_leads')
+              .select('*')
+              .order('created_at', { ascending: false })
+              .limit(5);
+            setLeadsFeed(feed || []);
           }
 
           setUsageCount(leadRecords.length);
@@ -124,12 +122,12 @@ function App() {
       if (!supabase) return;
       // Secret reset logic
       if (resetValue) {
-        supabase.from('app_settings')
-          .update({ value: parseInt(resetValue) })
-          .eq('key', 'lifetime_deals_remaining')
-          .then(({ error }) => {
-            if (!error) setSpots(parseInt(resetValue))
-          })
+        (async () => {
+          const { error } = await supabase.from('app_settings')
+            .update({ value: parseInt(resetValue) })
+            .eq('key', 'lifetime_deals_remaining');
+          if (!error) setSpots(parseInt(resetValue));
+        })();
       }
 
       // Stripe Fulfillment logic (if returning from checkout)
@@ -436,16 +434,9 @@ function App() {
     }
   };
 
-  if (loading) return <div className="container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'white' }}>Loading...</div>
+  if (loading) return <div style={{ color: 'white', padding: '10rem', textAlign: 'center' }}>⚡ Scanning the horizon...</div>
 
-  if (!supabase) {
-    return (
-      <div className="container" style={{ padding: '4rem 2rem', textAlign: 'center', color: 'white' }}>
-        <h2 style={{ color: '#ef4444', marginBottom: '1rem' }}>⚠️ Configuration Missing</h2>
-        <p>MarketVibe is live, but it's missing the connection keys for Supabase.</p>
-      </div>
-    )
-  }
+  if (!supabase) return <div style={{ color: '#ef4444', padding: '10rem', textAlign: 'center' }}>⚠️ Database connection missing.</div>
 
   return (
     <div className="container">
