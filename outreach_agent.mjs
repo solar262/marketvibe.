@@ -183,37 +183,37 @@ class MarketVibeSentinel {
     }
 
     detectNiche(text) {
-        // ... (existing logic, potentially refined later)
         const textLower = text.toLowerCase();
 
         // 🏠 Service & Physical
-        if (textLower.includes('cleaning') && (textLower.includes('service') || textLower.includes('maid') || textLower.includes('vacuum') || textLower.includes('scrub'))) return 'Service Business (Cleaning)';
-        if (textLower.includes('house') && (textLower.includes('cleaning') || textLower.includes('renovate'))) return 'Home Improvement';
+        if (/\b(cleaning|maid|vacuum|scrub)\b/i.test(textLower)) return 'Service Business (Cleaning)';
+        if (/\b(house|renovate|remodel)\b/i.test(textLower) && /\b(cleaning|renovate|house)\b/i.test(textLower)) return 'Home Improvement';
 
-        // 🎨 Physical Products & Hobbies (The "Crayon/Pen" fix)
-        if (textLower.includes('writing tools') || textLower.includes('stationery') || (textLower.includes('pen') && !textLower.includes('app'))) return 'Stationery & Writing Tools';
-        if (textLower.includes('miniature') || textLower.includes('toy') || textLower.includes('collectible') || textLower.includes('hobby')) return 'Hobby & Collectibles';
+        // 🎨 Physical Products & Hobbies
+        if (/\b(writing tools|stationery)\b/i.test(textLower) || (/\bpen\b/i.test(textLower) && !/\bapp\b/i.test(textLower))) return 'Stationery & Writing Tools';
+        if (/\b(miniature|toy|collectible|hobby)\b/i.test(textLower)) return 'Hobby & Collectibles';
 
-        if (textLower.includes('pet') || textLower.includes('dog')) return 'Pet Tech';
-        if (textLower.includes('coffee')) return 'Coffee Subscription';
-        if (textLower.includes('real estate') || textLower.includes('realtor') || textLower.includes('property')) return 'Real Estate Tech';
+        if (/\b(pet|dog|cat)\b/i.test(textLower)) return 'Pet Tech';
+        if (/\bcoffee\b/i.test(textLower)) return 'Coffee Subscription';
+        if (/\b(real estate|realtor|property)\b/i.test(textLower)) return 'Real Estate Tech';
 
         // 💻 E-commerce & Retail
-        if (textLower.includes('ecommerce') || textLower.includes('shopify') || textLower.includes('dropshipping')) return 'E-commerce';
-        if (textLower.includes('amazon') || textLower.includes('fba') || textLower.includes('selling products')) return 'Retail Arbitrage';
+        if (/\b(ecommerce|shopify|dropshipping)\b/i.test(textLower)) return 'E-commerce';
+        if (/\b(amazon|fba|selling products)\b/i.test(textLower)) return 'Retail Arbitrage';
 
         // 🤖 Tech & AI
-        if (textLower.includes('ai ') || textLower.includes('bot') || textLower.includes('agent') || textLower.includes('gpt')) return 'AI/Automation Agent';
-        if (textLower.includes('app') || textLower.includes('software') || textLower.includes('builder') || textLower.includes('saas')) return 'SaaS / Micro-SaaS';
+        if (/\b(ai |bot|agent|gpt)\b/i.test(textLower)) return 'AI/Automation Agent';
+        // Precise SaaS check (Avoid "happy", "apps", etc matching "app")
+        if (/\b(software|builder|saas)\b/i.test(textLower) || /\bapp\b/i.test(textLower)) return 'SaaS / Micro-SaaS';
 
         // 📈 Marketing & Agency
-        if (textLower.includes('marketing') || textLower.includes('agency') || textLower.includes('smma') || textLower.includes('outreach')) return 'Marketing Agency';
+        if (/\b(marketing|agency|smma|outreach)\b/i.test(textLower)) return 'Marketing Agency';
 
         // 💸 Fintech & Wealth
-        if (textLower.includes('money') || textLower.includes('pay') || textLower.includes('bank') || textLower.includes('crypto')) return 'Fintech';
+        if (/\b(money|pay|bank|crypto|finance)\b/i.test(textLower)) return 'Fintech';
 
-        // 🎓 Edtech
-        if (textLower.includes('learn') || textLower.includes('school') || textLower.includes('course') || textLower.includes('teaching') || textLower.includes('tutor')) return 'Education / Tutoring';
+        // 🎓 Edtech & Academic (Exclude from SaaS)
+        if (/\b(learn|school|course|teaching|tutor|university|admissions|harvard|phd|student)\b/i.test(textLower)) return 'Education & Academic';
 
         return 'Indie Project';
     }
@@ -301,10 +301,14 @@ class MarketVibeSentinel {
         if (text.length < 40) return true;
 
         // 2. Sentiment/Hostility Guard
-        const hostileWords = ['stupid', 'dumb', 'scam', 'hate', 'terrible', 'worst'];
+        const hostileWords = ['stupid', 'dumb', 'scam', 'hate', 'terrible', 'worst', 'sucks', 'bitter'];
         if (hostileWords.some(word => textLower.includes(word))) return true;
 
-        // 3. Repetition Check (Basic) - If they repeat the same word 5+ times
+        // 3. Academic/Emotional Venting Guard (Phase 29 Fix)
+        const ventingSignals = ['phd', 'harvard', 'admissions', 'rejections', 'venting', 'university', 'professor'];
+        if (ventingSignals.some(word => textLower.includes(word))) return true;
+
+        // 4. Repetition Check (Basic) - If they repeat the same word 5+ times
         const words = textLower.split(/\s+/);
         const counts = {};
         for (const w of words) {

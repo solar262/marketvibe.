@@ -29,6 +29,7 @@ function App() {
   const [leadsFeed, setLeadsFeed] = useState([]) // Growth leads for Experts
   const [usageCount, setUsageCount] = useState(0) // Validation count for free tier
   const [currentLeadId, setCurrentLeadId] = useState(null); // ID for sharing
+  const [previewId, setPreviewId] = useState(null); // ID for OG preview route
 
   useEffect(() => {
     // 1. Initial State Sync (Consolidated)
@@ -228,7 +229,7 @@ function App() {
       }
     } else if (path.startsWith('/og-preview/')) {
       const id = path.split('/').pop();
-      setPreviewId(id);
+      setPreviewId(parseInt(id, 10));
       setStep('og-preview');
       document.title = 'MarketVibe Growth Scorecard 📈';
     } else if (path === '/tools/naming') {
