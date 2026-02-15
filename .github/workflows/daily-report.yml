@@ -1,0 +1,30 @@
+name: MarketVibe CEO Morning Brief 👔🎤
+
+on:
+  schedule:
+    - cron: '0 8 * * *' # Every day at 8 AM UTC
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  morning-brief:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: 👔 Send CEO Morning Brief
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_RESEND_API_KEY: ${{ secrets.VITE_RESEND_API_KEY }}
+          FOUNDER_EMAIL: ${{ secrets.FOUNDER_EMAIL }}
+        run: node reporting_agent.mjs
