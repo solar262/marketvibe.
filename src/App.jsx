@@ -461,27 +461,9 @@ function App() {
 
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
           {paid && history && history.length > 0 && step !== 'admin-leads' && (
-            <select
-              onChange={(e) => handleProjectSelect(parseInt(e.target.value))}
-              value={history.find(h => h && results && JSON.stringify(h.results) === JSON.stringify(results))?.id || ''}
-              style={{
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                color: '#94a3b8',
-                padding: '0.4rem 0.75rem',
-                borderRadius: '0.5rem',
-                cursor: 'pointer',
-                fontSize: '0.85rem',
-                outline: 'none'
-              }}
-            >
-              <option value="" tabIndex={0}>📁 Project History</option>
-              {history.map(project => project ? (
-                <option key={project.id} value={project.id}>
-                  {project.project_name || 'Unnamed Project'} ({new Date(project.created_at).toLocaleDateString()})
-                </option>
-              ) : null)}
-            </select>
+            <div style={{ color: '#94a3b8', fontSize: '0.8rem' }}>
+              📁 {history.length} Projects Saved
+            </div>
           )}
 
           {results && (
@@ -685,7 +667,6 @@ function App() {
           &copy; 2026 MarketVibe. Built for builders who want to win.
         </div>
       </footer>
-      <Analytics />
     </div>
   )
 }
