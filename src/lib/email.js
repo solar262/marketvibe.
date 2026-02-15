@@ -1,8 +1,13 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(import.meta.env.VITE_RESEND_API_KEY);
+const apiKey = import.meta.env.VITE_RESEND_API_KEY;
+const resend = apiKey ? new Resend(apiKey) : null;
 
 export const sendWelcomeEmail = async (email) => {
+    if (!resend) {
+        console.warn('Resend client not initialized. Skipping welcome email.');
+        return { success: false, error: 'Missing API Key' };
+    }
     try {
         const { data, error } = await resend.emails.send({
             from: 'MarketVibe <onboarding@resend.dev>',
@@ -38,6 +43,10 @@ export const sendWelcomeEmail = async (email) => {
 };
 
 export const sendResultsEmail = async (email, projectName) => {
+    if (!resend) {
+        console.warn('Resend client not initialized. Skipping results email.');
+        return { success: false, error: 'Missing API Key' };
+    }
     const resultsUrl = `https://marketvibe.vercel.app/?view_results=${encodeURIComponent(email)}`;
 
     try {
