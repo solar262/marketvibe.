@@ -344,4 +344,4 @@ const LeadsDashboard = () => {
     );
 };
 
-export default memo(LeadsDashboard);
+export default LeadsDashboard;

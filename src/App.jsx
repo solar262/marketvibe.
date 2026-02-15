@@ -238,13 +238,13 @@ function App() {
     } else if (path === '/tools/naming') {
       setStep('tools-naming')
       document.title = 'Startup Name Generator - Free Branding Tool | MarketVibe'
-    } else if (path === '/admin/leads') {
+    } else if (path.includes('/admin/leads')) {
       setStep('admin-leads')
       document.title = 'Commander Center - Growth Leads | MarketVibe'
-    } else if (path === '/privacy') {
+    } else if (path.includes('/privacy')) {
       setStep('privacy')
       document.title = 'Privacy Policy | MarketVibe'
-    } else if (path === '/terms') {
+    } else if (path.includes('/terms')) {
       setStep('terms')
       document.title = 'Terms of Service | MarketVibe'
     }
@@ -460,10 +460,10 @@ function App() {
         </div>
 
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          {paid && history.length > 0 && (
+          {paid && history && history.length > 0 && step !== 'admin-leads' && (
             <select
               onChange={(e) => handleProjectSelect(parseInt(e.target.value))}
-              value={history.find(h => JSON.stringify(h.results) === JSON.stringify(results))?.id || ''}
+              value={history.find(h => h && results && JSON.stringify(h.results) === JSON.stringify(results))?.id || ''}
               style={{
                 background: 'rgba(255,255,255,0.05)',
                 border: '1px solid rgba(255,255,255,0.1)',
@@ -476,11 +476,11 @@ function App() {
               }}
             >
               <option value="" tabIndex={0}>📁 Project History</option>
-              {history.map(project => (
+              {history.map(project => project ? (
                 <option key={project.id} value={project.id}>
                   {project.project_name || 'Unnamed Project'} ({new Date(project.created_at).toLocaleDateString()})
                 </option>
-              ))}
+              ) : null)}
             </select>
           )}
 
