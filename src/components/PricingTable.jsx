@@ -132,7 +132,6 @@ const PricingTable = ({ onSelectPlan, spots }) => {
                             style={{
                                 background: plan.recommended ? 'linear-gradient(135deg, #6366f1, #a855f7)' : 'rgba(255, 255, 255, 0.05)',
                                 color: 'white',
-                                border: 'none',
                                 padding: '1.25rem',
                                 borderRadius: '1rem',
                                 fontSize: '1.1rem',
