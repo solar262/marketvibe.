@@ -133,9 +133,9 @@ const LeadsDashboard = () => {
                 <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '1.5rem', borderRadius: '1rem', border: '1px solid rgba(16, 185, 129, 0.2)', textAlign: 'center' }}>
                     <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: '0 0 0.5rem 0' }}>TOTAL REVENUE 💰</p>
                     <h2 style={{ fontSize: '2rem', margin: 0, color: '#10b981' }}>
-                        ${stats.closedLeads * 49}
+                        ${(stats?.closedLeads || 0) * 49}
                     </h2>
-                    <p style={{ color: '#059669', fontSize: '0.65rem', margin: '4px 0 0 0' }}>({stats.closedLeads} Conversions)</p>
+                    <p style={{ color: '#059669', fontSize: '0.65rem', margin: '4px 0 0 0' }}>({stats?.closedLeads || 0} Conversions)</p>
                 </div>
             </div>
 
@@ -201,9 +201,9 @@ const LeadsDashboard = () => {
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                        <span style={{ fontSize: '0.8rem', color: '#6366f1', fontWeight: 'bold' }}>{lead.platform.toUpperCase()}</span>
+                                        <span style={{ fontSize: '0.8rem', color: '#6366f1', fontWeight: 'bold' }}>{(lead?.platform || 'platform').toUpperCase()}</span>
                                         <a
-                                            href={`/og-preview/${lead.id}`}
+                                            href={`/og-preview/${lead?.id}`}
                                             target="_blank"
                                             style={{ fontSize: '0.7rem', color: '#94a3b8', textDecoration: 'underline' }}
                                         >

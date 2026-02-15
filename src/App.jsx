@@ -167,13 +167,16 @@ function App() {
 
     // 4.1 Track Website Hit (Silent & Filtered)
     const trackHit = async () => {
-      // Don't count admin visits or repeats in the same session
-      const isAdmin = window.location.pathname.startsWith('/admin');
-      const hasTracked = sessionStorage.getItem('mv_tracked');
+      try {
+        const isAdmin = window.location.pathname.startsWith('/admin');
+        const hasTracked = sessionStorage.getItem('mv_tracked');
 
-      if (!isAdmin && !hasTracked) {
-        await supabase.rpc('increment_hits');
-        sessionStorage.setItem('mv_tracked', 'true');
+        if (!isAdmin && !hasTracked) {
+          await supabase.rpc('increment_hits');
+          sessionStorage.setItem('mv_tracked', 'true');
+        }
+      } catch (err) {
+        console.warn('Hit tracking skipped (RPC not ready yet)');
       }
     };
     trackHit();
