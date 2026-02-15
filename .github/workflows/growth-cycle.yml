@@ -28,4 +28,4 @@ jobs:
           VITE_RESEND_API_KEY: ${{ secrets.VITE_RESEND_API_KEY }}
           RESEND_API_KEY: ${{ secrets.VITE_RESEND_API_KEY }}
           CLOSER_MODE: "true"
-        run: node outreach_agent.mjs --once
+        run: node growth_nexus.mjs

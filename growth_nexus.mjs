@@ -36,5 +36,10 @@ const isDirectRun = import.meta.url.includes(process.argv[1].replace(/\\/g, '/')
     import.meta.url.endsWith(process.argv[1].split(/[\\/]/).pop());
 
 if (isDirectRun) {
-    runMasterCycle();
+    runMasterCycle().then(() => {
+        process.exit(0);
+    }).catch(err => {
+        console.error("CRITICAL NEXUS ERROR:", err);
+        process.exit(1);
+    });
 }
