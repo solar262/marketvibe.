@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { generateScorecard } from '../lib/scorecard';
 import VerificationBadge from './VerificationBadge';
+import { generateMVPCode } from '../lib/mvp_templates';
 
 const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = 'founder', leads = [], usageCount = 0, leadId = null }) => {
     // Add safe defaults for old data migration
@@ -437,6 +438,40 @@ const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = '
                 >
                     <span>🖼️</span> {downloading ? 'Generating...' : 'Download Viral Scorecard'}
                 </button>
+
+                {unlocked && (
+                    <button
+                        onClick={() => {
+                            const code = generateMVPCode({
+                                name: results?.projectName || 'MarketVibe',
+                                landingPage: results?.landingPage || landingPage,
+                                revenueForecast: results?.revenueForecast || revenueForecast
+                            });
+                            const blob = new Blob([code], { type: 'text/javascript' });
+                            const url = URL.createObjectURL(blob);
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.download = `${(results?.projectName || 'marketvibe').toLowerCase().replace(/ /g, '-')}-mvp.js`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            URL.revokeObjectURL(url);
+                            alert("🚀 MVP Boilerplate Generated! Check your downloads.");
+                        }}
+                        className="btn-primary"
+                        style={{
+                            background: 'rgba(99, 102, 241, 0.1)',
+                            border: '1px solid #6366f1',
+                            color: '#6366f1',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            fontWeight: 'bold'
+                        }}
+                    >
+                        <span>🛠️</span> Export MVP Code
+                    </button>
+                )}
 
                 <button
                     onClick={() => {

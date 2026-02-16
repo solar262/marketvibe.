@@ -4,8 +4,8 @@ import { supabase } from '../lib/supabase';
 const LeadsDashboard = () => {
     const [leads, setLeads] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState('pending'); // 'pending', 'qualified', 'contacted', 'closed', 'rejected'
-    const [stats, setStats] = useState({ hits: 0, totalLeads: 0, pendingLeads: 0, qualifiedLeads: 0, contactedLeads: 0, closedLeads: 0 });
+    const [filter, setFilter] = useState('pending'); // 'pending', 'qualified', 'shadow_pending', 'contacted', 'closed', 'rejected'
+    const [stats, setStats] = useState({ hits: 0, totalLeads: 0, pendingLeads: 0, qualifiedLeads: 0, shadowLeads: 0, contactedLeads: 0, closedLeads: 0 });
     const [feedback, setFeedback] = useState({ message: '', type: '' });
     const [sentLeads, setSentLeads] = useState(new Set());
     const [page, setPage] = useState(1);
@@ -22,6 +22,7 @@ const LeadsDashboard = () => {
             const { count: total } = await supabase.from('growth_leads').select('*', { count: 'exact', head: true });
             const { count: pending } = await supabase.from('growth_leads').select('*', { count: 'exact', head: true }).eq('status', 'pending');
             const { count: qualified } = await supabase.from('growth_leads').select('*', { count: 'exact', head: true }).eq('status', 'qualified');
+            const { count: shadowy } = await supabase.from('growth_leads').select('*', { count: 'exact', head: true }).eq('status', 'shadow_pending');
             const { count: contacted } = await supabase.from('growth_leads').select('*', { count: 'exact', head: true }).eq('status', 'contacted');
             const { count: closed } = await supabase.from('growth_leads').select('*', { count: 'exact', head: true }).eq('status', 'closed');
 
@@ -30,6 +31,7 @@ const LeadsDashboard = () => {
                 totalLeads: total || 0,
                 pendingLeads: pending || 0,
                 qualifiedLeads: qualified || 0,
+                shadowLeads: shadowy || 0,
                 contactedLeads: contacted || 0,
                 closedLeads: closed || 0
             });
@@ -145,6 +147,10 @@ const LeadsDashboard = () => {
                     <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: '0 0 0.5rem 0' }}>PENDING REVIEW 🚦</p>
                     <h2 style={{ fontSize: '2rem', margin: 0, color: '#f59e0b' }}>{stats.pendingLeads}</h2>
                 </div>
+                <div style={{ background: 'rgba(99, 102, 241, 0.05)', padding: '1.5rem', borderRadius: '1rem', border: '1px solid rgba(99, 102, 241, 0.1)', textAlign: 'center' }}>
+                    <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: '0 0 0.5rem 0' }}>SHADOW PRESENCE 🕵️‍♂️</p>
+                    <h2 style={{ fontSize: '2rem', margin: 0, color: '#818cf8' }}>{stats.shadowLeads}</h2>
+                </div>
                 <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '1.5rem', borderRadius: '1rem', border: '1px solid rgba(16, 185, 129, 0.2)', textAlign: 'center' }}>
                     <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: '0 0 0.5rem 0' }}>TOTAL REVENUE 💰</p>
                     <h2 style={{ fontSize: '2rem', margin: 0, color: '#10b981' }}>
@@ -157,7 +163,7 @@ const LeadsDashboard = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                 <h2>Commander Center 🤖</h2>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    {['pending', 'qualified', 'contacted', 'closed', 'rejected'].map(s => (
+                    {['pending', 'qualified', 'shadow_pending', 'contacted', 'closed', 'rejected'].map(s => (
                         <button
                             key={s}
                             onClick={() => { setFilter(s); setPage(1); }}
