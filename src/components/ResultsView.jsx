@@ -428,7 +428,7 @@ const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = '
 
                 {!unlocked && (
                     <div style={{
-                        position: 'absolute',
+                        position: 'fixed', // NUCLEAR OPTION: Fixed to viewport
                         top: 0,
                         left: 0,
                         right: 0,
@@ -436,8 +436,10 @@ const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = '
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        zIndex: 999, // Ensure it's on top of everything
-                        pointerEvents: 'auto' // Capture all clicks
+                        zIndex: 99999, // Maximum z-index
+                        pointerEvents: 'auto',
+                        background: 'rgba(15, 23, 42, 0.85)', // Slight dimming of whole screen
+                        backdropFilter: 'blur(8px)' // Blur everything behind it
                     }}>
                         <div style={{
                             background: 'rgba(15, 23, 42, 0.98)',
@@ -482,121 +484,121 @@ const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = '
                         </div>
                     </div>
                 )}
-            </div>
 
-            <div style={{ marginTop: '5rem', textAlign: 'center', display: 'flex', gap: '1rem', justifyContent: 'center', opacity: unlocked ? 1 : 0.3 }}>
-                <button
-                    onClick={handleDownloadScorecard}
-                    className="btn-primary"
-                    disabled={downloading}
-                    style={{
-                        background: 'rgba(16, 185, 129, 0.1)',
-                        border: '1px solid #10b981',
-                        color: '#10b981',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem'
-                    }}
-                >
-                    <span>🖼️</span> {downloading ? 'Generating...' : 'Download Viral Scorecard'}
-                </button>
 
-                {unlocked && (
+                <div style={{ marginTop: '5rem', textAlign: 'center', display: 'flex', gap: '1rem', justifyContent: 'center', opacity: unlocked ? 1 : 0.3 }}>
+                    <button
+                        onClick={handleDownloadScorecard}
+                        className="btn-primary"
+                        disabled={downloading}
+                        style={{
+                            background: 'rgba(16, 185, 129, 0.1)',
+                            border: '1px solid #10b981',
+                            color: '#10b981',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem'
+                        }}
+                    >
+                        <span>🖼️</span> {downloading ? 'Generating...' : 'Download Viral Scorecard'}
+                    </button>
+
+                    {unlocked && (
+                        <button
+                            onClick={() => {
+                                const code = generateMVPCode({
+                                    name: results?.projectName || 'MarketVibe',
+                                    landingPage: results?.landingPage || landingPage,
+                                    revenueForecast: results?.revenueForecast || revenueForecast
+                                });
+                                const blob = new Blob([code], { type: 'text/javascript' });
+                                const url = URL.createObjectURL(blob);
+                                const link = document.createElement('a');
+                                link.href = url;
+                                link.download = `${(results?.projectName || 'marketvibe').toLowerCase().replace(/ /g, '-')}-mvp.js`;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                URL.revokeObjectURL(url);
+                                alert("🚀 MVP Boilerplate Generated! Check your downloads.");
+                            }}
+                            className="btn-primary"
+                            style={{
+                                background: 'rgba(99, 102, 241, 0.1)',
+                                border: '1px solid #6366f1',
+                                color: '#6366f1',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                fontWeight: 'bold'
+                            }}
+                        >
+                            <span>🛠️</span> Export MVP Code
+                        </button>
+                    )}
+
                     <button
                         onClick={() => {
-                            const code = generateMVPCode({
-                                name: results?.projectName || 'MarketVibe',
-                                landingPage: results?.landingPage || landingPage,
-                                revenueForecast: results?.revenueForecast || revenueForecast
-                            });
-                            const blob = new Blob([code], { type: 'text/javascript' });
-                            const url = URL.createObjectURL(blob);
-                            const link = document.createElement('a');
-                            link.href = url;
-                            link.download = `${(results?.projectName || 'marketvibe').toLowerCase().replace(/ /g, '-')}-mvp.js`;
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                            URL.revokeObjectURL(url);
-                            alert("🚀 MVP Boilerplate Generated! Check your downloads.");
+                            const revenue = revenueForecast.estimatedAnnualRevenue;
+                            const shareUrl = leadId ? `https://www.marketvibe1.com/og-preview/${leadId}` : `https://www.marketvibe1.com`;
+                            const text = `I just validated a $${revenue}/yr business idea on @MarketVibe in 60 seconds! 🚀\n\nMy 30-day roadmap is ready. Stop guessing, start building. 💎\n\nView my Growth Scorecard: ${shareUrl}`;
+                            const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
+                            window.open(twitterUrl, '_blank');
                         }}
                         className="btn-primary"
                         style={{
-                            background: 'rgba(99, 102, 241, 0.1)',
-                            border: '1px solid #6366f1',
-                            color: '#6366f1',
+                            background: 'rgba(29, 155, 240, 0.1)',
+                            border: '1px solid #1d9bf0',
+                            color: '#1d9bf0',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '0.5rem',
-                            fontWeight: 'bold'
+                            gap: '0.5rem'
                         }}
                     >
-                        <span>🛠️</span> Export MVP Code
+                        <span>🐦</span> Share Traction
                     </button>
-                )}
 
-                <button
-                    onClick={() => {
-                        const revenue = revenueForecast.estimatedAnnualRevenue;
-                        const shareUrl = leadId ? `https://www.marketvibe1.com/og-preview/${leadId}` : `https://www.marketvibe1.com`;
-                        const text = `I just validated a $${revenue}/yr business idea on @MarketVibe in 60 seconds! 🚀\n\nMy 30-day roadmap is ready. Stop guessing, start building. 💎\n\nView my Growth Scorecard: ${shareUrl}`;
-                        const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
-                        window.open(twitterUrl, '_blank');
-                    }}
-                    className="btn-primary"
-                    style={{
-                        background: 'rgba(29, 155, 240, 0.1)',
-                        border: '1px solid #1d9bf0',
-                        color: '#1d9bf0',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem'
-                    }}
-                >
-                    <span>🐦</span> Share Traction
-                </button>
+                    <button
+                        onClick={() => {
+                            const revenue = revenueForecast.estimatedAnnualRevenue;
+                            const shareUrl = leadId ? `https://www.marketvibe1.com/og-preview/${leadId}` : `https://www.marketvibe1.com`;
+                            const title = `I just used AI to validate a $${revenue}/yr business idea in 60 seconds. My 30-day roadmap is ready.`;
+                            const redditUrl = `https://www.reddit.com/submit?title=${encodeURIComponent(title)}&url=${encodeURIComponent(shareUrl)}`;
+                            window.open(redditUrl, '_blank');
+                        }}
+                        className="btn-primary"
+                        style={{
+                            background: 'rgba(255, 69, 0, 0.1)',
+                            border: '1px solid #ff4500',
+                            color: '#ff4500',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem'
+                        }}
+                    >
+                        <span>👽</span> Reddit Bait
+                    </button>
 
-                <button
-                    onClick={() => {
-                        const revenue = revenueForecast.estimatedAnnualRevenue;
-                        const shareUrl = leadId ? `https://www.marketvibe1.com/og-preview/${leadId}` : `https://www.marketvibe1.com`;
-                        const title = `I just used AI to validate a $${revenue}/yr business idea in 60 seconds. My 30-day roadmap is ready.`;
-                        const redditUrl = `https://www.reddit.com/submit?title=${encodeURIComponent(title)}&url=${encodeURIComponent(shareUrl)}`;
-                        window.open(redditUrl, '_blank');
-                    }}
-                    className="btn-primary"
-                    style={{
-                        background: 'rgba(255, 69, 0, 0.1)',
-                        border: '1px solid #ff4500',
-                        color: '#ff4500',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem'
-                    }}
-                >
-                    <span>👽</span> Reddit Bait
-                </button>
-
-                <button
-                    onClick={() => {
-                        if (unlocked) {
-                            window.print();
-                        } else {
-                            onUnlock('founder');
-                        }
-                    }}
-                    className="btn-primary"
-                    style={{
-                        background: 'transparent',
-                        border: '1px solid #6366f1',
-                        color: '#6366f1'
-                    }}
-                >
-                    {unlocked ? (planType === 'expert' ? '📄 Whitelabel PDF Export' : 'Download PDF Playbook') : 'Pay to Download PDF'}
-                </button>
-            </div>
-        </div >
-    );
+                    <button
+                        onClick={() => {
+                            if (unlocked) {
+                                window.print();
+                            } else {
+                                onUnlock('founder');
+                            }
+                        }}
+                        className="btn-primary"
+                        style={{
+                            background: 'transparent',
+                            border: '1px solid #6366f1',
+                            color: '#6366f1'
+                        }}
+                    >
+                        {unlocked ? (planType === 'expert' ? '📄 Whitelabel PDF Export' : 'Download PDF Playbook') : 'Pay to Download PDF'}
+                    </button>
+                </div>
+            </div >
+            );
 };
 
-export default React.memo(ResultsView);
+            export default React.memo(ResultsView);
