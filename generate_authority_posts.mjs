@@ -9,7 +9,7 @@ const supabase = createClient(
     process.env.VITE_SUPABASE_ANON_KEY
 );
 
-async function generateAuthorityPosts() {
+export async function generateAuthorityPosts() {
     console.log("✍️ Starting Authority Content Generation...");
 
     // 1. Fetch high-score leads that don't have a narrative yet
@@ -84,4 +84,10 @@ To win in this space, we recommend the 30-day playbook generated in the full rep
     console.log("🏁 Authority Content Cycle Complete.");
 }
 
-generateAuthorityPosts();
+// Auto-run if executed directly
+const isDirectRun = import.meta.url.includes(process.argv[1]?.replace(/\\/g, '/')) ||
+    import.meta.url.endsWith(process.argv[1]?.split(/[\\/]/).pop());
+
+if (isDirectRun) {
+    generateAuthorityPosts();
+}

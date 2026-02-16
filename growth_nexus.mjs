@@ -8,6 +8,9 @@ import dotenv from 'dotenv';
 import { MarketVibeSentinel } from './outreach_agent.mjs';
 import { MarketVibeNurturer } from './nurture_worker.mjs';
 import { runHeraldCycle } from './herald_worker.mjs';
+import { generateAuthorityPosts } from './generate_authority_posts.mjs';
+import { MarketVibeShadowAgent } from './shadow_agent.mjs';
+import { runTrendAudit } from './trend_agent.mjs';
 
 dotenv.config();
 
@@ -21,19 +24,31 @@ async function runMasterCycle() {
     console.log(`\n--- 🚀 GLOBAL GROWTH CYCLE STARTED: ${timestamp} ---`);
 
     try {
-        // 1. Discovery Phase (Reddit)
+        // 1. Discovery Phase (Reddit/X)
+        console.log("\n--- 🛰️ PHASE 1: DISCOVERY ---");
         const sentinel = new MarketVibeSentinel();
         await sentinel.runCycle();
 
-        console.log("\n--- ⏳ PHASING: SWITCHING TO NURTURE ---");
+        // 2. Trend-Jacking Phase (Breakout Detection)
+        console.log("\n--- 📰 PHASE 2: TREND-JACKING ---");
+        await runTrendAudit();
 
-        // 2. Nurturing Phase (Email)
+        // 3. Shadow Reputation Phase (Brand Trust)
+        console.log("\n--- 🕵️‍♂️ PHASE 3: SHADOW REPUTATION ---");
+        const shadowAgent = new MarketVibeShadowAgent();
+        await shadowAgent.runCycle();
+
+        // 4. Authority Phase (Programmatic Content)
+        console.log("\n--- ✍️ PHASE 4: AUTHORITY CONTENT ---");
+        await generateAuthorityPosts();
+
+        // 5. Nurturing Phase (Email Engagement)
+        console.log("\n--- 📧 PHASE 5: NURTURE ---");
         const nurturer = new MarketVibeNurturer();
         await nurturer.runCycle();
 
-        console.log("\n--- 🧹 PHASING: CLOSER SWEEP ---");
-
-        // 3. Autopilot Sweep (The Closer)
+        // 6. Autopilot Sweep (The Closer)
+        console.log("\n--- 🧹 PHASE 6: CLOSER SWEEP ---");
         const { data: sweepLeads } = await supabase
             .from('growth_leads')
             .select('id')
@@ -46,9 +61,8 @@ async function runMasterCycle() {
             console.log(`✅ Swept ${sweepLeads.length} high-intent leads to 'contacted'.`);
         }
 
-        console.log("\n--- 📣 PHASING: HERALD BOT (LIVE POSTS) ---");
-
-        // 4. Live Engagement Phase (Herald)
+        // 7. Live Engagement Phase (Herald Bot)
+        console.log("\n--- 📣 PHASE 7: HERALD BOT (LIVE ENGAGEMENT) ---");
         await runHeraldCycle();
 
     } catch (err) {
@@ -62,8 +76,8 @@ async function runMasterCycle() {
 export { runMasterCycle };
 
 // Run immediately if called directly
-const isDirectRun = import.meta.url.includes(process.argv[1].replace(/\\/g, '/')) ||
-    import.meta.url.endsWith(process.argv[1].split(/[\\/]/).pop());
+const isDirectRun = import.meta.url.includes(process.argv[1]?.replace(/\\/g, '/')) ||
+    import.meta.url.endsWith(process.argv[1]?.split(/[\\/]/).pop());
 
 if (isDirectRun) {
     runMasterCycle().then(() => {

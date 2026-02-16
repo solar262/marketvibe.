@@ -9,7 +9,7 @@ const supabase = createClient(
     process.env.VITE_SUPABASE_ANON_KEY
 );
 
-class MarketVibeShadowAgent {
+export class MarketVibeShadowAgent {
     constructor() {
         this.valueOpeners = [
             "I've been looking at some market data recently and...",
@@ -32,6 +32,11 @@ class MarketVibeShadowAgent {
 
         if (error) {
             console.error("❌ Error fetching leads:", error);
+            return;
+        }
+
+        if (!leads || leads.length === 0) {
+            console.log("✅ No new high-interest discovery leads found for shadow-posting.");
             return;
         }
 
@@ -82,5 +87,11 @@ If I were starting this, I'd focus purely on Week 1 visibility. No links here to
     }
 }
 
-const agent = new MarketVibeShadowAgent();
-agent.runCycle();
+// Auto-run if executed directly
+const isDirectRun = import.meta.url.includes(process.argv[1]?.replace(/\\/g, '/')) ||
+    import.meta.url.endsWith(process.argv[1]?.split(/[\\/]/).pop());
+
+if (isDirectRun) {
+    const agent = new MarketVibeShadowAgent();
+    agent.runCycle();
+}

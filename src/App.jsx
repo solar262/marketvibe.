@@ -15,6 +15,7 @@ import CaseStudyHub from './components/CaseStudyHub';
 import MarketSizeCalculator from './components/MarketSizeCalculator';
 import NicheValidator from './components/NicheValidator';
 import AuthorityInsights from './components/AuthorityInsights';
+import Newsroom from './components/Newsroom';
 import { popularNiches } from './lib/niches'
 
 function App() {
@@ -634,6 +635,7 @@ function App() {
       {step === 'market-size' && <MarketSizeCalculator />}
       {step === 'p-seo' && <NicheValidator />}
       {step === 'insights' && <AuthorityInsights />}
+      {step === 'newsroom' && <Newsroom />}
 
       <section className="features">
         <div className="feature-card">
@@ -689,6 +691,15 @@ function App() {
               </li>
               <li style={{ marginBottom: '1rem' }}>
                 <a href="/insights" style={{ color: '#ec4899', textDecoration: 'none', fontWeight: 'bold' }}>Market Intelligence 🛰️</a>
+              </li>
+              <li style={{ marginBottom: '1rem' }}>
+                <a
+                  href="/newsroom"
+                  onClick={(e) => { e.preventDefault(); setStep('newsroom'); window.scrollTo(0, 0); }}
+                  style={{ color: '#ef4444', textDecoration: 'none', fontWeight: 'bold' }}
+                >
+                  Trend Newsroom 📰 <span style={{ fontSize: '0.7rem', verticalAlign: 'top' }}>LIVE</span>
+                </a>
               </li>
             </ul>
           </div>
