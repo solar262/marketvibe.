@@ -4,8 +4,8 @@ const STRIPE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_live_place
 export const stripePromise = loadStripe(STRIPE_KEY);
 
 const PAYMENT_LINKS = {
-    founder: import.meta.env.VITE_STRIPE_FOUNDER_LINK,
-    expert: import.meta.env.VITE_STRIPE_EXPERT_LINK
+    founder: import.meta.env.VITE_STRIPE_FOUNDER_LINK || 'https://buy.stripe.com/14A5kD3L18dk3LA6Qq3ks00',
+    expert: import.meta.env.VITE_STRIPE_EXPERT_LINK || 'https://buy.stripe.com/8x2dR96XdctA81Q8Yy3ks01'
 };
 
 export const createCheckoutSession = async (email, plan = 'founder') => {
