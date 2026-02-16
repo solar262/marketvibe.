@@ -415,6 +415,7 @@ function App() {
   }
 
   const handleUnlock = async (planType = 'founder') => {
+    alert(`Debug: App.jsx handleUnlock fired for ${planType}`); // CRITICAL DEBUG
     setSubmitting(true)
     setErrorMessage('')
     try {
@@ -488,9 +489,11 @@ function App() {
 
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
           {paid && history && history.length > 0 && step !== 'admin-leads' && (
-            <div style={{ color: '#94a3b8', fontSize: '0.8rem' }}>
-              📁 {history.length} Projects Saved
-            </div>
+            <p style={{ marginTop: '2rem', fontSize: '0.9rem', opacity: 0.8 }}>
+              © 2024 MarketVibe. All rights reserved.
+              <br />
+              <span style={{ fontSize: '0.7rem', color: '#fbbf24' }}>v3.1 (DEBUG BUILD) - {new Date().toLocaleTimeString()}</span>
+            </p>
           )}
 
           {results && (
