@@ -47,7 +47,7 @@ const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = '
     };
 
     return (
-        <div className={`results-view ${planType === 'expert' ? 'expert-mode' : ''}`} style={{ textAlign: 'left', color: 'white', maxWidth: '800px', margin: '0 auto' }}>
+        <div className={`results-view ${planType === 'expert' ? 'expert-mode' : ''}`} style={{ position: 'relative', textAlign: 'left', color: 'white', maxWidth: '800px', margin: '0 auto' }}>
             <style>
                 {`
                 @media print {

@@ -422,7 +422,9 @@ function App() {
       await createCheckoutSession(email, planType)
     } catch (error) {
       console.error("Unlock error:", error)
-      setErrorMessage(error?.message || "Could not start checkout. Please try again.")
+      const msg = error?.message || "Could not start checkout. Please try again.";
+      setErrorMessage(msg);
+      alert(msg); // Ensure mobile users see the error
     } finally {
       setSubmitting(false)
     }

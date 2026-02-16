@@ -68,7 +68,7 @@ class MarketVibeSentinel {
                 const interestScore = this.calculateInterestScore(rawLead.post_content);
                 const isSystemSpam = this.isSpammy(rawLead.post_content);
 
-                const { error } = await supabase.from('growth_leads').insert({
+                const { error } = await supabase.from('growth_leads').upsert({
                     platform: rawLead.platform,
                     platform_id: rawLead.platform_id,
                     username: rawLead.username,
@@ -79,7 +79,7 @@ class MarketVibeSentinel {
                     draft_reply: draftReply,
                     draft_reply_twitter: draftReplyTwitter,
                     status: (process.env.CLOSER_MODE === 'true' && interestScore >= 6 && !isSystemSpam) ? 'contacted' : 'pending'
-                });
+                }, { onConflict: 'platform_id', ignoreDuplicates: true });
 
                 if (error) throw error;
                 console.log(`✅ Persisted lead from ${rawLead.username} (Spam: ${isSystemSpam})`);
@@ -126,7 +126,9 @@ class MarketVibeSentinel {
             }
         }
 
-        return allResults;
+        // Deduplicate results by platform_id before returning
+        const uniqueResults = Array.from(new Map(allResults.map(item => [item.platform_id, item])).values());
+        return uniqueResults;
     }
 
     processRedditResults(children, resultsArray) {
