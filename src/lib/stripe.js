@@ -9,15 +9,27 @@ const PAYMENT_LINKS = {
 };
 
 export const createCheckoutSession = async (email, plan = 'founder') => {
-    const link = PAYMENT_LINKS[plan];
+    // DEBUG: Alert to see what's happening on mobile
+    const envLink = import.meta.env[`VITE_STRIPE_${plan.toUpperCase()}_LINK`];
+    const hardcodedLink = plan === 'founder'
+        ? 'https://buy.stripe.com/14A5kD3L18dk3LA6Qq3ks00'
+        : 'https://buy.stripe.com/8x2dR96XdctA81Q8Yy3ks01';
+
+    const link = envLink || hardcodedLink;
+
+    alert(`Debug: Plan=${plan}\nEnvLink=${envLink}\nFinalLink=${link}`);
 
     if (!link || link.includes('placeholder') || link.length < 10) {
-        throw new Error(`Stripe ${plan} configuration incomplete. Please add your VITE_STRIPE_${plan.toUpperCase()}_LINK in the .env file.`);
+        alert(`ERROR: Link validation failed for ${plan}`);
+        throw new Error(`Stripe ${plan} configuration incomplete. Link is: ${link}`);
     }
 
+    /*
     if (STRIPE_KEY.includes('placeholder')) {
-        throw new Error(`Stripe Publishable Key missing. Please add VITE_STRIPE_PUBLISHABLE_KEY to your .env file.`);
+         alert("ERROR: Stripe Key is placeholder");
+         throw new Error(`Stripe Publishable Key missing.`);
     }
+    */
 
     const checkoutUrl = `${link}?prefilled_email=${encodeURIComponent(email)}`;
     window.location.href = checkoutUrl;
