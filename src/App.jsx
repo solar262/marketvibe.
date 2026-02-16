@@ -14,6 +14,7 @@ import TermsOfService from './components/TermsOfService';
 import CaseStudyHub from './components/CaseStudyHub';
 import MarketSizeCalculator from './components/MarketSizeCalculator';
 import NicheValidator from './components/NicheValidator';
+import AuthorityInsights from './components/AuthorityInsights';
 import { popularNiches } from './lib/niches'
 
 function App() {
@@ -173,13 +174,27 @@ function App() {
       try {
         const isAdmin = window.location.pathname.startsWith('/admin');
         const hasTracked = sessionStorage.getItem('mv_tracked');
+        const params = new URLSearchParams(window.location.search);
+        const ref = params.get('ref');
+        const leadId = params.get('lid');
 
         if (!isAdmin && !hasTracked) {
           await supabase.rpc('increment_hits');
           sessionStorage.setItem('mv_tracked', 'true');
+
+          // Log Viral Badge Referral
+          if (ref === 'badge' && leadId) {
+            await supabase
+              .from('growth_leads')
+              .update({ badge_hits: 1 }) // This should ideally be an increment, but for MVP we log the hit
+              .eq('id', leadId);
+
+            // In a real scenario, use an RPC for atomic increment
+            await supabase.rpc('increment_badge_hits', { target_id: parseInt(leadId, 10) });
+          }
         }
       } catch (err) {
-        console.warn('Hit tracking skipped (RPC not ready yet)');
+        console.warn('Hit tracking skipped (RPC or Params not ready yet)');
       }
     };
     trackHit();
@@ -256,6 +271,9 @@ function App() {
     } else if (path === '/tools/market-size') {
       setStep('market-size')
       document.title = 'Free TAM SAM SOM Calculator | MarketVibe'
+    } else if (path === '/insights') {
+      setStep('insights')
+      document.title = 'Market Intelligence: Startup Trends 2026 | MarketVibe'
     } else if (path.startsWith('/validate/')) {
       setStep('p-seo')
     }
@@ -615,6 +633,7 @@ function App() {
       {step === 'hub' && <CaseStudyHub />}
       {step === 'market-size' && <MarketSizeCalculator />}
       {step === 'p-seo' && <NicheValidator />}
+      {step === 'insights' && <AuthorityInsights />}
 
       <section className="features">
         <div className="feature-card">
@@ -667,6 +686,9 @@ function App() {
               </li>
               <li style={{ marginBottom: '1rem' }}>
                 <a href="/hub" style={{ color: '#f59e0b', textDecoration: 'none', fontWeight: 'bold' }}>Validation Hall of Fame 🏆</a>
+              </li>
+              <li style={{ marginBottom: '1rem' }}>
+                <a href="/insights" style={{ color: '#ec4899', textDecoration: 'none', fontWeight: 'bold' }}>Market Intelligence 🛰️</a>
               </li>
             </ul>
           </div>

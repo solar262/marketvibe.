@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 const CaseStudyHub = () => {
     const [cases, setCases] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [expandedId, setExpandedId] = useState(null);
 
     useEffect(() => {
         const fetchCases = async () => {
@@ -69,18 +70,42 @@ const CaseStudyHub = () => {
                                 <div style={{ fontSize: '0.8rem', color: '#475569' }}>
                                     Revenue Potential: <span style={{ color: '#10b981' }}>${c.results?.revenueForecast?.estimatedAnnualRevenue}</span>
                                 </div>
-                                <button style={{
-                                    background: 'transparent',
-                                    border: '1px solid #6366f1',
-                                    color: '#6366f1',
-                                    padding: '0.4rem 1rem',
-                                    borderRadius: '0.5rem',
-                                    fontSize: '0.8rem',
-                                    cursor: 'pointer'
-                                }}>
-                                    View Logic
+                                <button
+                                    onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}
+                                    style={{
+                                        background: expandedId === c.id ? '#6366f1' : 'transparent',
+                                        border: '1px solid #6366f1',
+                                        color: expandedId === c.id ? 'white' : '#6366f1',
+                                        padding: '0.4rem 1rem',
+                                        borderRadius: '0.5rem',
+                                        fontSize: '0.8rem',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s'
+                                    }}>
+                                    {expandedId === c.id ? 'Close Analysis' : 'View Analysis'}
                                 </button>
                             </div>
+
+                            {expandedId === c.id && c.expert_narrative && (
+                                <div style={{
+                                    marginTop: '2rem',
+                                    padding: '1.5rem',
+                                    background: 'rgba(99, 102, 241, 0.05)',
+                                    borderRadius: '1rem',
+                                    border: '1px solid rgba(99, 102, 241, 0.2)',
+                                    fontSize: '0.9rem',
+                                    lineHeight: '1.7',
+                                    color: '#cbd5e1',
+                                    textAlign: 'left'
+                                }}>
+                                    <h4 style={{ color: '#818cf8', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        🛰️ AI Market Insights
+                                    </h4>
+                                    <div style={{ whiteSpace: 'pre-wrap' }}>
+                                        {c.expert_narrative.replace(/## /g, '').replace(/### /g, '').replace(/\*\*/g, '')}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>

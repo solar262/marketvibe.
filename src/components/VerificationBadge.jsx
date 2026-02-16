@@ -1,7 +1,7 @@
 import React from 'react';
 
 const VerificationBadge = ({ score, leadId }) => {
-    const badgeLink = `https://www.marketvibe1.com/og-preview/${leadId}`;
+    const badgeLink = `https://www.marketvibe1.com/og-preview/${leadId}?ref=badge&lid=${leadId}`;
 
     return (
         <a

@@ -159,7 +159,7 @@ const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = '
                         <VerificationBadge score={results.overallScore} leadId={leadId} />
                         <button
                             onClick={() => {
-                                const code = `<a href="https://www.marketvibe1.com/og-preview/${leadId}" target="_blank"><img src="https://www.marketvibe1.com/logo.svg" style="width: 150px;" alt="Validated by MarketVibe"></a>`;
+                                const code = `<a href="https://www.marketvibe1.com/og-preview/${leadId}?ref=badge&lid=${leadId}" target="_blank"><img src="https://www.marketvibe1.com/logo.svg" style="width: 150px;" alt="Validated by MarketVibe"></a>`;
                                 navigator.clipboard.writeText(code);
                                 alert("Embed code copied to clipboard! 📋");
                             }}
@@ -339,6 +339,36 @@ const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = '
                         </div>
                     )}
                 </div>
+
+                {results.expertNarrative && (
+                    <div className="expert-narrative-box" style={{
+                        marginTop: '3rem',
+                        padding: '2.5rem',
+                        background: 'linear-gradient(145deg, rgba(99, 102, 241, 0.05) 0%, rgba(16, 185, 129, 0.05) 100%)',
+                        borderRadius: '1.5rem',
+                        border: '1px solid rgba(99, 102, 241, 0.2)',
+                        textAlign: 'left',
+                        boxShadow: '0 20px 40px -20px rgba(0,0,0,0.5)'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+                            <div style={{ padding: '0.6rem', background: '#6366f1', borderRadius: '12px', fontSize: '1.2rem' }}>🛰️</div>
+                            <div>
+                                <h3 style={{ color: 'white', fontSize: '1.25rem', margin: 0 }}>Expert Analysis</h3>
+                                <p style={{ color: '#818cf8', fontSize: '0.8rem', margin: 0, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    Programmatically Generated Intelligence
+                                </p>
+                            </div>
+                        </div>
+                        <div style={{
+                            color: '#cbd5e1',
+                            lineHeight: '1.7',
+                            fontSize: '1rem',
+                            whiteSpace: 'pre-wrap'
+                        }}>
+                            {results.expertNarrative.replace(/## /g, '').replace(/### /g, '').replace(/\*\*/g, '')}
+                        </div>
+                    </div>
+                )}
 
                 {!unlocked && (
                     <div style={{
