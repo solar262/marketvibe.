@@ -381,20 +381,22 @@ const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = '
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        zIndex: 10
+                        zIndex: 999, // Ensure it's on top of everything
+                        pointerEvents: 'auto' // Capture all clicks
                     }}>
                         <div style={{
                             background: 'rgba(15, 23, 42, 0.98)',
-                            padding: '3.5rem',
+                            padding: '2.5rem',
                             borderRadius: '32px',
                             border: '2px solid #6366f1',
                             textAlign: 'center',
                             boxShadow: '0 30px 60px -12px rgba(0, 0, 0, 0.9)',
-                            maxWidth: '550px'
+                            maxWidth: '90%', // Mobile responsive width
+                            margin: '0 1rem' // Mobile spacing
                         }}>
                             <div className="badge" style={{ marginBottom: '1.5rem', background: '#6366f1' }}>Founder's Offer: {spots} spots left</div>
-                            <h3 style={{ fontSize: '1.75rem', marginBottom: '1rem' }}>Unlock Your Professional Playbook 💎</h3>
-                            <p style={{ color: '#94a3b8', marginBottom: '2.5rem', fontSize: '1rem', lineHeight: '1.6' }}>
+                            <h3 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>Unlock Your Professional Playbook 💎</h3>
+                            <p style={{ color: '#94a3b8', marginBottom: '2rem', fontSize: '0.9rem', lineHeight: '1.6' }}>
                                 Get the full **30-Day Execution Roadmap**, niche-specific **Outreach Scripts**, and lifetime access to our scaling tools.
                                 <br /><br />
                                 <strong>Transform this analysis into a $1,000/mo business.</strong>
@@ -409,7 +411,12 @@ const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = '
                                     padding: '1.5rem',
                                     fontSize: '1.25rem',
                                     fontWeight: 'bold',
-                                    boxShadow: '0 10px 20px -5px rgba(99, 102, 241, 0.5)'
+                                    boxShadow: '0 10px 20px -5px rgba(99, 102, 241, 0.5)',
+                                    cursor: 'pointer',
+                                    position: 'relative',
+                                    zIndex: 1000,
+                                    touchAction: 'manipulation', // Optimize for touch
+                                    WebkitTapHighlightColor: 'transparent'
                                 }}
                             >
                                 {loading ? 'Preparing Plan...' : 'Unlock Full Execution Playbook — $49'}
