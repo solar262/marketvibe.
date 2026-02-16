@@ -292,10 +292,65 @@ const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = '
                     </div>
 
                     {/* Expert Only: AI Ad Copy */}
-                    <div style={{ marginTop: '3rem', filter: planType === 'expert' ? 'none' : 'blur(4px)', opacity: planType === 'expert' ? 1 : 0.6 }}>
+                    <div
+                        onClick={() => planType !== 'expert' && onUnlock('expert')}
+                        style={{
+                            marginTop: '3rem',
+                            filter: planType === 'expert' ? 'none' : 'blur(4px)',
+                            opacity: planType === 'expert' ? 1 : 0.6,
+                            cursor: planType !== 'expert' ? 'pointer' : 'default',
+                            position: 'relative'
+                        }}
+                    >
+                        {planType !== 'expert' && (
+                            <div style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                zIndex: 10,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}>
+                                <span style={{
+                                    background: '#fbbf24',
+                                    color: 'black',
+                                    fontWeight: 'bold',
+                                    padding: '8px 16px',
+                                    borderRadius: '20px',
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                }}>
+                                    🔒 Click to Unlock Expert Intel
+                                </span>
+                            </div>
+                        )}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                             <h2 style={{ color: '#ef4444', margin: 0 }}>📣 Expert Ad-Copy Generator</h2>
-                            {planType !== 'expert' && <span style={{ fontSize: '0.75rem', background: '#fbbf24', color: '#000', padding: '4px 12px', borderRadius: '20px', fontWeight: 'bold' }}>UPGRADE TO EXPERT 💎</span>}
+                            {planType !== 'expert' && (
+                                <button
+                                    onClick={() => onUnlock('expert')}
+                                    style={{
+                                        fontSize: '0.75rem',
+                                        background: '#fbbf24',
+                                        color: '#000',
+                                        padding: '6px 16px',
+                                        borderRadius: '20px',
+                                        fontWeight: 'bold',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        boxShadow: '0 4px 6px -1px rgba(251, 191, 36, 0.4)',
+                                        transition: 'transform 0.2s',
+                                        touchAction: 'manipulation'
+                                    }}
+                                >
+                                    UPGRADE TO EXPERT 💎
+                                </button>
+                            )}
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                             <div style={{ background: 'rgba(239, 68, 68, 0.05)', padding: '1.5rem', borderRadius: '16px', border: '1px solid rgba(239, 68, 68, 0.1)' }}>

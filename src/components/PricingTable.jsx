@@ -138,8 +138,14 @@ const PricingTable = ({ onSelectPlan, spots }) => {
                                 fontWeight: 'bold',
                                 cursor: 'pointer',
                                 transition: 'all 0.2s ease',
-                                border: plan.recommended ? 'none' : '1px solid rgba(255, 255, 255, 0.1)'
+                                border: plan.recommended ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
+                                touchAction: 'manipulation',
+                                WebkitTapHighlightColor: 'transparent',
+                                position: 'relative',
+                                zIndex: 10
                             }}
+                            onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.98)'}
+                            onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
                             onMouseOver={(e) => {
                                 e.currentTarget.style.transform = 'translateY(-2px)';
                                 if (!plan.recommended) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
