@@ -78,14 +78,14 @@ class MarketVibeSentinel {
                     teaser_report: report,
                     draft_reply: draftReply,
                     draft_reply_twitter: draftReplyTwitter,
-                    status: (process.env.CLOSER_MODE === 'true' && interestScore >= 9 && !isSystemSpam) ? 'contacted' : 'pending'
+                    status: (process.env.CLOSER_MODE === 'true' && interestScore >= 6 && !isSystemSpam) ? 'contacted' : 'pending'
                 });
 
                 if (error) throw error;
                 console.log(`✅ Persisted lead from ${rawLead.username} (Spam: ${isSystemSpam})`);
 
                 // 5. "The Closer" Auto-Pilot (Optional/Experimental)
-                if (process.env.CLOSER_MODE === 'true' && interestScore >= 9 && !isSystemSpam) {
+                if (process.env.CLOSER_MODE === 'true' && interestScore >= 6 && !isSystemSpam) {
                     console.log(`🤖 THE CLOSER: Auto-replying to high-intent lead @${rawLead.username}...`);
                     // In a production environment, this would call the Reddit/Twitter API
                     // For now, we update the status to 'contacted' to signal it's handled.
@@ -167,6 +167,7 @@ class MarketVibeSentinel {
         const roadblocks = [
             { id: 'pricing', keywords: ['price', 'pricing', 'charge', 'cost', 'subscription', 'monetize'], solution: "getting the pricing model right is a major hurdle early on." },
             { id: 'marketing', keywords: ['marketing', 'traffic', 'users', 'customers', 'growth', 'acquisition'], solution: "cracking the distribution code is what separates the winners." },
+            { id: 'engagement', keywords: ['engagement', 'chat', 'retention', 'participation', 'community building'], solution: "optimizing user engagement is the key to a sticky platform." },
             { id: 'technical', keywords: ['code', 'bug', 'deploy', 'error', 'stack', 'database', 'slow'], solution: "overcoming the technical debt trap is crucial before scaling." },
             { id: 'co-founder', keywords: ['partner', 'team', 'solo', 'cofounder', 'founder search'], solution: "finding a complimentary partner can 10x your speed." }
         ];
@@ -193,9 +194,12 @@ class MarketVibeSentinel {
         if (/\b(writing tools|stationery)\b/i.test(textLower) || (/\bpen\b/i.test(textLower) && !/\bapp\b/i.test(textLower))) return 'Stationery & Writing Tools';
         if (/\b(miniature|toy|collectible|hobby)\b/i.test(textLower)) return 'Hobby & Collectibles';
 
-        if (/\b(pet|dog|cat)\b/i.test(textLower)) return 'Pet Tech';
+        if (/\b(pet|dog|cat|feline|canine)\b/i.test(textLower)) return 'Pet Tech';
         if (/\bcoffee\b/i.test(textLower)) return 'Coffee Subscription';
         if (/\b(real estate|realtor|property)\b/i.test(textLower)) return 'Real Estate Tech';
+
+        // 🎮 Entertainment & Media
+        if (/\b(stream|twitch|kick|creator|youtube|tiktok)\b/i.test(textLower)) return 'Streaming & Content Creation';
 
         // 💻 E-commerce & Retail
         if (/\b(ecommerce|shopify|dropshipping)\b/i.test(textLower)) return 'E-commerce';
@@ -233,41 +237,41 @@ class MarketVibeSentinel {
                 keywords: ['co-founder', 'partner', 'co founder'],
                 type: 'co-founder',
                 openers: [
-                    `Finding the right co-founder for ${contextSeed} is easily the hardest part.`,
-                    `Saw your post about looking for a partner for ${contextSeed}. It's a tough search.`,
-                    `Building ${contextSeed} with the right teammate makes all the difference.`
+                    "finding a co-founder is honestly such a grind, but finding the right person for your project makes it worth it.",
+                    "saw you're looking for a partner. tbh that's a high-stakes search but it changes everything when you find the one.",
+                    "building with the right teammate is a literal game changer. hope you find someone solid."
                 ],
-                supportOpener: `I feel you on the co-founder search for ${contextSeed}—it's draining but vital.`
+                supportOpener: "finding a co-founder is easily the hardest part. it's draining but vital imo."
             },
             {
                 keywords: ['hire', 'hiring', 'developer', 'non-technical'],
                 type: 'hiring',
                 openers: [
-                    `Finding the right talent to build ${contextSeed} is a massive hurdle.`,
-                    `Saw you're looking to hire for ${contextSeed}. Good luck with the search!`,
-                    `Hiring for a new ${contextSeed} can be hit or miss without the right validation.`
+                    "hiring for a new project is always a bit stressful tbh. hope you find someone solid.",
+                    "hiring talent that actually 'gets' the vision is tough. good luck with the search!",
+                    "scaling a team is a high-stakes move. rooting for you honestly."
                 ],
-                supportOpener: `Scaling the team for ${contextSeed} is a high-stakes move.`
+                supportOpener: "finding the right people to build with is a massive hurdle imo."
             },
             {
                 keywords: ['feedback', 'advice', 'thoughts'],
                 type: 'feedback',
                 openers: [
-                    `Getting honest feedback on ${contextSeed} early on saves so much time later.`,
-                    `Love the concept behind ${contextSeed}. Honest feedback is gold at this stage.`,
-                    `I saw your post asking for thoughts on ${contextSeed}. It's a solid niche.`
+                    "love the energy here. getting honest feedback early is gold tbh.",
+                    "this is a solid niche. glad you're asking for feedback now rather than after months of building in a vacuum.",
+                    "love this concept. early feedback usually saves so much wasted time honestly."
                 ],
-                supportOpener: `Don't let the early feedback for ${contextSeed} discourage you—it's all data.`
+                supportOpener: "honest feedback is everything at this stage. don't let the noise get to you imo."
             },
             {
                 keywords: ['launch', 'today', 'live'],
                 type: 'launch',
                 openers: [
-                    `Huge congrats on the launch for ${contextSeed}! Day one is always a rush.`,
-                    `Saw that ${contextSeed} just went live. Massive milestone!`,
-                    `Wishing you a smooth launch for ${contextSeed}. It's a great feeling to ship.`
+                    "huge congrats on the launch! day one is always a massive rush.",
+                    "just saw you went live. huge milestone, keep that momentum going honestly!",
+                    "shipping is a win in itself. wishing you a smooth launch week tbh."
                 ],
-                supportOpener: `Launching ${contextSeed} is just the beginning of the real work.`
+                supportOpener: "launching is just the beginning of the real work. shipping is a huge win imo."
             }
         ];
 
@@ -323,16 +327,13 @@ class MarketVibeSentinel {
         const intent = this.detectIntent(lead.post_content, 'reddit');
         const niche = this.detectNiche(lead.post_content);
 
-        return `Hey @${lead.username}, ${intent.opener} 🔬
+        const templates = [
+            `hey @${lead.username}, ${intent.opener} i was actually checking some data on the ${niche} space earlier and it honestly looks like there's solid six-figure potential here if you nail the audience (${report.targetAudience.primarySegment}). i put together a quick 30-day plan on how i'd execute this if you want to check it out: https://marketvibe1.com`,
+            `hi @${lead.username}, ${intent.opener} this is a really interesting niche. i was just looking at some market trends for ${niche} and it's looking pretty bullish tbh. your target audience should be easy to reach. i actually have a free blueprint for getting this off the ground here if it helps: https://marketvibe1.com`,
+            `tagging @${lead.username} because i love this concept. ${intent.opener} the ${niche} market is wider than people think imo. i'm seeing huge yearly potential for ${report.targetAudience.primarySegment} right now. i mapped out a quick 30-day plan for a similar play here if you want it: https://marketvibe1.com`
+        ];
 
-I actually ran a quick MarketVibe study on the ${niche} market data for you:
-- Est. Year 1 Revenue: $${report.revenueForecast.estimatedAnnualRevenue}
-- Primary Audience: ${report.targetAudience.primarySegment}
-
-I put together a full 30-day execution blueprint for your project based on these numbers here:
-👉 https://www.marketvibe1.com
-
-Rooting for you!`;
+        return templates[Math.floor(Math.random() * templates.length)];
     }
 
     calculateInterestScore(text) {
@@ -368,8 +369,9 @@ Rooting for you!`;
 
         // 4. Listicle Detection (Often signals advice/guides)
         const listMatches = text.match(/\d+\.\s+\*\*/g); // Matches "1. **" style lists
-        if (listMatches && listMatches.length >= 2) {
-            score -= 5;
+        const hashMatches = text.match(/#\s+\d+\./g); // Matches "# 1." style headers
+        if ((listMatches && listMatches.length >= 2) || (hashMatches && hashMatches.length >= 2)) {
+            score -= 6;
         }
 
         // 5. Semantic Proximity to "Founder Pain"
@@ -388,13 +390,14 @@ Rooting for you!`;
     generateTwitterReply(lead, report) {
         const intent = this.detectIntent(lead.post_content, 'twitter');
         const niche = this.detectNiche(lead.post_content);
-        return `Hey @${lead.username}, ${intent.opener} 🔬 
 
-I ran a quick MarketVibe test on the ${niche} data for you:
-- Est. Revenue: $${report.revenueForecast.estimatedAnnualRevenue}
-- Audience: ${report.targetAudience.primarySegment}
+        const twitterTemplates = [
+            `hey @${lead.username}, ${intent.opener} just saw some data for ${niche} and it looks like solid six-figure potential for ${report.targetAudience.primarySegment} tbh. plan is here: https://marketvibe1.com`,
+            `@${lead.username} love the ${niche} play. ${intent.opener} i'm seeing huge yearly potential for ${report.targetAudience.primarySegment} right now imo. blueprint: https://marketvibe1.com`,
+            `hey @${lead.username}, ${intent.opener} the ${niche} space is blowing up honestly. i mapped out an execution plan for it here if you want it: https://marketvibe1.com`
+        ];
 
-Blueprint: 👉 https://www.marketvibe1.com`;
+        return twitterTemplates[Math.floor(Math.random() * twitterTemplates.length)];
     }
 }
 

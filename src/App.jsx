@@ -11,6 +11,9 @@ import LeadsDashboard from './components/LeadsDashboard'
 import GrowthScorecard from './components/GrowthScorecard';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import TermsOfService from './components/TermsOfService';
+import CaseStudyHub from './components/CaseStudyHub';
+import MarketSizeCalculator from './components/MarketSizeCalculator';
+import NicheValidator from './components/NicheValidator';
 import { popularNiches } from './lib/niches'
 
 function App() {
@@ -182,7 +185,7 @@ function App() {
     trackHit();
 
     // 5. pSEO Sub-routing (Detect /validate/:slug)
-    const path = window.location.pathname
+    const path = window.location.pathname.replace(/\/$/, '') || '/'
     if (path.startsWith('/validate/')) {
       const slug = path.split('/').pop()
       const foundNiche = popularNiches.find(n => n.slug === slug)
@@ -247,6 +250,14 @@ function App() {
     } else if (path.includes('/terms')) {
       setStep('terms')
       document.title = 'Terms of Service | MarketVibe'
+    } else if (path === '/hub') {
+      setStep('hub')
+      document.title = 'Hall of Fame - Validated Idea Case Studies | MarketVibe'
+    } else if (path === '/tools/market-size') {
+      setStep('market-size')
+      document.title = 'Free TAM SAM SOM Calculator | MarketVibe'
+    } else if (path.startsWith('/validate/')) {
+      setStep('p-seo')
     }
 
     return () => {
@@ -601,6 +612,9 @@ function App() {
 
       {step === 'privacy' && <PrivacyPolicy />}
       {step === 'terms' && <TermsOfService />}
+      {step === 'hub' && <CaseStudyHub />}
+      {step === 'market-size' && <MarketSizeCalculator />}
+      {step === 'p-seo' && <NicheValidator />}
 
       <section className="features">
         <div className="feature-card">
@@ -648,7 +662,12 @@ function App() {
               <li style={{ marginBottom: '1rem' }}>
                 <a href="/tools/naming" style={{ color: '#6366f1', textDecoration: 'none', fontWeight: 'bold' }}>Startup Name Generator 🚀</a>
               </li>
-              <li style={{ color: '#475569' }}>Market Size Calculator (Soon)</li>
+              <li style={{ marginBottom: '1rem' }}>
+                <a href="/tools/market-size" style={{ color: '#10b981', textDecoration: 'none', fontWeight: 'bold' }}>Market Size Calculator 📊</a>
+              </li>
+              <li style={{ marginBottom: '1rem' }}>
+                <a href="/hub" style={{ color: '#f59e0b', textDecoration: 'none', fontWeight: 'bold' }}>Validation Hall of Fame 🏆</a>
+              </li>
             </ul>
           </div>
         </div>

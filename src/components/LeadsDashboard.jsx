@@ -7,6 +7,7 @@ const LeadsDashboard = () => {
     const [filter, setFilter] = useState('pending'); // 'pending', 'qualified', 'contacted', 'closed', 'rejected'
     const [stats, setStats] = useState({ hits: 0, totalLeads: 0, pendingLeads: 0, qualifiedLeads: 0, contactedLeads: 0, closedLeads: 0 });
     const [feedback, setFeedback] = useState({ message: '', type: '' });
+    const [sentLeads, setSentLeads] = useState(new Set());
     const [page, setPage] = useState(1);
     const LEADS_PER_PAGE = 10;
 
@@ -98,7 +99,15 @@ const LeadsDashboard = () => {
         }
 
         window.open(url, '_blank');
+        setSentLeads(prev => new Set([...prev, lead.id]));
         handleUpdateStatus(lead.id, 'contacted');
+        setTimeout(() => {
+            setSentLeads(prev => {
+                const next = new Set(prev);
+                next.delete(lead.id);
+                return next;
+            });
+        }, 1500);
     };
 
     if (!supabase) return <div style={{ color: '#94a3b8', padding: '10rem', textAlign: 'center' }}>Database connection not available.</div>;
@@ -182,12 +191,15 @@ const LeadsDashboard = () => {
                             background: 'rgba(255,255,255,0.03)',
                             padding: '1.5rem',
                             borderRadius: '1rem',
-                            border: (lead.interest_score || 0) >= 8 ? '2px solid #fbbf24' : '1px solid rgba(255,255,255,0.1)',
-                            boxShadow: (lead.interest_score || 0) >= 8 ? '0 0 20px rgba(251, 191, 36, 0.1)' : 'none',
+                            border: sentLeads.has(lead.id) ? '2px solid #10b981' : (lead.interest_score || 0) >= 8 ? '2px solid #fbbf24' : '1px solid rgba(255,255,255,0.1)',
+                            boxShadow: sentLeads.has(lead.id) ? '0 0 20px rgba(16, 185, 129, 0.4)' : (lead.interest_score || 0) >= 8 ? '0 0 20px rgba(251, 191, 36, 0.1)' : 'none',
                             display: 'flex',
                             flexDirection: 'column',
                             gap: '1rem',
-                            position: 'relative'
+                            position: 'relative',
+                            transition: 'all 0.3s ease-in-out',
+                            opacity: sentLeads.has(lead.id) ? 0.7 : 1,
+                            transform: sentLeads.has(lead.id) ? 'scale(0.98)' : 'scale(1)'
                         }}>
                             {(lead.interest_score || 0) >= 8 && (
                                 <div style={{
@@ -250,20 +262,52 @@ const LeadsDashboard = () => {
                                         </>
                                     )}
                                     {(lead.status === 'qualified' || lead.status === 'pending') && (
-                                        <>
+                                        <div style={{ display: 'flex', gap: '0.8rem' }}>
                                             <button
                                                 onClick={() => handleHeraldAction(lead, 'twitter')}
-                                                style={{ background: '#1DA1F2', color: 'white', border: 'none', padding: '0.4rem 0.8rem', borderRadius: '0.5rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem' }}
+                                                style={{
+                                                    background: '#1DA1F2',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    padding: '0.6rem 1.2rem',
+                                                    borderRadius: '0.5rem',
+                                                    cursor: 'pointer',
+                                                    fontWeight: 'bold',
+                                                    fontSize: '0.9rem',
+                                                    boxShadow: '0 4px 14px 0 rgba(29, 161, 242, 0.39)',
+                                                    transition: 'transform 0.2s',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.5rem'
+                                                }}
+                                                onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                                                onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
                                             >
-                                                Post X
+                                                🚀 Post X
                                             </button>
                                             <button
                                                 onClick={() => handleHeraldAction(lead, 'reddit')}
-                                                style={{ background: '#FF4500', color: 'white', border: 'none', padding: '0.4rem 0.8rem', borderRadius: '0.5rem', cursor: 'pointer', fontSize: '0.75rem' }}
+                                                style={{
+                                                    background: '#FF4500',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    padding: '0.6rem 1.2rem',
+                                                    borderRadius: '0.5rem',
+                                                    cursor: 'pointer',
+                                                    fontWeight: 'bold',
+                                                    fontSize: '0.9rem',
+                                                    boxShadow: '0 4px 14px 0 rgba(255, 69, 0, 0.39)',
+                                                    transition: 'transform 0.2s',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.5rem'
+                                                }}
+                                                onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                                                onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
                                             >
-                                                Reply Reddit
+                                                🔥 Reply Reddit
                                             </button>
-                                        </>
+                                        </div>
                                     )}
                                     {lead.status === 'contacted' && (
                                         <button

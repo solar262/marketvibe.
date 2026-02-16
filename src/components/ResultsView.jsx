@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { generateScorecard } from '../lib/scorecard';
+import VerificationBadge from './VerificationBadge';
 
 const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = 'founder', leads = [], usageCount = 0, leadId = null }) => {
     // Add safe defaults for old data migration
@@ -137,6 +138,49 @@ const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = '
                     </div>
                 </div>
             </div>
+
+            {/* Viral Verification Loop */}
+            {unlocked && (
+                <div style={{
+                    marginTop: '3rem',
+                    padding: '2rem',
+                    background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%)',
+                    borderRadius: '24px',
+                    border: '1px solid rgba(99, 102, 241, 0.3)',
+                    textAlign: 'center'
+                }}>
+                    <h3 style={{ color: '#fff', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}>
+                        🛡️ Proof of Validation
+                    </h3>
+                    <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '2rem', maxWidth: '500px', margin: '0 auto 2rem' }}>
+                        Your idea has a high-intent validation score. Embed this trust badge on your landing page to increase visitor conversion.
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem' }}>
+                        <VerificationBadge score={results.overallScore} leadId={leadId} />
+                        <button
+                            onClick={() => {
+                                const code = `<a href="https://www.marketvibe1.com/og-preview/${leadId}" target="_blank"><img src="https://www.marketvibe1.com/logo.svg" style="width: 150px;" alt="Validated by MarketVibe"></a>`;
+                                navigator.clipboard.writeText(code);
+                                alert("Embed code copied to clipboard! 📋");
+                            }}
+                            style={{
+                                background: 'rgba(255,255,255,0.05)',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                color: '#94a3b8',
+                                padding: '0.6rem 1.2rem',
+                                borderRadius: '8px',
+                                fontSize: '0.8rem',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                            }}
+                            onMouseOver={(e) => e.currentTarget.style.color = '#fff'}
+                            onMouseOut={(e) => e.currentTarget.style.color = '#94a3b8'}
+                        >
+                            📋 Copy Embed Code
+                        </button>
+                    </div>
+                </div>
+            )}
 
             <div style={{ marginTop: '3rem', position: 'relative' }}>
                 <div style={{
