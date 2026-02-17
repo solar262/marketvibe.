@@ -52,10 +52,18 @@ const AdminDashboard = () => {
 
         } catch (error) {
             console.error('Dashboard Error:', error);
+            // Ensure we stop loading even on error
+            setMetrics(prev => ({ ...prev, loading: false }));
         }
     };
 
-    if (metrics.loading) return <div style={{ color: 'white', padding: '4rem', textAlign: 'center' }}>Loading Command Center...</div>;
+    if (metrics.loading) return (
+        <div style={{ color: 'white', padding: '4rem', textAlign: 'center', minHeight: '100vh', background: '#0f172a' }}>
+            <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>📡</div>
+            <h2>Establishing Uplink...</h2>
+            <p style={{ color: '#94a3b8' }}>Contacting Lead Database</p>
+        </div>
+    );
 
     return (
         <div style={{

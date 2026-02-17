@@ -1,18 +1,26 @@
 
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+
 
 const BlogPost = () => {
-    const { slug } = useParams();
+    // Manual slug extraction since we are not using React Router's <Route>
+    const slug = window.location.pathname.split('/').pop();
     const [post, setPost] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const loadPost = async () => {
             try {
-                // Dynamic import
-                const module = await import(`../content/blog/${slug}.json`);
-                setPost(module.default || module);
+                // Vite glob import for dynamic loading
+                const modules = import.meta.glob('../content/blog/*.json');
+                const path = `../content/blog/${slug}.json`;
+
+                if (modules[path]) {
+                    const mod = await modules[path]();
+                    setPost(mod.default || mod);
+                } else {
+                    console.error("Post not found:", path);
+                }
             } catch (err) {
                 console.error("Failed to load blog post", err);
             } finally {
@@ -51,7 +59,7 @@ const BlogPost = () => {
                 const text = content.match(/\[\*\*(.*?)\*\*\]/)[1];
                 return (
                     <div key={i} style={{ marginTop: '3rem', textAlign: 'center' }}>
-                        <Link to={url} style={{
+                        <a href={url.replace('/validate/', '/validate/')} style={{
                             background: '#ec4899',
                             color: 'white',
                             padding: '1rem 2rem',
@@ -63,7 +71,7 @@ const BlogPost = () => {
                             boxShadow: '0 4px 14px 0 rgba(236, 72, 153, 0.39)'
                         }}>
                             {text}
-                        </Link>
+                        </a>
                     </div>
                 );
             }
@@ -84,6 +92,31 @@ const BlogPost = () => {
 
             <div className="blog-content">
                 {renderContent(post.content)}
+            </div>
+
+            {/* Permanent CTA Footer */}
+            <div style={{ marginTop: '4rem', padding: '3rem', background: 'rgba(99, 102, 241, 0.1)', borderRadius: '1rem', border: '1px solid rgba(99, 102, 241, 0.3)', textAlign: 'center' }}>
+                <h3 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: 'white' }}>Build a Business in {post.niche}</h3>
+                <p style={{ color: '#cbd5e1', marginBottom: '2rem' }}>
+                    Don't just read about trends—act on them. Validate your idea in seconds.
+                </p>
+                <a href={`/validate/${post.slug}`} style={{
+                    background: '#6366f1',
+                    color: 'white',
+                    padding: '1rem 2rem',
+                    borderRadius: '0.5rem',
+                    textDecoration: 'none',
+                    fontWeight: 'bold',
+                    fontSize: '1.1rem',
+                    display: 'inline-block',
+                    boxShadow: '0 4px 14px 0 rgba(99, 102, 241, 0.39)',
+                    transition: 'transform 0.2s'
+                }}
+                    onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+                    onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}
+                >
+                    Launch Validation Project 🚀
+                </a>
             </div>
         </article>
     );

@@ -8,7 +8,8 @@ dotenv.config();
 
 const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY);
 
-async function analyzeTrends() {
+// Export for the Nexus
+export async function runTrendAudit() {
     console.log("📰 Newsroom Agent: Scanning Global Trends...");
 
     // 1. Fetch all leads
@@ -82,4 +83,17 @@ async function analyzeTrends() {
     console.log(`\n✅ Trends cached to ${outputPath}`);
 }
 
-analyzeTrends();
+// Run immediately if called directly
+const isDirectRun = process.argv[1] && (
+    import.meta.url.includes(process.argv[1].replace(/\\/g, '/')) ||
+    import.meta.url.endsWith(process.argv[1].split(/[\\/]/).pop())
+);
+
+if (isDirectRun) {
+    runTrendAudit().then(() => {
+        process.exit(0);
+    }).catch(err => {
+        console.error("TREND AGENT ERROR:", err);
+        process.exit(1);
+    });
+}

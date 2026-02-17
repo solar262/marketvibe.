@@ -121,7 +121,15 @@ const LeadsDashboard = () => {
     if (!supabase) return <div style={{ color: '#94a3b8', padding: '10rem', textAlign: 'center' }}>Database connection not available.</div>;
 
     return (
-        <div style={{ color: 'white', maxWidth: '1000px', margin: '0 auto', position: 'relative' }}>
+        <div style={{
+            color: 'white',
+            maxWidth: '1200px',
+            margin: '0 auto',
+            position: 'relative',
+            padding: '0 1rem 4rem 1rem', // Added horizontal padding and bottom space
+            width: '100%',
+            boxSizing: 'border-box'
+        }}>
             {/* Feedback Toast */}
             {feedback.message && (
                 <div style={{
@@ -140,7 +148,12 @@ const LeadsDashboard = () => {
                 </div>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '2.5rem' }}>
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                gap: '1rem',
+                marginBottom: '2.5rem'
+            }}>
                 <div style={{ background: 'rgba(99, 102, 241, 0.1)', padding: '1.5rem', borderRadius: '1rem', border: '1px solid rgba(99, 102, 241, 0.2)', textAlign: 'center' }}>
                     <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: '0 0 0.5rem 0' }}>WEBSITE VISITORS 📈</p>
                     <h2 style={{ fontSize: '2rem', margin: 0, color: '#6366f1' }}>{stats.hits}</h2>
@@ -170,7 +183,14 @@ const LeadsDashboard = () => {
                 </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+            <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '2rem',
+                flexWrap: 'wrap',
+                gap: '1rem'
+            }}>
                 <h2>Commander Center 🤖</h2>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                     {['pending', 'qualified', 'shadow_pending', 'contacted', 'closed', 'rejected'].map(s => (
@@ -215,7 +235,8 @@ const LeadsDashboard = () => {
                             position: 'relative',
                             transition: 'all 0.3s ease-in-out',
                             opacity: sentLeads.has(lead.id) ? 0.7 : 1,
-                            transform: sentLeads.has(lead.id) ? 'scale(0.98)' : 'scale(1)'
+                            transform: sentLeads.has(lead.id) ? 'scale(0.98)' : 'scale(1)',
+                            overflow: 'hidden' // Prevent internal overflow
                         }}>
                             {(lead.interest_score || 0) >= 8 && (
                                 <div style={{
@@ -232,7 +253,7 @@ const LeadsDashboard = () => {
                                     HIGH INTENT 🔥
                                 </div>
                             )}
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <div className="lead-card-header">
                                 <div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                                         <span style={{ fontSize: '0.8rem', color: '#6366f1', fontWeight: 'bold' }}>{(lead?.platform || 'platform').toUpperCase()}</span>
@@ -260,7 +281,7 @@ const LeadsDashboard = () => {
                                     </h3>
                                     <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Niche: {lead.niche}</span>
                                 </div>
-                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                <div className="lead-card-actions">
                                     {lead.status === 'pending' && (
                                         <>
                                             <button
@@ -279,51 +300,54 @@ const LeadsDashboard = () => {
                                     )}
                                     {(lead.status === 'qualified' || lead.status === 'pending') && (
                                         <div style={{ display: 'flex', gap: '0.8rem' }}>
-                                            <button
-                                                onClick={() => handleHeraldAction(lead, 'twitter')}
-                                                style={{
-                                                    background: '#1DA1F2',
-                                                    color: 'white',
-                                                    border: 'none',
-                                                    padding: '0.6rem 1.2rem',
-                                                    borderRadius: '0.5rem',
-                                                    cursor: 'pointer',
-                                                    fontWeight: 'bold',
-                                                    fontSize: '0.9rem',
-                                                    boxShadow: '0 4px 14px 0 rgba(29, 161, 242, 0.39)',
-                                                    transition: 'transform 0.2s',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '0.5rem'
-                                                }}
-                                                onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-                                                onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                                            >
-                                            >
-                                                📜 Send Script (DM)
-                                            </button>
-                                            <button
-                                                onClick={() => handleHeraldAction(lead, 'reddit')}
-                                                style={{
-                                                    background: '#FF4500',
-                                                    color: 'white',
-                                                    border: 'none',
-                                                    padding: '0.6rem 1.2rem',
-                                                    borderRadius: '0.5rem',
-                                                    cursor: 'pointer',
-                                                    fontWeight: 'bold',
-                                                    fontSize: '0.9rem',
-                                                    boxShadow: '0 4px 14px 0 rgba(255, 69, 0, 0.39)',
-                                                    transition: 'transform 0.2s',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '0.5rem'
-                                                }}
-                                                onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-                                                onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                                            >
-                                                📜 Send Script (DM)
-                                            </button>
+                                            {lead.platform === 'twitter' && (
+                                                <button
+                                                    onClick={() => handleHeraldAction(lead, 'twitter')}
+                                                    style={{
+                                                        background: '#1DA1F2',
+                                                        color: 'white',
+                                                        border: 'none',
+                                                        padding: '0.6rem 1.2rem',
+                                                        borderRadius: '0.5rem',
+                                                        cursor: 'pointer',
+                                                        fontWeight: 'bold',
+                                                        fontSize: '0.9rem',
+                                                        boxShadow: '0 4px 14px 0 rgba(29, 161, 242, 0.39)',
+                                                        transition: 'transform 0.2s',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '0.5rem'
+                                                    }}
+                                                    onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                                                    onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                                                >
+                                                    📜 Send DM (X)
+                                                </button>
+                                            )}
+                                            {lead.platform === 'reddit' && (
+                                                <button
+                                                    onClick={() => handleHeraldAction(lead, 'reddit')}
+                                                    style={{
+                                                        background: '#FF4500',
+                                                        color: 'white',
+                                                        border: 'none',
+                                                        padding: '0.6rem 1.2rem',
+                                                        borderRadius: '0.5rem',
+                                                        cursor: 'pointer',
+                                                        fontWeight: 'bold',
+                                                        fontSize: '0.9rem',
+                                                        boxShadow: '0 4px 14px 0 rgba(255, 69, 0, 0.39)',
+                                                        transition: 'transform 0.2s',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '0.5rem'
+                                                    }}
+                                                    onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                                                    onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                                                >
+                                                    📜 Reply (Reddit)
+                                                </button>
+                                            )}
                                         </div>
                                     )}
                                     {lead.status === 'contacted' && (
@@ -340,7 +364,15 @@ const LeadsDashboard = () => {
                                 </div>
                             </div>
 
-                            <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '0.5rem', fontSize: '0.9rem' }}>
+                            <div style={{
+                                background: 'rgba(0,0,0,0.2)',
+                                padding: '1rem',
+                                borderRadius: '0.5rem',
+                                fontSize: '0.9rem',
+                                wordBreak: 'break-word',
+                                overflowWrap: 'break-word',
+                                whiteSpace: 'pre-wrap'
+                            }}>
                                 <p style={{ color: '#94a3b8', margin: 0 }}>"{lead.post_content}"</p>
                             </div>
 
@@ -348,7 +380,11 @@ const LeadsDashboard = () => {
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                                     <h4 style={{ margin: 0, fontSize: '0.9rem' }}>Draft Replies:</h4>
                                 </div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                <div style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                                    gap: '1rem'
+                                }}>
                                     <div>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
                                             <span style={{ fontSize: '0.7rem', color: '#FF4500' }}>REDDIT (DETAILED)</span>
@@ -404,6 +440,33 @@ const LeadsDashboard = () => {
                 @keyframes slideIn {
                     from { transform: translateX(100%); opacity: 0; }
                     to { transform: translateX(0); opacity: 1; }
+                }
+
+                .lead-card-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    flex-wrap: wrap;
+                    gap: 1rem;
+                }
+
+                .lead-card-actions {
+                    display: flex;
+                    gap: 0.5rem;
+                    flex-wrap: wrap;
+                    justify-content: flex-end;
+                }
+
+                @media (max-width: 768px) {
+                    .lead-card-header {
+                        flex-direction: column;
+                        align-items: stretch;
+                    }
+                    .lead-card-actions {
+                        justify-content: flex-start;
+                        border-top: 1px solid rgba(255,255,255,0.05);
+                        padding-top: 1rem;
+                    }
                 }
                 `}
             </style>

@@ -1,72 +1,72 @@
 [
   {
-    "niche": "Stationery & Writing Tools",
-    "volume": 101,
-    "velocity": 101,
-    "avgInterest": "9.6",
-    "heatScore": 312.58415841584156
+    "niche": "SaaS / Micro-SaaS",
+    "volume": 104,
+    "velocity": 104,
+    "avgInterest": "7.0",
+    "heatScore": 318.9807692307692
   },
   {
-    "niche": "SaaS / Micro-SaaS",
-    "volume": 87,
-    "velocity": 87,
-    "avgInterest": "7.2",
-    "heatScore": 268.1954022988506
+    "niche": "Stationery & Writing Tools",
+    "volume": 102,
+    "velocity": 102,
+    "avgInterest": "9.6",
+    "heatScore": 315.55882352941177
   },
   {
     "niche": "Indie Project",
-    "volume": 78,
-    "velocity": 78,
-    "avgInterest": "5.4",
-    "heatScore": 239.43589743589743
+    "volume": 95,
+    "velocity": 95,
+    "avgInterest": "5.5",
+    "heatScore": 290.4947368421053
   },
   {
     "niche": "AI/Automation Agent",
-    "volume": 74,
-    "velocity": 74,
+    "volume": 83,
+    "velocity": 83,
     "avgInterest": "7.3",
-    "heatScore": 229.28378378378378
+    "heatScore": 256.32530120481925
   },
   {
     "niche": "AI Agent",
-    "volume": 50,
-    "velocity": 50,
+    "volume": 65,
+    "velocity": 65,
     "avgInterest": "5.0",
-    "heatScore": 155
+    "heatScore": 200
   },
   {
     "niche": "Pet Tech",
-    "volume": 46,
-    "velocity": 46,
-    "avgInterest": "7.2",
-    "heatScore": 145.2173913043478
+    "volume": 59,
+    "velocity": 59,
+    "avgInterest": "6.8",
+    "heatScore": 183.8135593220339
   },
   {
     "niche": "Streaming & Content Creation",
-    "volume": 30,
-    "velocity": 30,
-    "avgInterest": "5.8",
-    "heatScore": 95.8
+    "volume": 36,
+    "velocity": 36,
+    "avgInterest": "5.6",
+    "heatScore": 113.58333333333333
   },
   {
     "niche": "Home Improvement",
-    "volume": 26,
-    "velocity": 26,
-    "avgInterest": "5.0",
-    "heatScore": 82.96153846153847
+    "volume": 31,
+    "velocity": 31,
+    "avgInterest": "5.3",
+    "heatScore": 98.3225806451613
   },
   {
     "niche": "Fintech",
-    "volume": 23,
-    "velocity": 23,
-    "avgInterest": "5.6",
-    "heatScore": 74.6086956521739
+    "volume": 27,
+    "velocity": 27,
+    "avgInterest": "5.9",
+    "heatScore": 86.88888888888889
   },
   {
-    "niche": "Service Business (Cleaning)",
-    "volume": 17,
-    "velocity": 17,
-    "avgInterest": "7.6",
-    "heatScore": 58.64705882352941
+    "niche": "Marketing Agency",
+    "volume": 24,
+    "velocity": 24,
+    "avgInterest": "6.3",
+    "heatScore": 78.29166666666667
   }
 ]

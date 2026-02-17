@@ -52,6 +52,26 @@ const ReferralHub = () => {
         <div style={{ textAlign: 'center', padding: '4rem', color: '#94a3b8' }}>
             <h2>Start Validating to Unlock Referrals</h2>
             <p>Once you submit your first idea, you'll get a unique link to earn free upgrades.</p>
+
+            <button
+                onClick={() => {
+                    const fakeId = 'demo_' + Math.random().toString(36).substr(2, 9);
+                    localStorage.setItem('marketvibe_lead_id', fakeId);
+                    setReferralCode('DEMO-User-123');
+                    setReferralCount(1);
+                }}
+                style={{
+                    marginTop: '2rem',
+                    background: 'transparent',
+                    border: '1px dashed #6366f1',
+                    color: '#6366f1',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '0.5rem',
+                    cursor: 'pointer'
+                }}
+            >
+                [Admin] Simulate Validation
+            </button>
         </div>
     );
 

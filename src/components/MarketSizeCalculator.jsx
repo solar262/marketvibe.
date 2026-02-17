@@ -99,7 +99,7 @@ const MarketSizeCalculator = () => {
                             📩 Email Me This Report
                         </button>
                         <button
-                            onClick={onGetBlueprint}
+                            onClick={() => window.location.href = '/'}
                             style={{
                                 background: '#10b981',
                                 color: 'white',

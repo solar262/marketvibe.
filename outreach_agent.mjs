@@ -190,7 +190,15 @@ class MarketVibeSentinel {
 
         // 🏠 Service & Physical
         if (/\b(cleaning|maid|vacuum|scrub)\b/i.test(textLower)) return 'Service Business (Cleaning)';
-        if (/\b(house|renovate|remodel)\b/i.test(textLower) && /\b(cleaning|renovate|house)\b/i.test(textLower)) return 'Home Improvement';
+        if (/\b(renovate|remodel|plumbing|roofing|landscaping|contractor|repairs)\b/i.test(textLower) && /\b(house|home|apartment)\b/i.test(textLower)) return 'Home Improvement';
+
+        // 🏥 Professional & Local Services (Medical/Legal/Agency)
+        if (/\b(clinic|doctor|dentist|patient|receptionist|medical|surgeon|hospital)\b/i.test(textLower)) return 'Medical/Professional Service';
+        if (/\b(lawyer|attorney|legal|consultant|advisor)\b/i.test(textLower)) return 'Consulting/Professional Service';
+        if (/\b(marketing|agency|smma|outreach|ad management|clients)\b/i.test(textLower)) return 'Marketing/Service Agency';
+
+        // 🛠️ Productivity & Utilities
+        if (/\b(clipboard|workflow|productivity|task|calendar|notes|todo|organize|system tray|windows app|mac app|desktop app|utility)\b/i.test(textLower)) return 'Productivity Tool';
 
         // 🎨 Physical Products & Hobbies
         if (/\b(writing tools|stationery)\b/i.test(textLower) || (/\bpen\b/i.test(textLower) && !/\bapp\b/i.test(textLower))) return 'Stationery & Writing Tools';
@@ -210,18 +218,12 @@ class MarketVibeSentinel {
         // 🤖 Tech & AI
         if (/\b(ai |bot|agent|gpt)\b/i.test(textLower)) return 'AI/Automation Agent';
         // Precise SaaS check (Avoid "happy", "apps", etc matching "app")
-        if (/\b(software|builder|saas)\b/i.test(textLower) || /\bapp\b/i.test(textLower)) return 'SaaS / Micro-SaaS';
+        if (/\b(software|builder|saas)\b/i.test(textLower) || (/\bapp\b/i.test(textLower) && !/\bhappy\b/i.test(textLower))) return 'SaaS / Micro-SaaS';
 
-        // 📈 Marketing & Agency
-        if (/\b(marketing|agency|smma|outreach)\b/i.test(textLower)) return 'Marketing Agency';
+        // 🎓 Edtech & Academic
+        if (/\b(learn|school|course|teaching|tutor|university|admissions|harvard|phd|student|institute|institute|training)\b/i.test(textLower)) return 'Education/Training';
 
-        // 💸 Fintech & Wealth
-        if (/\b(money|pay|bank|crypto|finance)\b/i.test(textLower)) return 'Fintech';
-
-        // 🎓 Edtech & Academic (Exclude from SaaS)
-        if (/\b(learn|school|course|teaching|tutor|university|admissions|harvard|phd|student)\b/i.test(textLower)) return 'Education & Academic';
-
-        return 'Indie Project';
+        return 'High-Value Venture'; // Replaces "Indie Project" for better tone
     }
 
     detectIntent(text, platform = 'reddit') {
@@ -236,7 +238,7 @@ class MarketVibeSentinel {
 
         const intents = [
             {
-                keywords: ['co-founder', 'partner', 'co founder'],
+                keywords: ['\bco-founder\b', '\bpartner\b', '\bco founder\b'],
                 type: 'co-founder',
                 openers: [
                     "finding a co-founder is honestly such a grind, but finding the right person for your project makes it worth it.",
@@ -246,34 +248,44 @@ class MarketVibeSentinel {
                 supportOpener: "finding a co-founder is easily the hardest part. it's draining but vital imo."
             },
             {
-                keywords: ['hire', 'hiring', 'developer', 'non-technical'],
+                keywords: ['\bhiring\b', '\bjob\b', '\brole\b', '\bcontract\b'],
                 type: 'hiring',
                 openers: [
-                    "hiring for a new project is always a bit stressful tbh. hope you find someone solid.",
-                    "hiring talent that actually 'gets' the vision is tough. good luck with the search!",
-                    "scaling a team is a high-stakes move. rooting for you honestly."
+                    "building out a team is the ultimate leveling up move.",
+                    "hiring is a whole different skill set than building but it's how you scale honestly.",
+                    "finding solid talent to bring the vision to life is high-leverage work."
                 ],
-                supportOpener: "finding the right people to build with is a massive hurdle imo."
+                supportOpener: "scaling the team is always a transition phase. wishing you luck with the new hires!"
             },
             {
-                keywords: ['feedback', 'advice', 'thoughts'],
+                keywords: ['\bfeedback\b', '\bcritique\b', '\bthoughts\b', '\broast\b'],
                 type: 'feedback',
                 openers: [
-                    "love the energy here. getting honest feedback early is gold tbh.",
-                    "this is a solid niche. glad you're asking for feedback now rather than after months of building in a vacuum.",
-                    "love this concept. early feedback usually saves so much wasted time honestly."
+                    "asking for feedback early is how you avoid building in a vacuum.",
+                    "getting fresh eyes on a project is crucial honestly.",
+                    "roasting your own idea before you launch is a pro move."
                 ],
-                supportOpener: "honest feedback is everything at this stage. don't let the noise get to you imo."
+                supportOpener: "feedback loops are the secret weapon of building in public imo."
             },
             {
-                keywords: ['launch', 'today', 'live'],
+                keywords: ['\blaunch\b', '\btoday\b', '\bwent live\b', '\bshipping\b'],
                 type: 'launch',
                 openers: [
-                    "huge congrats on the launch! day one is always a massive rush.",
+                    "launching is easily the most nerve-wracking and exciting part of the journey.",
                     "just saw you went live. huge milestone, keep that momentum going honestly!",
                     "shipping is a win in itself. wishing you a smooth launch week tbh."
                 ],
-                supportOpener: "launching is just the beginning of the real work. shipping is a huge win imo."
+                supportOpener: "shipping is a win in itself. wishing you a smooth launch week tbh."
+            },
+            {
+                keywords: ['\bwrong\b', '\bnot converting\b', '\bhelp me fix\b', '\blow conversion\b', '\bno sales\b', '\bfailing\b'],
+                type: 'troubleshooting',
+                openers: [
+                    "ads not converting is easily the most frustrating part of the game. tracking exactly where the traffic is leaking usually helps tbh.",
+                    "saw yours ads aren't hitting. honestly that usually comes down to either the hook or the market alignment.",
+                    "not converting is a grind. usually it's a data gap between the offer and the audience imo."
+                ],
+                supportOpener: "troubleshooting a live funnel is a high-stress move. rooting for you to find the leak honestly."
             }
         ];
 
@@ -283,7 +295,9 @@ class MarketVibeSentinel {
         if (match) {
             opener = (sentiment === 'supportive') ? (match.supportOpener || match.openers[0]) : match.openers[Math.floor(Math.random() * match.openers.length)];
         } else {
-            opener = `That ${this.detectNiche(text)} idea sounds like it has serious potential.`;
+            const niche = this.detectNiche(text);
+            const label = niche.includes('SaaS') ? "project" : "venture";
+            opener = `That ${niche} ${label} sounds like it has serious potential.`;
         }
 
         // Add entity mention if found
@@ -310,9 +324,18 @@ class MarketVibeSentinel {
         const hostileWords = ['stupid', 'dumb', 'scam', 'hate', 'terrible', 'worst', 'sucks', 'bitter'];
         if (hostileWords.some(word => textLower.includes(word))) return true;
 
-        // 3. Academic/Emotional Venting Guard (Phase 29 Fix)
-        const ventingSignals = ['phd', 'harvard', 'admissions', 'rejections', 'venting', 'university', 'professor'];
-        if (ventingSignals.some(word => textLower.includes(word))) return true;
+        // 3. Academic/Emotional Venting & Life Crisis Guard (Phase 32 Hardening)
+        const ventingSignals = [
+            'phd', 'harvard', 'admissions', 'rejections', 'venting', 'university', 'professor',
+            'medicine', 'doctor', 'medical school', 'graduate entry', 'husband', 'children',
+            'family', 'dream', 'fulfil', 'nhs', 'pharmacy', 'radiography', 'physicians associate',
+            'career advice', 'life advice', 'not realistic', 'settled', 'disturb my family'
+        ];
+        if (ventingSignals.some(signal => textLower.includes(signal))) return true;
+
+        // 4. Personal Narrative Guard (Long posts with "I" and "My")
+        const iCount = (textLower.match(/\b(i|my|we|husband)\b/g) || []).length;
+        if (textLower.length > 500 && iCount > 15) return true; // Likely a personal story, not a business pitch
 
         // 4. Repetition Check (Basic) - If they repeat the same word 5+ times
         const words = textLower.split(/\s+/);
@@ -328,25 +351,33 @@ class MarketVibeSentinel {
     generateDraftReply(lead, report) {
         const intent = this.detectIntent(lead.post_content, 'reddit');
         const niche = this.detectNiche(lead.post_content);
+        // Force production domain for outreach
+        const SITE_URL = 'https://marketvibe1.com';
 
         const templates = [
-            `hey @${lead.username}, ${intent.opener} i was actually checking some data on the ${niche} space earlier and it honestly looks like there's solid six-figure potential here if you nail the audience (${report.targetAudience.primarySegment}). i put together a quick 30-day plan on how i'd execute this if you want to check it out: https://marketvibe1.com`,
-            `hi @${lead.username}, ${intent.opener} i was just looking at some market trends for ${niche} and it's looking pretty bullish tbh. i actually have a free blueprint for getting this off the ground here if it helps: https://marketvibe1.com`,
-            `tagging @${lead.username} because i love this concept. ${intent.opener} the ${niche} market is wider than people think imo. i mapped out a quick 30-day plan for a similar play here if you want it: https://marketvibe1.com`,
-            `hey @${lead.username}, ${intent.opener} i noticed you're building in ${niche}. if you're looking for a name, i built an AI generator that just dropped some cool ones for this specific niche: https://marketvibe1.com/tools/naming`,
-            `saw your post @${lead.username}. if you're still mapping out the ${niche} market, i built a free TAM calculator that might save you some time on the research: https://marketvibe1.com/tools/market-size`,
-            `really interesting play @${lead.username}. ${intent.opener} i've been tracking momentum in the ${niche} space and it's breakout season. check out these live data signals i found: https://marketvibe1.com/newsroom`
+            `hey @${lead.username}, ${intent.opener} i was actually looking at some growth data for the ${niche} space earlier and it honestly looks like there's solid six-figure potential here if you nail the audience (${report.targetAudience.primarySegment}). i mapped out a quick revenue forecast for a similar concept here if you want to check it out: ${SITE_URL}`,
+            `hi @${lead.username}, ${intent.opener} i was just looking at some market trends for ${niche} and it's looking pretty bullish tbh. i actually have a few data-backed insights on how to scale this kind of play here: ${SITE_URL}`,
+            `tagging @${lead.username} because i love this concept. ${intent.opener} the ${niche} space is wider than people think imo. i pulled some numbers on the yearly potential for this niche if you want to see the breakdown: ${SITE_URL}`,
+            `hey @${lead.username}, ${intent.opener} i noticed you're building in ${niche}. if you're looking for a name later on, i built an AI generator that just dropped some cool ones for this niche: ${SITE_URL}/tools/naming`,
+            `saw your post @${lead.username}. if you're still mapping out the ${niche} market, i built a free TAM calculator that might save you some time on the research: ${SITE_URL}/tools/market-size`,
+            `really interesting play @${lead.username}. ${intent.opener} i've been tracking momentum in the ${niche} space and it's breakout season. check out these live data signals i found: ${SITE_URL}/newsroom`
         ];
+
+        // 🧠 Strategic Template Injection (High Context)
+        if (intent.type === 'troubleshooting') {
+            templates.unshift(`hi @${lead.username}, ${intent.opener} if you're auditing your ${niche} funnel, i built a free TAM calculator that might help you find where the target audience is actually hanging out: ${SITE_URL}/tools/market-size`);
+            templates.unshift(`hey @${lead.username}, ${intent.opener} scaling ${niche} is usually a data game. check out these live breakout trends for your space, might give you an edge on the ads: ${SITE_URL}/newsroom`);
+        }
 
         // Contextual Tool Injection 🛠️
         if (lead.post_content.match(/name|naming|brand/i)) {
-            templates.push(`hey @${lead.username}, ${intent.opener} naming is always the hardest part tbh. i actually built a free AI generator specifically for ${niche} ventures if you want to try it: https://marketvibe1.com/tools/naming`);
+            templates.push(`hey @${lead.username}, ${intent.opener} naming is always the hardest part tbh. i actually built a free AI generator specifically for ${niche} ventures if you want to try it: ${SITE_URL}/tools/naming`);
         }
         if (lead.post_content.match(/market size|tam|investor|pitch/i)) {
-            templates.push(`saw your post @${lead.username}. if you're pitching this, i built a free TAM calculator that maps out the ${niche} market limit in seconds: https://marketvibe1.com/tools/market-size`);
+            templates.push(`saw your post @${lead.username}. if you're pitching this, i built a free TAM calculator that maps out the ${niche} market limit in seconds: ${SITE_URL}/tools/market-size`);
         }
         if (lead.post_content.match(/trend|demand|growing|popular/i)) {
-            templates.push(`really interesting play @${lead.username}. tracking breakout momentum in the ${niche} space right now. check out these live data signals i found: https://marketvibe1.com/newsroom`);
+            templates.push(`really interesting play @${lead.username}. tracking breakout momentum in the ${niche} space right now. check out these live data signals i found: ${SITE_URL}/newsroom`);
         }
 
         return templates[Math.floor(Math.random() * templates.length)];
@@ -411,24 +442,25 @@ class MarketVibeSentinel {
     generateTwitterReply(lead, report) {
         const intent = this.detectIntent(lead.post_content, 'twitter');
         const niche = this.detectNiche(lead.post_content);
+        const SITE_URL = 'https://marketvibe1.com';
 
         const twitterTemplates = [
-            `hey @${lead.username}, ${intent.opener} just saw some data for ${niche} and it looks like solid six-figure potential for ${report.targetAudience.primarySegment} tbh. plan is here: https://marketvibe1.com`,
-            `@${lead.username} love the ${niche} play. i'm seeing huge yearly potential for ${report.targetAudience.primarySegment} right now imo. blueprint: https://marketvibe1.com`,
-            `hey @${lead.username}, i noticed you're building in ${niche}. if you're looking for a name, i built an AI generator that just dropped some cool ones for this niche: https://marketvibe1.com/tools/naming`,
-            `saw your post @${lead.username}. if you're still mapping out the ${niche} market, i built a free TAM calculator that might save you some time: https://marketvibe1.com/tools/market-size`,
-            `really interesting play @${lead.username}. tracking breakout momentum in the ${niche} space right now. check out these live data signals: https://marketvibe1.com/newsroom`
+            `hey @${lead.username}, ${intent.opener} just saw some data for ${niche} and it looks like solid six-figure potential for ${report.targetAudience.primarySegment} tbh. data breakdown here: ${SITE_URL}`,
+            `@${lead.username} love the ${niche} play. i'm seeing huge yearly potential for ${report.targetAudience.primarySegment} right now imo. mapped it out here: ${SITE_URL}`,
+            `hey @${lead.username}, i noticed you're building in ${niche}. if you're looking for a name, i built an AI generator that just dropped some cool ones for this niche: ${SITE_URL}/tools/naming`,
+            `@${lead.username} if you're still mapping out the ${niche} market, i built a free TAM calculator that might save you some time: ${SITE_URL}/tools/market-size`,
+            `really interesting play @${lead.username}. tracking breakout momentum in the ${niche} space right now. check this out: ${SITE_URL}/newsroom`
         ];
 
         // Contextual Tool Injection (Twitter) 🛠️
         if (lead.post_content.match(/name|naming|brand/i)) {
-            twitterTemplates.push(`@${lead.username} naming is tough. i built a free AI generator for ${niche} ventures if you want to try it: https://marketvibe1.com/tools/naming`);
+            twitterTemplates.push(`@${lead.username} naming is tough. i built a free AI generator for ${niche} ventures if you want to try it: ${SITE_URL}/tools/naming`);
         }
         if (lead.post_content.match(/market size|tam|investor|pitch/i)) {
-            twitterTemplates.push(`@${lead.username} if you're pitching this, i built a free TAM calculator that maps out the ${niche} market: https://marketvibe1.com/tools/market-size`);
+            twitterTemplates.push(`@${lead.username} if you're pitching this, i built a free TAM calculator that maps out the ${niche} market: ${SITE_URL}/tools/market-size`);
         }
         if (lead.post_content.match(/trend|demand|growing|popular/i)) {
-            twitterTemplates.push(`@${lead.username} tracking breakout momentum in ${niche} right now. check out these live signals: https://marketvibe1.com/newsroom`);
+            twitterTemplates.push(`@${lead.username} tracking breakout momentum in ${niche} right now. check out these live signals: ${SITE_URL}/newsroom`);
         }
 
         return twitterTemplates[Math.floor(Math.random() * twitterTemplates.length)];
