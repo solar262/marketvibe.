@@ -633,7 +633,7 @@ function App() {
                 onChange={(e) => setEmail(e.target.value)}
               />
               <button type="submit" className="btn-primary" disabled={submitting} style={{ fontSize: '1.1rem', padding: '1rem 2rem' }}>
-                {submitting ? 'Connecting...' : 'Start Building — Free'}
+                {submitting ? 'Connecting...' : 'Get My Free Report'}
               </button>
             </form>
             <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1.5rem', fontSize: '0.8rem', color: '#64748b' }}>

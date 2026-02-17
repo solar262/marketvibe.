@@ -185,9 +185,9 @@ const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = '
 
             <div style={{ marginTop: '3rem', position: 'relative' }}>
                 <div style={{
-                    filter: unlocked ? 'none' : 'blur(12px)',
-                    opacity: unlocked ? 1 : 0.2,
-                    pointerEvents: unlocked ? 'auto' : 'none',
+                    filter: 'none',
+                    opacity: 1,
+                    pointerEvents: 'auto',
                     transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
                 }}>
                     <h2 style={{ color: '#f59e0b', marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -426,7 +426,7 @@ const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = '
                     </div>
                 )}
 
-                {!unlocked && (
+                {false && !unlocked && (
                     <div style={{
                         position: 'fixed', // NUCLEAR OPTION: Fixed to viewport
                         top: 0,
