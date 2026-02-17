@@ -40,6 +40,11 @@ const PricingTable = ({ onSelectPlan, spots }) => {
                 'All Basic Features',
                 'Niche-Specific 30-Day Interactive Roadmap',
                 'Founder Asset Library (Outreach & Email)',
+                '📄 Professional PDF Export',
+                '💻 MVP Landing Page Code Generator',
+                '📊 Viral Scorecard Download (PNG)',
+                '🔁 Unlimited Validations',
+                '💼 Full Commercial Rights',
                 'Priority Verification Badge',
                 'Ready-to-Post Social Templates',
                 'Lifetime Access + All Updates'
@@ -55,6 +60,10 @@ const PricingTable = ({ onSelectPlan, spots }) => {
             period: '/mo',
             description: 'For power users and agencies.',
             features: [
+                'All Founder Features',
+                '🎯 Live Growth Leads (Reddit/Twitter)',
+                '🛰️ Competitor Intelligence Reports',
+                '✍️ AI-Generated Ad Copy (Facebook/Google)',
                 'Unlimited Validations',
                 'White-label PDF Reports',
                 'Custom Branding',
