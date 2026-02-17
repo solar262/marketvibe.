@@ -98,7 +98,7 @@ const LeadsDashboard = () => {
         });
     };
 
-    const handleHeraldAction = (lead, platform) => {
+    const handleHeraldAction = async (lead, platform) => {
         let url = '';
         const script = selectScript(lead); // Generate dynamic high-ticket script
 
