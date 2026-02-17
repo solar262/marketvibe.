@@ -1,27 +1,71 @@
+
 # MarketVibe 🚀
+**The Autonomous Growth Engine for SaaS Founders.**
 
-**MarketVibe** helps founders and builders validate their product ideas in minutes, not months. It generates high-conversion lead magnet copy and professional revenue forecasts based on minimal user input.
+MarketVibe is not just a landing page. It is a self-driving business system that validates ideas, generates leads, writes its own content, and closes sales.
 
-## Core Features
-- **Value-First Fulfillment**: Provides instant validation results (Landing Page Copy & Revenue Forecast) to build trust.
-- **Strategic Paywall**: Locks high-value implementation blueprints behind a persuasive "Founder's Offer" conversion point.
-- **Automated Delivery**: Sends validation reports directly to users via email and provides unique, persistent URLs for every report.
-- **Real-time Urgency**: Includes a live "Lifetime Deals Remaining" counter to drive conversions.
+## 🌟 Core Systems
 
-## Technical Tech Stack
-- **Frontend**: React (19+) + Vite 7
-- **Database/Auth**: Supabase
-- **Email Delivery**: Resend
-- **Payments**: Stripe Checkout
-- **Deployment**: Vercel
+### 1. The Trend Engine (`/newsroom`)
+- **What it does**: Scrapes Reddit/Twitter for breakout niches.
+- **How to run**: `node trend_agent.mjs`
+- **Output**: Populates the "Newsroom" with top 10 trends and "Launch This" buttons.
 
-## Getting Started
-1. **Clone and Install**: `npm install`
-2. **Setup Env**: Create a `.env` file with your `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_RESEND_API_KEY`.
-3. **Run Local**: `npm run dev`
+### 2. The Sales Bot (`/admin`)
+- **What it does**: Identifies high-ticket leads and queues sales DMs.
+- **How to run**: `node outreach_agent.mjs` (Findings) -> `node closer_autopilot.mjs` (DM Queuing).
+- **Manual Override**: Go to `/admin` and click "Send Script (DM)" to auto-copy the perfect message.
 
-## Deployment
-This project is optimized for deployment on **Vercel**. Simply push to your branch or run `npx vercel --prod`.
+### 3. The Content Machine (`/blog`)
+- **What it does**: Writes SEO-optimized articles based on trending niches.
+- **How to run**: `node blog_agent.mjs`
+- **Output**: Generates JSON content in `src/content/blog` which hot-reloads the `/blog` page.
+
+### 4. The Viral Loop (`/viral`)
+- **What it does**: Incentivizes users to refer 3 friends to unlock the "Expert Report".
+- **Logic**: Users get a unique `?ref=CODE` link. 3 signups = Free Upgrade.
 
 ---
-*Built for founders who want to stop guessing and start building.*
+
+## 🛠️ Technical Stack
+- **Frontend**: React 19 + Vite
+- **Backend Logic**: Node.js Scripts (`.mjs`)
+- **Database**: Supabase (Leads, Referrals, Trends)
+- **Deployment**: Vercel
+
+## 🚀 Quick Start (Operator's Guide)
+
+### Install Dependencies
+```bash
+npm install
+```
+
+### Run the Development Server
+```bash
+npm run dev
+```
+
+### Run the Autonomous Agents (Cron Jobs)
+To keep the data fresh, you should set up these scripts to run daily (e.g., via GitHub Actions or a local scheduler):
+```bash
+# 1. Update Trends
+node trend_agent.mjs
+
+# 2. Find New Leads
+node outreach_agent.mjs
+
+# 3. Write New Content
+node blog_agent.mjs
+```
+
+### Deploy to Production
+```bash
+npx vercel --prod
+```
+
+## 🔐 Admin Access
+Access the "God Mode" dashboard at: `https://www.marketvibe1.com/admin` (or `http://localhost:5173/admin`).
+*Note: Ensure your IP is whitelisted or add auth if deploying publicly.*
+
+---
+*Built by Antigravity & You.*

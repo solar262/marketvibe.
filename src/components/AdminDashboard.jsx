@@ -106,6 +106,31 @@ const AdminDashboard = () => {
                     />
                 </div>
 
+                {/* Navigation to Sub-modules */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem', marginBottom: '3rem' }}>
+                    <a href="/admin/leads" style={{ textDecoration: 'none' }}>
+                        <div style={{ background: 'rgba(99, 102, 241, 0.1)', padding: '2rem', borderRadius: '1rem', border: '1px solid #6366f1', textAlign: 'center', transition: 'transform 0.2s', cursor: 'pointer' }} onMouseOver={e => e.currentTarget.style.transform = 'translateY(-5px)'} onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}>
+                            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🤖</div>
+                            <h3 style={{ color: 'white', margin: 0 }}>Sales Bot</h3>
+                            <p style={{ color: '#94a3b8' }}>Send High-Ticket DMs</p>
+                        </div>
+                    </a>
+                    <a href="/newsroom" style={{ textDecoration: 'none' }}>
+                        <div style={{ background: 'rgba(236, 72, 153, 0.1)', padding: '2rem', borderRadius: '1rem', border: '1px solid #ec4899', textAlign: 'center', transition: 'transform 0.2s', cursor: 'pointer' }} onMouseOver={e => e.currentTarget.style.transform = 'translateY(-5px)'} onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}>
+                            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📰</div>
+                            <h3 style={{ color: 'white', margin: 0 }}>Newsroom</h3>
+                            <p style={{ color: '#94a3b8' }}>Trend Intelligence</p>
+                        </div>
+                    </a>
+                    <a href="/blog" style={{ textDecoration: 'none' }}>
+                        <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '2rem', borderRadius: '1rem', border: '1px solid #10b981', textAlign: 'center', transition: 'transform 0.2s', cursor: 'pointer' }} onMouseOver={e => e.currentTarget.style.transform = 'translateY(-5px)'} onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}>
+                            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✍️</div>
+                            <h3 style={{ color: 'white', margin: 0 }}>Auto-Blog</h3>
+                            <p style={{ color: '#94a3b8' }}>SEO Content Engine</p>
+                        </div>
+                    </a>
+                </div>
+
                 {/* Recent Validations Table */}
                 <h2 style={{ fontSize: '1.25rem', marginBottom: '1.5rem' }}>💎 Recent Validations</h2>
                 <div style={{ background: '#1e293b', borderRadius: '1rem', overflow: 'hidden', border: '1px solid #334155' }}>

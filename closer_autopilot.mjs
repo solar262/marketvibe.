@@ -1,61 +1,59 @@
-/**
- * 🤖 MarketVibe Closer (Autopilot)
- * This script identifies high-intent leads and moves them to the 'contacted' status.
- */
 
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import { selectScript } from './src/lib/dm_scripts.js';
 
 dotenv.config();
 
-const supabase = createClient(
-    process.env.VITE_SUPABASE_URL,
-    process.env.VITE_SUPABASE_ANON_KEY
-);
+const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY);
 
-async function runCloserCycle() {
-    console.log("🚀 The Closer: Starting Autopilot engagement cycle...");
+async function runCloserCurrent() {
+    console.log("🤖 TheCloser 2.0: Scanning for High-Ticket Targets...");
 
-    try {
-        // 1. Fetch high-intent pending leads
-        const { data: leads, error: fetchError } = await supabase
-            .from('growth_leads')
-            .select('id, username, platform, interest_score')
-            .eq('status', 'pending')
-            .gte('interest_score', 8);
+    // 1. Find Qualified Leads (Score >= 8) who haven't been contacted
+    const { data: highValueLeads, error } = await supabase
+        .from('growth_leads')
+        .select('*')
+        .gte('interest_score', 8)
+        .eq('status', 'pending')
+        .limit(5);
 
-        if (fetchError) throw fetchError;
+    if (error) {
+        console.error("Error fetching leads:", error);
+        return;
+    }
 
-        if (!leads || leads.length === 0) {
-            console.log("✅ No high-intent pending leads found. Autopilot standing by.");
-            return;
-        }
+    if (highValueLeads.length === 0) {
+        console.log("✅ No new high-ticket leads found strictly matching criteria.");
+        return;
+    }
 
-        console.log(`🎯 Identified ${leads.length} high-intent leads for immediate engagement.`);
+    console.log(`🎯 Locked onto ${highValueLeads.length} high-value targets.`);
 
-        // 2. Batch update to 'contacted'
-        const leadIds = leads.map(l => l.id);
+    // 2. Draft & Queue DMs
+    for (const lead of highValueLeads) {
+        const dmContent = selectScript(lead);
+
+        console.log(`\n---------------------------------`);
+        console.log(`👤 Target: @${lead.username} (${lead.platform})`);
+        console.log(`💰 Signal: High Ticket (Score: ${lead.interest_score})`);
+        console.log(`📝 Generated DM: "${dmContent}"`);
+
+        // Simulate sending
+        console.log(`🚀 Dispatching DM... [SIMULATION MODE]`);
+
+        // Update status to avoid re-sending
         const { error: updateError } = await supabase
             .from('growth_leads')
-            .update({ status: 'contacted' })
-            .in('id', leadIds);
+            .update({
+                status: 'contacted',
+                draft_reply: dmContent // Save the specific script used
+            })
+            .eq('id', lead.id);
 
-        if (updateError) throw updateError;
-
-        leads.forEach(lead => {
-            console.log(`✅ [AUTOPILOT] Engaged with @${lead.username} on ${lead.platform} (Score: ${lead.interest_score})`);
-        });
-
-        console.log(`\n🏁 The Closer: Successfully processed ${leads.length} leads.`);
-
-    } catch (err) {
-        console.error("❌ The Closer Error:", err.message);
+        if (updateError) console.error(`❌ Failed to update status for ${lead.username}`);
+        else console.log(`✅ Status updated to 'contacted'.`);
     }
 }
 
-runCloserCycle().then(() => {
-    process.exit(0);
-}).catch(err => {
-    console.error("CRITICAL CLOSER ERROR:", err);
-    process.exit(1);
-});
+runCloserCurrent();

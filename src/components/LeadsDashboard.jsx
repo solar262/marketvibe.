@@ -1,5 +1,6 @@
 import React, { useState, useEffect, memo } from 'react';
 import { supabase } from '../lib/supabase';
+import { selectScript } from '../lib/dm_scripts';
 
 const LeadsDashboard = () => {
     const [leads, setLeads] = useState([]);
@@ -91,15 +92,18 @@ const LeadsDashboard = () => {
 
     const handleHeraldAction = (lead, platform) => {
         let url = '';
+        const script = selectScript(lead); // Generate dynamic high-ticket script
+
         if (platform === 'twitter') {
-            const twitterText = lead.draft_reply_twitter || lead.draft_reply;
-            url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(twitterText)}`;
-            showFeedback('Opening X...', 'info');
+            // Copy script to clipboard and open profile (Reliable for DMs)
+            copyToClipboard(script);
+            url = `https://twitter.com/${lead.username}`;
+            showFeedback('Script Copied! Paste in their DMs 📨', 'success');
         } else if (platform === 'reddit') {
             const redditId = lead.platform_id.replace('rd_', '');
             url = `https://www.reddit.com/comments/${redditId}`;
-            copyToClipboard(lead.draft_reply);
-            showFeedback('Opening Reddit Thread... (Reply copied)', 'info');
+            copyToClipboard(script);
+            showFeedback('Script Copied! Paste in Reply/DM 📨', 'success');
         }
 
         window.open(url, '_blank');
@@ -295,7 +299,8 @@ const LeadsDashboard = () => {
                                                 onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
                                                 onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
                                             >
-                                                🚀 Post X
+                                            >
+                                                📜 Send Script (DM)
                                             </button>
                                             <button
                                                 onClick={() => handleHeraldAction(lead, 'reddit')}
@@ -317,7 +322,7 @@ const LeadsDashboard = () => {
                                                 onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
                                                 onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
                                             >
-                                                🔥 Reply Reddit
+                                                📜 Send Script (DM)
                                             </button>
                                         </div>
                                     )}

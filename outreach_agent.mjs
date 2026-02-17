@@ -366,12 +366,17 @@ class MarketVibeSentinel {
         // 2. High intent keywords (+2)
         const highIntent = [
             'validate', 'feedback', 'struggling', 'stuck',
-            'customer', 'revenue', 'launch', 'market', 'budget', 'hiring',
-            'investing', 'competitor', 'business model', 'pricing'
+            'customer', 'revenue', 'launch', 'market', 'competitor', 'business model'
         ];
         highIntent.forEach(word => {
             if (textLower.includes(word)) score += 1;
         });
+
+        // 2b. HIGH TICKET SIGNALS (+3) - The "Money" keywords
+        const moneyWords = ['budget', 'hiring', 'investing', 'pricing', 'pay for', 'willing to pay', 'cost'];
+        if (moneyWords.some(w => textLower.includes(w))) {
+            score += 3; // These people have wallets open
+        }
 
         // 3. Negative Semantic Mapping (The "Advice-Giver" Filter) -7 to -10
         const adviceSignals = [

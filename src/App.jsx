@@ -16,6 +16,9 @@ import MarketSizeCalculator from './components/MarketSizeCalculator';
 import NicheValidator from './components/NicheValidator';
 import AuthorityInsights from './components/AuthorityInsights';
 import Newsroom from './components/Newsroom';
+import BlogIndex from './components/BlogIndex';
+import BlogPost from './components/BlogPost';
+import ReferralHub from './components/ReferralHub';
 import AdminDashboard from './components/AdminDashboard';
 import { popularNiches } from './lib/niches'
 
@@ -315,6 +318,19 @@ function App() {
     } else if (path === '/newsroom') {
       setStep('newsroom')
       document.title = 'The Newsroom: Breaking Market Trends | MarketVibe'
+    } else if (path === '/blog') {
+      setStep('blog-index')
+      document.title = 'Growth Blog: Market Trends & Analysis | MarketVibe'
+    } else if (path.startsWith('/blog/')) {
+      setStep('blog-post')
+    } else if (path === '/viral') {
+      setStep('viral')
+    }
+
+    // Capture Referral Code
+    const refCode = params.get('ref');
+    if (refCode) {
+      localStorage.setItem('marketvibe_referrer', refCode);
     }
 
     return () => {
@@ -368,11 +384,29 @@ function App() {
         }
 
         // 2. Otherwise, treat as a new lead
-        const { error } = await supabase
+        // Generate Referral Code for new user
+        const referralCode = email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '') + '-' + Math.floor(Math.random() * 1000);
+        const referrer = localStorage.getItem('marketvibe_referrer');
+
+        const { data, error } = await supabase
           .from('leads')
-          .insert([{ email, status: 'started_validation' }])
+          .insert([{
+            email: email,
+            referral_code: referralCode,
+            referred_by: referrer,
+            status: 'started_validation'
+          }])
+          .select()
 
         if (error) throw error
+
+        // If referred, increment the referrer's count (optimistic)
+        if (referrer) {
+          await supabase.rpc('increment_referral', { referrer_code: referrer });
+        }
+
+        // Store ID for session
+        localStorage.setItem('marketvibe_lead_id', data[0].id);
 
         localStorage.setItem('marketvibe_lead_email', email)
         await sendWelcomeEmail(email)
@@ -906,6 +940,9 @@ function App() {
       {step === 'p-seo' && <NicheValidator />}
       {step === 'insights' && <AuthorityInsights />}
       {step === 'newsroom' && <Newsroom />}
+      {step === 'blog-index' && <BlogIndex />}
+      {step === 'blog-post' && <BlogPost />}
+      {step === 'viral' && <ReferralHub />}
       {step === 'admin' && <AdminDashboard />}
       {step === 'privacy' && <PrivacyPolicy />}
       {step === 'terms' && <TermsOfService />}
