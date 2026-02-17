@@ -603,24 +603,24 @@ function App() {
       {step === 'landing' && (
         <section className="hero">
           <div className="badge">{activeNiche ? `${activeNiche.name} Validation Protocol` : 'Limited Founders Opportunity'}</div>
-          <h1>
+          <h1 style={{ fontSize: '3.5rem', lineHeight: '1.1', marginBottom: '1.5rem', background: 'linear-gradient(to right, #fff, #94a3b8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
             {activeNiche ? (
-              <>Launch Your {activeNiche.name} <br /> Startup in 30 Days</>
+              <>Launch Your {activeNiche.name} <br /> Empire in 30 Days</>
             ) : (
-              <>Stop Brainstorming. <br /> Start Validating.</>
+              <>Build a $10k/mo Business <br /> in 30 Days.</>
             )}
           </h1>
-          <p>
+          <p style={{ fontSize: '1.25rem', color: '#cbd5e1', maxWidth: '600px', margin: '0 auto 2.5rem', lineHeight: '1.6' }}>
             {activeNiche ? (
               `Get an instant data-driven validation for ${activeNiche.name}. MarketVibe generates your niche-specific 30-day execution roadmap and founder assets so you can ship before you build.`
             ) : (
-              "MarketVibe is your autonomous launch partner. Transform any business idea into a validated revenue forecast and a 30-day execution playbook in seconds."
+              "Stop guessing. Get a data-backed revenue forecast, a 30-day execution roadmap, and investor-ready assets generated instantly by AI."
             )}
           </p>
 
           <div className="cta-box floating">
-            <div className="counter">
-              Only <span className="counter-number">{spots}</span> lifetime deals remaining
+            <div className="counter" style={{ color: '#ef4444', fontWeight: 'bold', fontSize: '1rem', background: 'rgba(239, 68, 68, 0.1)', display: 'inline-block', padding: '0.5rem 1rem', borderRadius: '2rem', marginBottom: '1rem', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+              🔥 Only <span className="counter-number" style={{ fontSize: '1.2rem' }}>{spots}</span> Founder Spots Remaining
             </div>
             <form onSubmit={handleEmailSubmit} className="input-group">
               <input
@@ -632,10 +632,15 @@ function App() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
-              <button type="submit" className="btn-primary" disabled={submitting}>
-                {submitting ? 'Connecting...' : 'Validate My Idea — Free'}
+              <button type="submit" className="btn-primary" disabled={submitting} style={{ fontSize: '1.1rem', padding: '1rem 2rem' }}>
+                {submitting ? 'Connecting...' : 'Start Building — Free'}
               </button>
             </form>
+            <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1.5rem', fontSize: '0.8rem', color: '#64748b' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>🔒 100% Free</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>💳 No Credit Card</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>✨ Unsubscribe Anytime</span>
+            </div>
             {errorMessage && <p className="error-text">{errorMessage}</p>}
           </div>
 
