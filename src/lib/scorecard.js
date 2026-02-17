@@ -82,7 +82,7 @@ export const generateScorecard = async (projectData) => {
     // 7. Footer / CTA
     ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
     ctx.font = '20px Inter, sans-serif';
-    ctx.fillText('Validate your idea at marketvibe.vercel.app', 60, 580);
+    ctx.fillText('Validate your idea at marketvibe1.com', 60, 580);
 
     return canvas.toDataURL('image/png');
 };

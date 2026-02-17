@@ -331,9 +331,23 @@ class MarketVibeSentinel {
 
         const templates = [
             `hey @${lead.username}, ${intent.opener} i was actually checking some data on the ${niche} space earlier and it honestly looks like there's solid six-figure potential here if you nail the audience (${report.targetAudience.primarySegment}). i put together a quick 30-day plan on how i'd execute this if you want to check it out: https://marketvibe1.com`,
-            `hi @${lead.username}, ${intent.opener} this is a really interesting niche. i was just looking at some market trends for ${niche} and it's looking pretty bullish tbh. your target audience should be easy to reach. i actually have a free blueprint for getting this off the ground here if it helps: https://marketvibe1.com`,
-            `tagging @${lead.username} because i love this concept. ${intent.opener} the ${niche} market is wider than people think imo. i'm seeing huge yearly potential for ${report.targetAudience.primarySegment} right now. i mapped out a quick 30-day plan for a similar play here if you want it: https://marketvibe1.com`
+            `hi @${lead.username}, ${intent.opener} i was just looking at some market trends for ${niche} and it's looking pretty bullish tbh. i actually have a free blueprint for getting this off the ground here if it helps: https://marketvibe1.com`,
+            `tagging @${lead.username} because i love this concept. ${intent.opener} the ${niche} market is wider than people think imo. i mapped out a quick 30-day plan for a similar play here if you want it: https://marketvibe1.com`,
+            `hey @${lead.username}, ${intent.opener} i noticed you're building in ${niche}. if you're looking for a name, i built an AI generator that just dropped some cool ones for this specific niche: https://marketvibe1.com/tools/naming`,
+            `saw your post @${lead.username}. if you're still mapping out the ${niche} market, i built a free TAM calculator that might save you some time on the research: https://marketvibe1.com/tools/market-size`,
+            `really interesting play @${lead.username}. ${intent.opener} i've been tracking momentum in the ${niche} space and it's breakout season. check out these live data signals i found: https://marketvibe1.com/newsroom`
         ];
+
+        // Contextual Tool Injection 🛠️
+        if (lead.post_content.match(/name|naming|brand/i)) {
+            templates.push(`hey @${lead.username}, ${intent.opener} naming is always the hardest part tbh. i actually built a free AI generator specifically for ${niche} ventures if you want to try it: https://marketvibe1.com/tools/naming`);
+        }
+        if (lead.post_content.match(/market size|tam|investor|pitch/i)) {
+            templates.push(`saw your post @${lead.username}. if you're pitching this, i built a free TAM calculator that maps out the ${niche} market limit in seconds: https://marketvibe1.com/tools/market-size`);
+        }
+        if (lead.post_content.match(/trend|demand|growing|popular/i)) {
+            templates.push(`really interesting play @${lead.username}. tracking breakout momentum in the ${niche} space right now. check out these live data signals i found: https://marketvibe1.com/newsroom`);
+        }
 
         return templates[Math.floor(Math.random() * templates.length)];
     }
@@ -395,9 +409,22 @@ class MarketVibeSentinel {
 
         const twitterTemplates = [
             `hey @${lead.username}, ${intent.opener} just saw some data for ${niche} and it looks like solid six-figure potential for ${report.targetAudience.primarySegment} tbh. plan is here: https://marketvibe1.com`,
-            `@${lead.username} love the ${niche} play. ${intent.opener} i'm seeing huge yearly potential for ${report.targetAudience.primarySegment} right now imo. blueprint: https://marketvibe1.com`,
-            `hey @${lead.username}, ${intent.opener} the ${niche} space is blowing up honestly. i mapped out an execution plan for it here if you want it: https://marketvibe1.com`
+            `@${lead.username} love the ${niche} play. i'm seeing huge yearly potential for ${report.targetAudience.primarySegment} right now imo. blueprint: https://marketvibe1.com`,
+            `hey @${lead.username}, i noticed you're building in ${niche}. if you're looking for a name, i built an AI generator that just dropped some cool ones for this niche: https://marketvibe1.com/tools/naming`,
+            `saw your post @${lead.username}. if you're still mapping out the ${niche} market, i built a free TAM calculator that might save you some time: https://marketvibe1.com/tools/market-size`,
+            `really interesting play @${lead.username}. tracking breakout momentum in the ${niche} space right now. check out these live data signals: https://marketvibe1.com/newsroom`
         ];
+
+        // Contextual Tool Injection (Twitter) 🛠️
+        if (lead.post_content.match(/name|naming|brand/i)) {
+            twitterTemplates.push(`@${lead.username} naming is tough. i built a free AI generator for ${niche} ventures if you want to try it: https://marketvibe1.com/tools/naming`);
+        }
+        if (lead.post_content.match(/market size|tam|investor|pitch/i)) {
+            twitterTemplates.push(`@${lead.username} if you're pitching this, i built a free TAM calculator that maps out the ${niche} market: https://marketvibe1.com/tools/market-size`);
+        }
+        if (lead.post_content.match(/trend|demand|growing|popular/i)) {
+            twitterTemplates.push(`@${lead.username} tracking breakout momentum in ${niche} right now. check out these live signals: https://marketvibe1.com/newsroom`);
+        }
 
         return twitterTemplates[Math.floor(Math.random() * twitterTemplates.length)];
     }
@@ -418,7 +445,11 @@ if (isDirectRun) {
     if (isOnce) {
         sentinel.runCycle();
     } else {
-        // Normal continuous mode
-        sentinel.runCycle();
+        // Normal continuous mode (Loop every 10 minutes)
+        console.log("🔄 Starting Continuous Sentinel Mode (10m Interval)...");
+        sentinel.runCycle(); // Run immediately first
+        setInterval(() => {
+            sentinel.runCycle();
+        }, 10 * 60 * 1000);
     }
 }

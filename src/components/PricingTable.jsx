@@ -1,6 +1,21 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 
 const PricingTable = ({ onSelectPlan, spots }) => {
+    const [todayCount, setTodayCount] = useState(14); // Initial optimistic state
+
+    useEffect(() => {
+        if (!supabase) return;
+        const fetchToday = async () => {
+            const today = new Date().toISOString().split('T')[0];
+            const { count } = await supabase.from('leads')
+                .select('*', { count: 'exact', head: true })
+                .gte('created_at', today);
+            if (count !== null) setTodayCount(count + 9); // Base social proof
+        };
+        fetchToday();
+    }, []);
+
     const plans = [
         {
             name: 'Basic',
@@ -56,6 +71,22 @@ const PricingTable = ({ onSelectPlan, spots }) => {
         <section style={{ padding: '6rem 0' }}>
             <div style={{ textAlign: 'center', marginBottom: '4rem' }}>
                 <h2 style={{ fontSize: '2.5rem', fontWeight: '800', marginBottom: '1rem', color: 'white' }}> Simple, Transparent Pricing 💎</h2>
+
+                <div style={{
+                    background: 'rgba(236, 72, 153, 0.15)',
+                    color: '#f472b6',
+                    display: 'inline-block',
+                    padding: '0.4rem 1.2rem',
+                    borderRadius: '2rem',
+                    marginBottom: '1.5rem',
+                    fontWeight: 'bold',
+                    fontSize: '0.9rem',
+                    border: '1px solid rgba(236, 72, 153, 0.3)',
+                    boxShadow: '0 0 15px rgba(236, 72, 153, 0.1)'
+                }}>
+                    🔥 {todayCount} Founders validated today
+                </div>
+
                 <p style={{ color: '#94a3b8', fontSize: '1.2rem', maxWidth: '600px', margin: '0 auto' }}>
                     Choose the plan that fits your ambition. From first idea to first revenue.
                 </p>

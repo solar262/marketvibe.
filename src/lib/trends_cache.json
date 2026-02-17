@@ -1,0 +1,72 @@
+[
+  {
+    "niche": "Stationery & Writing Tools",
+    "volume": 101,
+    "velocity": 101,
+    "avgInterest": "9.6",
+    "heatScore": 312.58415841584156
+  },
+  {
+    "niche": "SaaS / Micro-SaaS",
+    "volume": 87,
+    "velocity": 87,
+    "avgInterest": "7.2",
+    "heatScore": 268.1954022988506
+  },
+  {
+    "niche": "Indie Project",
+    "volume": 78,
+    "velocity": 78,
+    "avgInterest": "5.4",
+    "heatScore": 239.43589743589743
+  },
+  {
+    "niche": "AI/Automation Agent",
+    "volume": 74,
+    "velocity": 74,
+    "avgInterest": "7.3",
+    "heatScore": 229.28378378378378
+  },
+  {
+    "niche": "AI Agent",
+    "volume": 50,
+    "velocity": 50,
+    "avgInterest": "5.0",
+    "heatScore": 155
+  },
+  {
+    "niche": "Pet Tech",
+    "volume": 46,
+    "velocity": 46,
+    "avgInterest": "7.2",
+    "heatScore": 145.2173913043478
+  },
+  {
+    "niche": "Streaming & Content Creation",
+    "volume": 30,
+    "velocity": 30,
+    "avgInterest": "5.8",
+    "heatScore": 95.8
+  },
+  {
+    "niche": "Home Improvement",
+    "volume": 26,
+    "velocity": 26,
+    "avgInterest": "5.0",
+    "heatScore": 82.96153846153847
+  },
+  {
+    "niche": "Fintech",
+    "volume": 23,
+    "velocity": 23,
+    "avgInterest": "5.6",
+    "heatScore": 74.6086956521739
+  },
+  {
+    "niche": "Service Business (Cleaning)",
+    "volume": 17,
+    "velocity": 17,
+    "avgInterest": "7.6",
+    "heatScore": 58.64705882352941
+  }
+]

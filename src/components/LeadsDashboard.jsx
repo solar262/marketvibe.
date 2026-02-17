@@ -19,6 +19,7 @@ const LeadsDashboard = () => {
     const fetchStats = async () => {
         try {
             const { data: appData } = await supabase.from('app_settings').select('value').eq('key', 'website_hits').single();
+            const { count: inbound } = await supabase.from('leads').select('*', { count: 'exact', head: true });
             const { count: total } = await supabase.from('growth_leads').select('*', { count: 'exact', head: true });
             const { count: pending } = await supabase.from('growth_leads').select('*', { count: 'exact', head: true }).eq('status', 'pending');
             const { count: qualified } = await supabase.from('growth_leads').select('*', { count: 'exact', head: true }).eq('status', 'qualified');
@@ -28,6 +29,7 @@ const LeadsDashboard = () => {
 
             setStats({
                 hits: appData?.value || 0,
+                inboundLeads: inbound || 0,
                 totalLeads: total || 0,
                 pendingLeads: pending || 0,
                 qualifiedLeads: qualified || 0,
@@ -138,6 +140,10 @@ const LeadsDashboard = () => {
                 <div style={{ background: 'rgba(99, 102, 241, 0.1)', padding: '1.5rem', borderRadius: '1rem', border: '1px solid rgba(99, 102, 241, 0.2)', textAlign: 'center' }}>
                     <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: '0 0 0.5rem 0' }}>WEBSITE VISITORS 📈</p>
                     <h2 style={{ fontSize: '2rem', margin: 0, color: '#6366f1' }}>{stats.hits}</h2>
+                </div>
+                <div style={{ background: 'rgba(236, 72, 153, 0.1)', padding: '1.5rem', borderRadius: '1rem', border: '1px solid rgba(236, 72, 153, 0.2)', textAlign: 'center' }}>
+                    <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: '0 0 0.5rem 0' }}>INBOUND SUBMISSIONS 👤</p>
+                    <h2 style={{ fontSize: '2rem', margin: 0, color: '#ec4899' }}>{stats.inboundLeads}</h2>
                 </div>
                 <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.5rem', borderRadius: '1rem', border: '1px solid rgba(255,255,255,0.05)', textAlign: 'center' }}>
                     <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: '0 0 0.5rem 0' }}>AI-FOUND LEADS 🤖</p>

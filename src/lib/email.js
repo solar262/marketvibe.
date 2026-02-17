@@ -47,7 +47,7 @@ export const sendResultsEmail = async (email, projectName) => {
         console.warn('Resend client not initialized. Skipping results email.');
         return { success: false, error: 'Missing API Key' };
     }
-    const resultsUrl = `https://marketvibe.vercel.app/?view_results=${encodeURIComponent(email)}`;
+    const resultsUrl = `https://www.marketvibe1.com/?view_results=${encodeURIComponent(email)}`;
 
     try {
         const { data, error } = await resend.emails.send({

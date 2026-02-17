@@ -21,7 +21,7 @@ Use this document to rapidly submit MarketVibe to high-authority directories. Ea
 
 ---
 
-## � The Maker Message (First Comment)
+## 📣 The Maker Message (First Comment)
 *Copy and paste this as the first comment on your Product Hunt post to build immediate trust.*
 
 "Hey Product Hunt! 👋 

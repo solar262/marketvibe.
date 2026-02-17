@@ -51,6 +51,7 @@ export const generateValidationReport = (projectData) => {
 
     const revenueForecast = {
         totalAddressableMarket: estimatedMarketSize.toLocaleString(),
+        marketSize: estimatedMarketSize.toLocaleString(), // Alias for backward compatibility
         estimatedAnnualRevenue: annualRevenue.toLocaleString(),
         pricingTiers: [
             { name: "Starter", price: `$${basePrice}`, features: ["Basic Analytics", "1 Project", "Email Support"] },

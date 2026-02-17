@@ -16,6 +16,7 @@ import MarketSizeCalculator from './components/MarketSizeCalculator';
 import NicheValidator from './components/NicheValidator';
 import AuthorityInsights from './components/AuthorityInsights';
 import Newsroom from './components/Newsroom';
+import AdminDashboard from './components/AdminDashboard';
 import { popularNiches } from './lib/niches'
 
 function App() {
@@ -33,16 +34,63 @@ function App() {
   const [leadsFeed, setLeadsFeed] = useState([]) // Growth leads for Experts
   const [usageCount, setUsageCount] = useState(0) // Validation count for free tier
   const [currentLeadId, setCurrentLeadId] = useState(null); // ID for sharing
-  const [previewId, setPreviewId] = useState(null); // ID for OG preview route
+  const [previewId, setPreviewId] = useState(null); // ID for preview route
+  const [checkoutModalOpen, setCheckoutModalOpen] = useState(false); // Modal for checkout email
+  const [pendingPlan, setPendingPlan] = useState(null); // Plan to unlock after email
+  const [selectedProjectName, setSelectedProjectName] = useState(''); // Name from generator
 
   useEffect(() => {
     // 1. Initial State Sync (Consolidated)
     const params = new URLSearchParams(window.location.search)
+    const currentLoc = window.location.pathname;
+
+    // Admin Route
+    if (currentLoc === '/admin') {
+      setStep('admin');
+      return;
+    }
+
     const viewEmail = params.get('view_results')
     const status = params.get('status')
-    const resetValue = params.get('secret_reset')
     const savedEmail = localStorage.getItem('marketvibe_lead_email')
     const finalEmail = viewEmail || (status === 'success' ? savedEmail : null)
+
+    // 1.1 Detect Badge Referral (Phase 38)
+    const badgeId = params.get('lid') || params.get('ref_badge');
+    const isBadgeRef = params.get('ref') === 'badge' || !!params.get('ref_badge');
+
+    if (isBadgeRef && badgeId && supabase) {
+      const logBadgeHit = async () => {
+        try {
+          const referrer = document.referrer || 'direct';
+          const domain = referrer !== 'direct' ? new URL(referrer).hostname : 'direct';
+
+          const { data: existing } = await supabase
+            .from('badge_hits')
+            .select('*')
+            .eq('lead_id', badgeId)
+            .eq('source_domain', domain)
+            .single();
+
+          if (existing) {
+            await supabase.from('badge_hits').update({
+              click_count: existing.click_count + 1,
+              last_hit_at: new Date().toISOString()
+            }).eq('id', existing.id);
+          } else {
+            await supabase.from('badge_hits').insert({
+              lead_id: badgeId,
+              source_domain: domain,
+              click_count: 1
+            });
+          }
+          console.log(`🛰️ Viral badge hit detected from ${domain}`);
+        } catch (e) {
+          console.error("Badge hit error:", e);
+        }
+      };
+      logBadgeHit();
+    }
 
     // Batch simple state updates
     if (finalEmail) {
@@ -56,17 +104,14 @@ function App() {
       try {
         // Increment Website Hits (Non-blocking)
         const hasCounted = sessionStorage.getItem('vibe_session_counted');
-        if (!hasCounted) {
-          supabase.rpc('increment_hits').then(() => {
-            sessionStorage.setItem('vibe_session_counted', 'true');
-          }).catch(() => {
-            // Fallback for legacy app_settings if RPC isn't available
+        if (!hasCounted && supabase) {
+          supabase.rpc('increment_hits').catch(() => {
+            // Fallback for legacy app_settings
             supabase.from('app_settings').select('value').eq('key', 'website_hits').single().then(({ data }) => {
-              if (data) {
-                supabase.from('app_settings').update({ value: (data.value || 0) + 1 }).eq('key', 'website_hits');
-              }
+              if (data) supabase.from('app_settings').update({ value: (data.value || 0) + 1 }).eq('key', 'website_hits');
             });
           });
+          sessionStorage.setItem('vibe_session_counted', 'true');
         }
 
         const currentEmail = viewEmail || savedEmail || email;
@@ -126,6 +171,7 @@ function App() {
     const handleDeferredTasks = () => {
       if (!supabase) return;
       // Secret reset logic
+      const resetValue = params.get('reset_spots'); // Assuming this is how resetValue is obtained
       if (resetValue) {
         (async () => {
           const { error } = await supabase.from('app_settings')
@@ -182,17 +228,6 @@ function App() {
         if (!isAdmin && !hasTracked) {
           await supabase.rpc('increment_hits');
           sessionStorage.setItem('mv_tracked', 'true');
-
-          // Log Viral Badge Referral
-          if (ref === 'badge' && leadId) {
-            await supabase
-              .from('growth_leads')
-              .update({ badge_hits: 1 }) // This should ideally be an increment, but for MVP we log the hit
-              .eq('id', leadId);
-
-            // In a real scenario, use an RPC for atomic increment
-            await supabase.rpc('increment_badge_hits', { target_id: parseInt(leadId, 10) });
-          }
         }
       } catch (err) {
         console.warn('Hit tracking skipped (RPC or Params not ready yet)');
@@ -277,6 +312,9 @@ function App() {
       document.title = 'Market Intelligence: Startup Trends 2026 | MarketVibe'
     } else if (path.startsWith('/validate/')) {
       setStep('p-seo')
+    } else if (path === '/newsroom') {
+      setStep('newsroom')
+      document.title = 'The Newsroom: Breaking Market Trends | MarketVibe'
     }
 
     return () => {
@@ -415,7 +453,7 @@ function App() {
   }
 
   const handleUnlock = async (planType = 'founder') => {
-    alert(`Debug: App.jsx handleUnlock fired for ${planType}`); // CRITICAL DEBUG
+    // alert(`Debug: App.jsx handleUnlock fired for ${planType}`); // CRITICAL DEBUG
     setSubmitting(true)
     setErrorMessage('')
     try {
@@ -435,26 +473,21 @@ function App() {
     if (planId === 'pro' || planId === 'expert') {
       const stripeType = planId === 'pro' ? 'founder' : 'expert'
       // If we have an email, go straight to checkout
-      if (email) {
+      if (email && email.includes('@')) {
         handleUnlock(stripeType)
       } else {
-        // Otherwise prompt for email first
-        document.getElementById('email-input')?.focus()
-        setErrorMessage('Please enter your email first to secure your spot.')
+        // New Logic: Trigger Checkout Modal instead of scrolling to top
+        setPendingPlan(stripeType);
+        setCheckoutModalOpen(true);
       }
     } else if (planId === 'free') {
       if (email && email.includes('@')) {
         setStep('setup');
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
-        const emailInput = document.querySelector('input[type="email"]') || document.getElementById('email-input');
-        if (emailInput) {
-          emailInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          setTimeout(() => emailInput.focus(), 500); // Small delay for scroll to finish
-        } else {
-          // Fallback: Just go to top where the form usually is
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
+        // New Logic: Trigger Checkout Modal instead of scrolling to top
+        setPendingPlan(planId);
+        setCheckoutModalOpen(true);
       }
     }
   }
@@ -572,6 +605,163 @@ function App() {
             {errorMessage && <p className="error-text">{errorMessage}</p>}
           </div>
 
+          <div style={{
+            margin: '4rem auto 0',
+            maxWidth: '1200px',
+            background: 'rgba(255,255,255,0.02)',
+            border: '1px solid rgba(255,255,255,0.05)',
+            borderRadius: '1rem',
+            padding: '1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem',
+            overflow: 'hidden',
+            whiteSpace: 'nowrap'
+          }}>
+            <div style={{
+              background: '#ef4444',
+              color: 'white',
+              padding: '0.25rem 0.75rem',
+              borderRadius: '0.5rem',
+              fontSize: '0.7rem',
+              fontWeight: 'bold',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <span style={{ width: '8px', height: '8px', background: 'white', borderRadius: '50%', animation: 'pulse 1.5s infinite' }}></span>
+              LIVE SIGNALS
+            </div>
+            <div style={{
+              display: 'flex',
+              gap: '3rem',
+              color: '#94a3b8',
+              fontSize: '0.85rem',
+              animation: 'ticker 30s linear infinite'
+            }}>
+              {popularNiches.slice(0, 10).map((n, i) => (
+                <span key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ color: '#10b981' }}>●</span>
+                  New Validation: {n.name}
+                </span>
+              ))}
+              {/* Loop for seamless scroll */}
+              {popularNiches.slice(0, 10).map((n, i) => (
+                <span key={`l-${i}`} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ color: '#10b981' }}>●</span>
+                  New Validation: {n.name}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <section style={{ padding: '4rem 0', background: 'rgba(255,255,255,0.02)', borderRadius: '2rem', marginTop: '1rem', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+              <h2 style={{ fontSize: '2.5rem', fontWeight: 'bold' }}>The Founder's Toolkit 🛠️</h2>
+              <p style={{ color: '#94a3b8', maxWidth: '600px', margin: '1rem auto' }}>
+                Free high-precision tools used by our autonomous agents to find and validate market gaps.
+              </p>
+            </div>
+
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: '2rem',
+              padding: '0 2rem'
+            }}>
+              {[
+                {
+                  title: 'Brand Builder',
+                  desc: 'Generate viral-ready names for your next pivot.',
+                  icon: '🚀',
+                  color: '#6366f1',
+                  action: () => {
+                    if (email) setStep('tools-naming');
+                    else {
+                      setErrorMessage('Please enter your email to unlock the Founder Toolkit.');
+                      document.getElementById('email-input')?.focus();
+                      document.getElementById('email-input')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                  }
+                },
+                {
+                  title: 'TAM Calculator',
+                  desc: 'Calculate your market size with VC-grade precision.',
+                  icon: '📊',
+                  color: '#10b981',
+                  action: () => {
+                    if (email) setStep('market-size');
+                    else {
+                      setErrorMessage('Please enter your email to unlock the Founder Toolkit.');
+                      document.getElementById('email-input')?.focus();
+                      document.getElementById('email-input')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                  }
+                },
+                {
+                  title: 'Trend Newsroom',
+                  desc: 'Real-time breakout trends detected by our Sentinel agent.',
+                  icon: '📰',
+                  color: '#ef4444',
+                  action: () => {
+                    if (email) setStep('newsroom');
+                    else {
+                      setErrorMessage('Please enter your email to unlock the Founder Toolkit.');
+                      document.getElementById('email-input')?.focus();
+                      document.getElementById('email-input')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                  }
+                },
+                {
+                  title: 'Market Intelligence',
+                  desc: 'Anonymized data from 1,700+ global startup validations.',
+                  icon: '🛰️',
+                  color: '#ec4899',
+                  action: () => {
+                    if (email) setStep('insights');
+                    else {
+                      setErrorMessage('Please enter your email to unlock the Founder Toolkit.');
+                      document.getElementById('email-input')?.focus();
+                      document.getElementById('email-input')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                  }
+                }
+              ].map((tool, idx) => (
+                <div
+                  key={idx}
+                  onClick={tool.action}
+                  style={{
+                    background: 'rgba(255,255,255,0.03)',
+                    padding: '2rem',
+                    borderRadius: '1.5rem',
+                    border: '1px solid rgba(255,255,255,0.05)',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    position: 'relative',
+                    overflow: 'hidden'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-5px)';
+                    e.currentTarget.style.borderColor = tool.color;
+                    e.currentTarget.style.background = `rgba(${parseInt(tool.color.slice(1, 3), 16)}, ${parseInt(tool.color.slice(3, 5), 16)}, ${parseInt(tool.color.slice(5, 7), 16)}, 0.05)`;
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)';
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
+                  }}
+                >
+                  <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>{tool.icon}</div>
+                  <h3 style={{ marginBottom: '0.5rem', color: 'white' }}>{tool.title}</h3>
+                  <p style={{ color: '#94a3b8', fontSize: '0.9rem', lineHeight: '1.5' }}>{tool.desc}</p>
+                  <div style={{ marginTop: '1.5rem', color: tool.color, fontWeight: 'bold', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    Access Tool <span>→</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
           <PricingTable onSelectPlan={handleSelectPlan} spots={spots} />
 
           <section className="testimonials" style={{ padding: '4rem 0', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
@@ -592,7 +782,7 @@ function App() {
 
       {step === 'setup' && (
         <section style={{ padding: '4rem 0', textAlign: 'center' }}>
-          <ProjectForm onSubmit={handleProjectSubmit} loading={submitting} />
+          <ProjectForm onSubmit={handleProjectSubmit} loading={submitting} initialName={selectedProjectName} />
           {errorMessage && <p className="error-text">{errorMessage}</p>}
         </section>
       )}
@@ -600,6 +790,7 @@ function App() {
       {step === 'tools-naming' && (
         <section style={{ padding: '4rem 0' }}>
           <NameGenerator onSelectName={(name) => {
+            setSelectedProjectName(name)
             setStep('setup')
           }} />
         </section>
@@ -622,10 +813,10 @@ function App() {
           <ResultsView
             results={results}
             unlocked={paid}
-            planType={planType}
             onUnlock={handleUnlock}
             spots={spots}
             loading={submitting}
+            planType={planType}
             leads={leadsFeed}
             usageCount={usageCount}
             leadId={currentLeadId}
@@ -634,13 +825,91 @@ function App() {
         </section>
       )}
 
+      {/* Checkout Email Modal */}
+      {checkoutModalOpen && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.85)', zIndex: 99999,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          backdropFilter: 'blur(5px)'
+        }}>
+          <div style={{
+            background: '#0f172a', padding: '2.5rem', borderRadius: '1.5rem',
+            border: '1px solid #334155', maxWidth: '450px', width: '90%',
+            textAlign: 'center', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+          }}>
+            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🧾</div>
+            <h3 style={{ color: 'white', marginBottom: '0.5rem', fontSize: '1.5rem' }}>Where should we send your receipt?</h3>
+            <p style={{ color: '#94a3b8', marginBottom: '2rem' }}>
+              Enter your email to create your account and proceed to secure checkout.
+            </p>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (email && email.includes('@')) {
+                setCheckoutModalOpen(false);
+                handleUnlock(pendingPlan);
+              } else {
+                setErrorMessage('Please enter a valid email.');
+              }
+            }}>
+              <input
+                type="email"
+                placeholder="your@email.com"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                autoFocus
+                style={{
+                  width: '100%', padding: '1rem', marginBottom: '1rem',
+                  background: 'rgba(255,255,255,0.05)', border: '1px solid #475569',
+                  color: 'white', borderRadius: '0.75rem', fontSize: '1rem'
+                }}
+              />
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setCheckoutModalOpen(false)}
+                  style={{
+                    flex: 1, padding: '1rem', borderRadius: '0.75rem',
+                    border: '1px solid #475569', color: '#94a3b8',
+                    background: 'transparent', cursor: 'pointer', fontWeight: 'bold'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  style={{
+                    flex: 2, padding: '1rem', borderRadius: '0.75rem',
+                    border: 'none', background: '#6366f1', color: 'white',
+                    fontWeight: 'bold', cursor: 'pointer',
+                    opacity: submitting ? 0.7 : 1
+                  }}
+                >
+                  {submitting ? 'Processing...' : 'Continue to Payment →'}
+                </button>
+              </div>
+              {errorMessage && <p style={{ color: '#ef4444', marginTop: '1rem', fontSize: '0.9rem' }}>{errorMessage}</p>}
+            </form>
+          </div>
+        </div>
+      )}
+
+      {step === 'admin' && <AdminDashboard />}
       {step === 'privacy' && <PrivacyPolicy />}
       {step === 'terms' && <TermsOfService />}
       {step === 'hub' && <CaseStudyHub />}
-      {step === 'market-size' && <MarketSizeCalculator />}
+      {step === 'market-size' && <MarketSizeCalculator onGetBlueprint={() => {
+        setStep('setup');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }} />}
       {step === 'p-seo' && <NicheValidator />}
       {step === 'insights' && <AuthorityInsights />}
       {step === 'newsroom' && <Newsroom />}
+      {step === 'admin' && <AdminDashboard />}
+      {step === 'privacy' && <PrivacyPolicy />}
+      {step === 'terms' && <TermsOfService />}
+      {step === 'hub' && <CaseStudyHub />}
 
       <section className="features">
         <div className="feature-card">

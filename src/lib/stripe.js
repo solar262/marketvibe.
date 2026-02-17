@@ -3,34 +3,29 @@ import { loadStripe } from '@stripe/stripe-js';
 const STRIPE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_live_placeholder';
 export const stripePromise = loadStripe(STRIPE_KEY);
 
-const PAYMENT_LINKS = {
-    founder: import.meta.env.VITE_STRIPE_FOUNDER_LINK || 'https://buy.stripe.com/14A5kD3L18dk3LA6Qq3ks00',
-    expert: import.meta.env.VITE_STRIPE_EXPERT_LINK || 'https://buy.stripe.com/8x2dR96XdctA81Q8Yy3ks01'
+const HARDCODED_LINKS = {
+    founder: 'https://buy.stripe.com/14A5kD3L18dk3LA6Qq3ks00',
+    expert: 'https://buy.stripe.com/8x2dR96XdctA81Q8Yy3ks01'
 };
 
 export const createCheckoutSession = async (email, plan = 'founder') => {
-    // DEBUG: Alert to see what's happening on mobile
-    const envLink = import.meta.env[`VITE_STRIPE_${plan.toUpperCase()}_LINK`];
-    const hardcodedLink = plan === 'founder'
-        ? 'https://buy.stripe.com/14A5kD3L18dk3LA6Qq3ks00'
-        : 'https://buy.stripe.com/8x2dR96XdctA81Q8Yy3ks01';
+    // 1. Try to get link from environment
+    const envVarName = `VITE_STRIPE_${plan.toUpperCase()}_LINK`;
+    let link = import.meta.env[envVarName];
 
-    const link = envLink || hardcodedLink;
-
-    alert(`Debug: Plan=${plan}\nEnvLink=${envLink}\nFinalLink=${link}`);
-
+    // 2. If missing or placeholder, use hardcoded fallback
     if (!link || link.includes('placeholder') || link.length < 10) {
-        alert(`ERROR: Link validation failed for ${plan}`);
-        throw new Error(`Stripe ${plan} configuration incomplete. Link is: ${link}`);
+        console.warn(`[Stripe] Missing ${envVarName}, using hardcoded fallback.`);
+        link = HARDCODED_LINKS[plan] || HARDCODED_LINKS.founder;
     }
 
-    /*
-    if (STRIPE_KEY.includes('placeholder')) {
-         alert("ERROR: Stripe Key is placeholder");
-         throw new Error(`Stripe Publishable Key missing.`);
+    // 3. Final Validation
+    if (!link || !link.startsWith('http')) {
+        console.error(`[Stripe] Critical Error: No valid payment link for ${plan}. Link value: ${link}`);
+        throw new Error(`Payment Configuration Error (Code 777). Please contact support.`);
     }
-    */
 
+    // 4. Redirect
     const checkoutUrl = `${link}?prefilled_email=${encodeURIComponent(email)}`;
     window.location.href = checkoutUrl;
 };

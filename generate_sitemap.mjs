@@ -1,7 +1,7 @@
 import fs from 'fs';
 import { popularNiches } from './src/lib/niches.js';
 
-const BASE_URL = 'https://marketvibe.vercel.app';
+const BASE_URL = 'https://www.marketvibe1.com';
 
 const generateSitemap = () => {
     const pages = [

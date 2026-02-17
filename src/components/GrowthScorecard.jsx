@@ -59,17 +59,17 @@ const GrowthScorecard = ({ leadId }) => {
                     </div>
                     <div style={{ background: 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '1.5rem', border: '1px solid rgba(255,255,255,0.1)' }}>
                         <p style={{ color: '#94a3b8', fontSize: '1.5rem', margin: '0 0 0.5rem 0' }}>Market Opportunity</p>
-                        <h2 style={{ fontSize: '4rem', margin: 0, color: '#6366f1' }}>{report.revenueForecast.marketSize}</h2>
+                        <h2 style={{ fontSize: '4rem', margin: 0, color: '#6366f1' }}>{report.revenueForecast.totalAddressableMarket}</h2>
                     </div>
                 </div>
 
                 <p style={{ fontSize: '1.5rem', color: '#64748b', marginTop: '2rem' }}>
-                    Validated idea for <span style={{ color: '#fff' }}>@{lead.username}</span> on Reddit
+                    Validated idea for <span style={{ color: '#fff' }}>@{lead.username}</span> on {lead.platform || 'Reddit'}
                 </p>
             </div>
 
             <div style={{ position: 'absolute', bottom: '2rem', width: '100%', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '1rem' }}>
-                Generate your blueprint at marketvibe.vercel.app
+                Generate your blueprint at marketvibe1.com
             </div>
         </div>
     );

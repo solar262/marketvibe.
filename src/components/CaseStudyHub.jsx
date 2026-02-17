@@ -17,7 +17,24 @@ const CaseStudyHub = () => {
                 .order('created_at', { ascending: false })
                 .limit(12);
 
-            setCases(data || []);
+            // Deduplicate logic: Filter by unique (Project Name + Niche)
+            const uniqueCases = [];
+            const seen = new Set();
+
+            if (data) {
+                data.forEach(item => {
+                    const name = (item.project_name || '').toLowerCase().trim();
+                    const niche = (item.results?.niche || '').toLowerCase().trim();
+                    const key = `${name}-${niche}`;
+
+                    if (name && !seen.has(key)) {
+                        seen.add(key);
+                        uniqueCases.push(item);
+                    }
+                });
+            }
+
+            setCases(uniqueCases);
             setLoading(false);
         };
         fetchCases();

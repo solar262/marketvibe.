@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { niches } from '../lib/niches';
+import { popularNiches } from '../lib/niches';
 import { generateValidationReport } from '../lib/generator';
 
 const NicheValidator = () => {
@@ -9,20 +9,33 @@ const NicheValidator = () => {
     const [report, setReport] = useState(null);
 
     useEffect(() => {
-        const found = niches.find(n => n.id === nicheId) || niches[0];
-        setNicheData(found);
+        let found = popularNiches.find(n => n.slug === nicheId);
+
+        // Dynamic Fallback for Trending Niches
+        if (!found && nicheId) {
+            const humanName = nicheId.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+            found = {
+                name: humanName,
+                slug: nicheId,
+                audience: "Early Adopters & Niche Enthusiasts",
+                description: `Building a business in the ${humanName} space.`
+            };
+        }
+
+        const targetNiche = found || popularNiches[0];
+        setNicheData(targetNiche);
 
         // Generate a sample preview report for the niche
         const sampleReport = generateValidationReport({
-            name: found.name,
-            description: `How to build and validate a ${found.name} business in 30 days.`,
-            audience: found.audience || "Founders & Builders",
-            niche: found.name
+            name: targetNiche.name,
+            description: `How to build and validate a ${targetNiche.name} business in 30 days.`,
+            audience: targetNiche.audience || "Founders & Builders",
+            niche: targetNiche.name
         });
         setReport(sampleReport);
 
         // Update document title for SEO
-        document.title = `Validate ${found.name} Startup Idea - MarketVibe`;
+        document.title = `Validate ${targetNiche.name} Startup Idea - MarketVibe`;
     }, [nicheId]);
 
     if (!nicheData || !report) return null;

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 
-const ProjectForm = ({ onSubmit, loading }) => {
+const ProjectForm = ({ onSubmit, loading, initialName = '' }) => {
     const [formData, setFormData] = useState({
-        name: '',
+        name: initialName,
         description: '',
         audience: ''
     });
