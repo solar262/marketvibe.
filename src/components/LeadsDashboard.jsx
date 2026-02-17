@@ -76,11 +76,19 @@ const LeadsDashboard = () => {
                 .update({ status: newStatus })
                 .eq('id', id);
 
-            if (!error) {
+            if (error) {
+                console.error('Update status error:', error);
+                showFeedback(`Permission Error: Database blocked the update to "${newStatus}". Please run the SQL unlock script.`, 'error');
+                return false;
+            } else {
                 setLeads(prev => prev.filter(l => l.id !== id));
+                fetchStats(); // Force refresh stats immediately
+                return true;
             }
         } catch (err) {
             console.error('Update status error:', err);
+            showFeedback('Sync Error: Check your internet connection.', 'error');
+            return false;
         }
     };
 
@@ -108,7 +116,12 @@ const LeadsDashboard = () => {
 
         window.open(url, '_blank');
         setSentLeads(prev => new Set([...prev, lead.id]));
-        handleUpdateStatus(lead.id, 'contacted');
+
+        // Wrap status update in success check
+        const success = await handleUpdateStatus(lead.id, 'contacted');
+        if (success) {
+            showFeedback(`Marked ${lead.username} as Contacted! 🚀`, 'success');
+        }
         setTimeout(() => {
             setSentLeads(prev => {
                 const next = new Set(prev);
