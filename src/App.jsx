@@ -1047,6 +1047,7 @@ function App() {
           <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
             <a href="/privacy" style={{ color: '#475569', textDecoration: 'none' }}>Privacy Policy</a>
             <a href="/terms" style={{ color: '#475569', textDecoration: 'none' }}>Terms of Service</a>
+            <a href="mailto:partners@marketvibe1.com?subject=Sponsorship%20Inquiry" style={{ color: '#94a3b8', textDecoration: 'none', transition: 'color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.color = '#fff'} onMouseOut={(e) => e.currentTarget.style.color = '#94a3b8'}>Sponsor</a>
             <a href="mailto:support@marketvibe1.com" style={{ color: '#6366f1', textDecoration: 'none', fontWeight: 'bold' }}>Support: support@marketvibe1.com</a>
           </div>
           &copy; 2026 MarketVibe. Built for builders who want to win.
