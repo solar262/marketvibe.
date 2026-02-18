@@ -160,7 +160,10 @@ const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = '
                         <VerificationBadge score={results.overallScore} leadId={leadId} />
                         <button
                             onClick={() => {
-                                const code = `<a href="https://www.marketvibe1.com/og-preview/${leadId}?ref=badge&lid=${leadId}" target="_blank"><img src="https://www.marketvibe1.com/logo.svg" style="width: 150px;" alt="Validated by MarketVibe"></a>`;
+                                const code = `<a href="https://www.marketvibe1.com/og-preview/${leadId}?ref=badge&lid=${leadId}" target="_blank" style="text-decoration: none; font-family: sans-serif; color: #6366f1; font-weight: bold; display: inline-flex; align-items: center; gap: 8px; background: #0f172a; padding: 8px 12px; borderRadius: 8px; border: 1px solid #334155;">
+  <img src="https://www.marketvibe1.com/logo.svg" style="width: 24px; height: 24px;" alt="MarketVibe Logo">
+  Validated by MarketVibe
+</a>`;
                                 navigator.clipboard.writeText(code);
                                 alert("Embed code copied to clipboard! 📋");
                             }}
