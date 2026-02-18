@@ -20,6 +20,8 @@ import BlogIndex from './components/BlogIndex';
 import BlogPost from './components/BlogPost';
 import ReferralHub from './components/ReferralHub';
 import AdminDashboard from './components/AdminDashboard';
+import LaunchpadDirectory from './components/LaunchpadDirectory';
+import LaunchpadSubmit from './components/LaunchpadSubmit';
 import EmailCapturePopup from './components/EmailCapturePopup';
 import { popularNiches } from './lib/niches'
 
@@ -326,6 +328,12 @@ function App() {
       setStep('blog-post')
     } else if (path === '/viral') {
       setStep('viral')
+    } else if (path === '/launchpad') {
+      setStep('launchpad')
+      document.title = 'MarketVibe Launchpad - Discover Validated Startups'
+    } else if (path === '/launchpad/submit') {
+      setStep('launchpad-submit')
+      document.title = 'Submit to Launchpad | MarketVibe'
     }
 
     // Capture Referral Code
@@ -555,7 +563,13 @@ function App() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+          <a href="/launchpad" style={{
+            color: '#a5b4fc', textDecoration: 'none', fontWeight: 600, fontSize: '0.9rem',
+            display: 'flex', alignItems: 'center', gap: '6px'
+          }}>
+            <span>🚀</span> Launchpad
+          </a>
           {paid && history && history.length > 0 && step !== 'admin-leads' && (
             <p style={{ marginTop: '2rem', fontSize: '0.9rem', opacity: 0.8 }}>
               © 2024 MarketVibe. All rights reserved.
@@ -953,6 +967,8 @@ function App() {
       {step === 'privacy' && <PrivacyPolicy />}
       {step === 'terms' && <TermsOfService />}
       {step === 'hub' && <CaseStudyHub />}
+      {step === 'launchpad' && <LaunchpadDirectory supabase={supabase} />}
+      {step === 'launchpad-submit' && <LaunchpadSubmit supabase={supabase} />}
 
       <section className="features">
         <div className="feature-card">
