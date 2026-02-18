@@ -486,7 +486,81 @@ const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = '
                 )}
             </div>
 
-            <div style={{ marginTop: '5rem', textAlign: 'center', display: 'flex', gap: '1rem', justifyContent: 'center', opacity: unlocked ? 1 : 0.3 }}>
+            {/* 💰 UPGRADE CTA — Only shown to free users */}
+            {!unlocked && (
+                <div style={{
+                    marginTop: '3rem',
+                    padding: '2.5rem',
+                    background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(168, 85, 247, 0.08) 100%)',
+                    borderRadius: '1.5rem',
+                    border: '2px solid rgba(99, 102, 241, 0.3)',
+                    textAlign: 'center',
+                    position: 'relative',
+                    overflow: 'hidden'
+                }}>
+                    <div style={{
+                        position: 'absolute', top: 0, left: 0, right: 0, height: '3px',
+                        background: 'linear-gradient(90deg, #6366f1, #a855f7, #ec4899)'
+                    }} />
+                    <div style={{ fontSize: '0.85rem', color: '#f43f5e', fontWeight: 'bold', marginBottom: '0.75rem' }}>
+                        🔥 {spots} Founder Spots Remaining
+                    </div>
+                    <h3 style={{ fontSize: '1.5rem', marginBottom: '0.75rem', color: 'white' }}>
+                        Upgrade to Founder — Take Action Today 🚀
+                    </h3>
+                    <p style={{ color: '#94a3b8', marginBottom: '1.5rem', fontSize: '0.95rem', lineHeight: '1.6', maxWidth: '500px', margin: '0 auto 1.5rem' }}>
+                        You've seen the data. Now get the tools to execute:
+                    </p>
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                        gap: '1rem',
+                        marginBottom: '2rem',
+                        maxWidth: '500px',
+                        margin: '0 auto 2rem'
+                    }}>
+                        {[
+                            { icon: '📄', label: 'PDF Export' },
+                            { icon: '💻', label: 'MVP Code' },
+                            { icon: '🔁', label: 'Unlimited Runs' },
+                            { icon: '💼', label: 'Commercial Rights' }
+                        ].map((item, i) => (
+                            <div key={i} style={{
+                                background: 'rgba(255,255,255,0.03)',
+                                padding: '0.75rem',
+                                borderRadius: '0.75rem',
+                                border: '1px solid rgba(255,255,255,0.06)',
+                                fontSize: '0.85rem',
+                                color: '#cbd5e1'
+                            }}>
+                                <div style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>{item.icon}</div>
+                                {item.label}
+                            </div>
+                        ))}
+                    </div>
+                    <button
+                        onClick={() => onUnlock('founder')}
+                        className="btn-primary"
+                        disabled={loading}
+                        style={{
+                            padding: '1.25rem 3rem',
+                            fontSize: '1.15rem',
+                            fontWeight: 'bold',
+                            boxShadow: '0 10px 25px -5px rgba(99, 102, 241, 0.4)',
+                            cursor: 'pointer',
+                            touchAction: 'manipulation',
+                            WebkitTapHighlightColor: 'transparent'
+                        }}
+                    >
+                        {loading ? 'Preparing...' : 'Unlock Founder Kit — $49 One-Time'}
+                    </button>
+                    <p style={{ marginTop: '1rem', fontSize: '0.8rem', color: '#475569' }}>
+                        One-time payment · Instant delivery · Full commercial rights
+                    </p>
+                </div>
+            )}
+
+            <div style={{ marginTop: '5rem', textAlign: 'center', display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
                 <button
                     onClick={handleDownloadScorecard}
                     className="btn-primary"
