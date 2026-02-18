@@ -901,7 +901,12 @@ function App() {
               e.preventDefault();
               if (email && email.includes('@')) {
                 setCheckoutModalOpen(false);
-                handleUnlock(pendingPlan);
+                if (pendingPlan === 'free') {
+                  setStep('setup');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                } else {
+                  handleUnlock(pendingPlan);
+                }
               } else {
                 setErrorMessage('Please enter a valid email.');
               }
@@ -940,7 +945,7 @@ function App() {
                     opacity: submitting ? 0.7 : 1
                   }}
                 >
-                  {submitting ? 'Processing...' : 'Continue to Payment →'}
+                  {submitting ? 'Processing...' : (pendingPlan === 'free' ? 'Start Free Validation →' : 'Continue to Payment →')}
                 </button>
               </div>
               {errorMessage && <p style={{ color: '#ef4444', marginTop: '1rem', fontSize: '0.9rem' }}>{errorMessage}</p>}
