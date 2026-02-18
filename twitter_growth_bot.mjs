@@ -112,12 +112,13 @@ async function runTwitterGrowthBot() {
 
     const browser = await connectToEdge();
     const page = await browser.newPage();
-    page.setDefaultTimeout(30000);
+    page.setDefaultTimeout(60000); // Increased timeout to 60s
 
     try {
         // Check logged in to Twitter
-        await page.goto('https://x.com/home', { waitUntil: 'networkidle2' });
-        await sleep(3000);
+        // Use domcontentloaded which is faster/safer than networkidle2 for Twitter/X
+        await page.goto('https://x.com/home', { waitUntil: 'domcontentloaded' });
+        await sleep(5000); // Give it a bit more time to settle
 
         const currentUrl = page.url();
         if (currentUrl.includes('/login') || currentUrl.includes('/i/flow')) {
@@ -137,8 +138,8 @@ async function runTwitterGrowthBot() {
             log(`🔍 Searching: "${searchTerm}"`);
 
             const searchUrl = `https://x.com/search?q=${encodeURIComponent(searchTerm)}&f=user`;
-            await page.goto(searchUrl, { waitUntil: 'networkidle2' });
-            await sleep(4000);
+            await page.goto(searchUrl, { waitUntil: 'domcontentloaded' });
+            await sleep(5000);
 
             // Extract profile URLs from search results
             const profileLinks = await page.evaluate(() => {
@@ -168,8 +169,8 @@ async function runTwitterGrowthBot() {
 
                 try {
                     log(`Visiting: ${profileUrl}`);
-                    await page.goto(profileUrl, { waitUntil: 'networkidle2' });
-                    await sleep(3000);
+                    await page.goto(profileUrl, { waitUntil: 'domcontentloaded' });
+                    await sleep(4000);
 
                     // Find follow button (not unfollow/following)
                     const followed = await page.evaluate(() => {
