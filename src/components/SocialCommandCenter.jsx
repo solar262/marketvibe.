@@ -97,16 +97,41 @@ const SocialCommandCenter = () => {
     };
 
     const handlePostNow = async (post) => {
-        // In production: call Twitter/LinkedIn API here
-        // For now: mark as posted and open Twitter compose
-        const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(post?.content || postText)}`;
+        const content = post?.content || postText;
+        if (!content.trim()) return;
+
+        // Open Twitter with pre-filled text
+        const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(content)}`;
         window.open(twitterUrl, '_blank');
 
+        const now = new Date().toISOString();
+
         if (post?.id && supabase) {
-            await supabase.from('social_posts').update({ status: 'posted', posted_at: new Date().toISOString() }).eq('id', post.id);
+            // Post came from queue — update existing record
+            await supabase.from('social_posts')
+                .update({ status: 'posted', posted_at: now })
+                .eq('id', post.id);
             setQueue(prev => prev.filter(p => p.id !== post.id));
-            setPosted(prev => [{ ...post, status: 'posted' }, ...prev]);
+            setPosted(prev => [{ ...post, status: 'posted', posted_at: now }, ...prev]);
             setStats(prev => ({ ...prev, queued: prev.queued - 1, posted: prev.posted + 1 }));
+        } else {
+            // Post came directly from Compose — insert new record as posted
+            const newRecord = {
+                platform,
+                content,
+                status: 'posted',
+                posted_at: now,
+                created_at: now,
+            };
+            if (supabase) {
+                const { data } = await supabase.from('social_posts').insert(newRecord).select().single();
+                if (data) setPosted(prev => [data, ...prev]);
+            } else {
+                setPosted(prev => [{ ...newRecord, id: Date.now() }, ...prev]);
+            }
+            setStats(prev => ({ ...prev, posted: prev.posted + 1, totalReach: (prev.posted + 1) * 340 }));
+            setPostText('');
+            setSelectedTemplate(null);
         }
     };
 
