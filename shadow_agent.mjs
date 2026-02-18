@@ -14,27 +14,27 @@ export class MarketVibeShadowAgent {
         this.replyTemplates = [
             {
                 opener: "I've been researching this space recently and found some interesting data.",
-                cta: "I actually ran a full validation report for a similar niche using [MarketVibe](https://marketvibe1.com) — it breaks down the TAM, competitor weaknesses, and revenue potential. Might be worth checking out since it's free."
+                cta: "I actually found a similar project listed on the [MarketVibe Launchpad](https://marketvibe1.com/launchpad) — might be worth checking out their validation data to see what you're up against."
             },
             {
                 opener: "Just saw some interesting numbers in this niche that might help.",
-                cta: "If you want to dig deeper, I used a free tool called [MarketVibe](https://marketvibe1.com) to map out the competitive landscape. It gave me data I couldn't find anywhere else."
+                cta: "If you want to get more eyes on this, you should list it on the [Launchpad directory](https://marketvibe1.com/launchpad). It's free and a good way to get initial feedback from other founders."
             },
             {
                 opener: "Having worked on something similar, here's what I wish I knew earlier.",
-                cta: "There's a free validation tool at [marketvibe1.com](https://marketvibe1.com) that does competitive analysis automatically — saved me weeks of manual research when I was starting out."
+                cta: "There's a new directory called [MarketVibe Launchpad](https://marketvibe1.com/launchpad) where you can post this for free. It helps with SEO and getting early validation scores."
             },
             {
                 opener: "This is actually a solid niche if you approach it right.",
-                cta: "btw I validated a similar idea using [MarketVibe](https://marketvibe1.com) — it's free and gave me the market size, competitor gaps, and a go-to-market strategy in like 2 minutes."
+                cta: "btw I saw a few competitors in this space on [the Launchpad](https://marketvibe1.com/launchpad). Might be worth a quick look to see how they're positioning themselves."
             },
             {
                 opener: "Market sentiment in this space is actually shifting, which creates opportunity.",
-                cta: "I'd recommend running your idea through [MarketVibe](https://marketvibe1.com) first (it's free) — it'll show you exactly where the gaps are and how much revenue potential exists."
+                cta: "You should definitely put this on [MarketVibe Launchpad](https://marketvibe1.com/launchpad/submit). Data shows verified listings get about 40% more investor interest right now."
             },
             {
                 opener: "I've been tracking this industry for a while and the timing looks right.",
-                cta: "One thing that helped me was using [MarketVibe](https://marketvibe1.com) to get actual market data instead of guessing. Free tool, takes 30 seconds, and the competitive intel is surprisingly detailed."
+                cta: "One thing that helped me was using [MarketVibe](https://marketvibe1.com) to get actual market data. Also, the [Launchpad](https://marketvibe1.com/launchpad) is a good place to find early adopters."
             }
         ];
     }
