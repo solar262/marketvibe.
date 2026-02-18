@@ -23,6 +23,8 @@ import AdminDashboard from './components/AdminDashboard';
 import LaunchpadDirectory from './components/LaunchpadDirectory';
 import LaunchpadSubmit from './components/LaunchpadSubmit';
 import LaunchpadListing from './components/LaunchpadListing';
+import InvestorLanding from './components/InvestorLanding';
+import InvestorDashboard from './components/InvestorDashboard';
 import EmailCapturePopup from './components/EmailCapturePopup';
 import { popularNiches } from './lib/niches'
 
@@ -337,6 +339,12 @@ function App() {
       document.title = 'Submit to Launchpad | MarketVibe'
     } else if (path.startsWith('/launchpad/listing/')) {
       setStep('launchpad-listing')
+    } else if (path === '/investors') {
+      setStep('investors')
+      document.title = 'Investor Access | MarketVibe Deal Flow'
+    } else if (path === '/investor/dashboard') {
+      setStep('investor-dashboard')
+      document.title = 'Investor Dashboard | MarketVibe'
     }
 
     // Capture Referral Code
@@ -983,6 +991,12 @@ function App() {
           onBack={() => { window.location.href = '/launchpad'; }}
           supabase={supabase}
         />
+      )}
+      {step === 'investors' && (
+        <InvestorLanding onNavigate={(path) => { window.location.href = path; }} />
+      )}
+      {step === 'investor-dashboard' && (
+        <InvestorDashboard supabase={supabase} />
       )}
 
       <section className="features">
