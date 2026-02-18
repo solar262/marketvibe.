@@ -20,6 +20,7 @@ import BlogIndex from './components/BlogIndex';
 import BlogPost from './components/BlogPost';
 import ReferralHub from './components/ReferralHub';
 import AdminDashboard from './components/AdminDashboard';
+import EmailCapturePopup from './components/EmailCapturePopup';
 import { popularNiches } from './lib/niches'
 
 function App() {
@@ -1030,6 +1031,12 @@ function App() {
           &copy; 2026 MarketVibe. Built for builders who want to win.
         </div>
       </footer>
+
+      {/* Email Capture Popup — shows on landing page after 8s or exit intent */}
+      <EmailCapturePopup supabase={supabase} onEmailCaptured={(capturedEmail) => {
+        setEmail(capturedEmail);
+        console.log('Lead captured via popup:', capturedEmail);
+      }} />
     </div>
   )
 }

@@ -34,6 +34,25 @@ You have the ${name} idea. You have the revenue forecast. Now you just need the 
 We've helped 100+ founders skip the guesswork. Grab your blueprint before the lifetime deal expires!
 
 https://www.marketvibe1.com`
+    },
+    {
+        step: 3,
+        delayHours: 48,
+        subject: "Last chance: Your validation report expires in 24 hours ⏰",
+        template: (name) => `Quick heads-up — the free validation report you generated for ${name} will expire from our servers in 24 hours.
+
+After that, you'd need to regenerate it (and the lifetime deal pricing might not be available).
+
+Here's what founders who upgraded are saying:
+- "I launched 3 weeks faster because of the execution blueprint" — Sarah K.
+- "The competitor analysis alone saved me from building the wrong thing" — Mike R.
+
+Lock in the $49 lifetime deal before it's gone:
+https://www.marketvibe1.com
+
+— The MarketVibe Team
+
+P.S. This is genuinely the lowest price we'll ever offer. After this batch, it goes to $99/mo.`
     }
 ];
 
