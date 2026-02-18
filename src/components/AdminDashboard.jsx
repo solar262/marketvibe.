@@ -137,6 +137,14 @@ const AdminDashboard = () => {
                             <p style={{ color: '#94a3b8' }}>SEO Content Engine</p>
                         </div>
                     </a>
+                    <a href="/admin/social" style={{ textDecoration: 'none' }}>
+                        <div style={{ background: 'rgba(168, 85, 247, 0.1)', padding: '2rem', borderRadius: '1rem', border: '1px solid #a855f7', textAlign: 'center', transition: 'transform 0.2s', cursor: 'pointer' }} onMouseOver={e => e.currentTarget.style.transform = 'translateY(-5px)'} onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}>
+                            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📡</div>
+                            <h3 style={{ color: 'white', margin: 0 }}>Social HQ</h3>
+                            <p style={{ color: '#94a3b8' }}>Post · Queue · Automate</p>
+                        </div>
+                    </a>
+
                 </div>
 
                 {/* Recent Validations Table */}

@@ -25,6 +25,7 @@ import LaunchpadSubmit from './components/LaunchpadSubmit';
 import LaunchpadListing from './components/LaunchpadListing';
 import InvestorLanding from './components/InvestorLanding';
 import InvestorDashboard from './components/InvestorDashboard';
+import SocialCommandCenter from './components/SocialCommandCenter';
 import EmailCapturePopup from './components/EmailCapturePopup';
 import { popularNiches } from './lib/niches'
 
@@ -345,6 +346,9 @@ function App() {
     } else if (path === '/investor/dashboard') {
       setStep('investor-dashboard')
       document.title = 'Investor Dashboard | MarketVibe'
+    } else if (path === '/admin/social') {
+      setStep('social-command')
+      document.title = 'Social Command Center | MarketVibe'
     }
 
     // Capture Referral Code
@@ -997,6 +1001,9 @@ function App() {
       )}
       {step === 'investor-dashboard' && (
         <InvestorDashboard supabase={supabase} />
+      )}
+      {step === 'social-command' && (
+        <SocialCommandCenter />
       )}
 
       <section className="features">
