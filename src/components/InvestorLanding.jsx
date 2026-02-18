@@ -8,7 +8,7 @@ const InvestorLanding = ({ onNavigate }) => {
     const [email, setEmail] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
-    const INVESTOR_STRIPE_LINK = 'https://buy.stripe.com/14A5kD3L18dk3LA6Qq3ks00'; // replace with real investor link
+    const INVESTOR_STRIPE_LINK = 'https://buy.stripe.com/4gMcN5dlBdxEgym7Uu3ks02';
 
     const handleGetAccess = (e) => {
         e.preventDefault();
