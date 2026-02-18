@@ -58,6 +58,7 @@ const LaunchpadCard = ({ listing, onUpvote }) => {
             cursor: 'pointer',
             position: 'relative',
         }}
+            onClick={() => window.location.href = `/launchpad/listing/${listing.id}`}
             onMouseOver={(e) => {
                 e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
                 e.currentTarget.style.transform = 'translateY(-2px)';
