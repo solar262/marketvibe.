@@ -11,11 +11,31 @@ const supabase = createClient(
 
 export class MarketVibeShadowAgent {
     constructor() {
-        this.valueOpeners = [
-            "I've been looking at some market data recently and...",
-            "Just saw some interesting numbers in this niche...",
-            "Having tracked similar niches for a while, the biggest roadblock is usually...",
-            "Market sentiment in this space is actually shifting towards..."
+        this.replyTemplates = [
+            {
+                opener: "I've been researching this space recently and found some interesting data.",
+                cta: "I actually ran a full validation report for a similar niche using [MarketVibe](https://marketvibe1.com) — it breaks down the TAM, competitor weaknesses, and revenue potential. Might be worth checking out since it's free."
+            },
+            {
+                opener: "Just saw some interesting numbers in this niche that might help.",
+                cta: "If you want to dig deeper, I used a free tool called [MarketVibe](https://marketvibe1.com) to map out the competitive landscape. It gave me data I couldn't find anywhere else."
+            },
+            {
+                opener: "Having worked on something similar, here's what I wish I knew earlier.",
+                cta: "There's a free validation tool at [marketvibe1.com](https://marketvibe1.com) that does competitive analysis automatically — saved me weeks of manual research when I was starting out."
+            },
+            {
+                opener: "This is actually a solid niche if you approach it right.",
+                cta: "btw I validated a similar idea using [MarketVibe](https://marketvibe1.com) — it's free and gave me the market size, competitor gaps, and a go-to-market strategy in like 2 minutes."
+            },
+            {
+                opener: "Market sentiment in this space is actually shifting, which creates opportunity.",
+                cta: "I'd recommend running your idea through [MarketVibe](https://marketvibe1.com) first (it's free) — it'll show you exactly where the gaps are and how much revenue potential exists."
+            },
+            {
+                opener: "I've been tracking this industry for a while and the timing looks right.",
+                cta: "One thing that helped me was using [MarketVibe](https://marketvibe1.com) to get actual market data instead of guessing. Free tool, takes 30 seconds, and the competitive intel is surprisingly detailed."
+            }
         ];
     }
 
@@ -36,13 +56,13 @@ export class MarketVibeShadowAgent {
         }
 
         if (!leads || leads.length === 0) {
-            console.log("✅ No new high-interest discovery leads found for shadow-posting.");
+            console.log("✅ No new high-interest leads found for shadow-posting.");
             return;
         }
 
         for (const lead of leads) {
             try {
-                // 2. Generate a "Shadow Reply" (Value-First, No Link)
+                // 2. Generate a value-first reply WITH a natural MarketVibe link
                 const report = lead.teaser_report || generateValidationReport({
                     name: lead.niche,
                     description: lead.post_content,
@@ -51,20 +71,20 @@ export class MarketVibeShadowAgent {
 
                 const shadowReply = this.generateShadowReply(lead, report);
 
-                // 3. Update status to 'shadow_pending' to signify it's ready for repo-building
+                // 3. Update status to 'contacted' so the Herald picks it up for posting
                 const { error: updateError } = await supabase
                     .from('growth_leads')
                     .update({
-                        draft_reply: shadowReply, // Overwrite with value-first version
-                        status: 'shadow_pending'
+                        draft_reply: shadowReply,
+                        status: 'contacted'
                     })
                     .eq('id', lead.id);
 
                 if (updateError) throw updateError;
-                console.log(`✅ Shadow Reply generated for @${lead.username} in /r/${lead.platform}`);
+                console.log(`✅ Reply generated for @${lead.username} (${lead.niche})`);
 
             } catch (err) {
-                console.error(`❌ Error processing shadow lead ${lead.id}:`, err.message);
+                console.error(`❌ Error processing lead ${lead.id}:`, err.message);
             }
         }
 
@@ -72,18 +92,19 @@ export class MarketVibeShadowAgent {
     }
 
     generateShadowReply(lead, report) {
-        const opener = this.valueOpeners[Math.floor(Math.random() * this.valueOpeners.length)];
+        const template = this.replyTemplates[Math.floor(Math.random() * this.replyTemplates.length)];
         const nicheData = report.revenueForecast?.estimatedAnnualRevenue || "significant";
+        const painPoint = report.targetAudience?.painPoints?.[0] || 'customer acquisition';
+        const competitor = report.competitorIntelligence?.[0]?.name || 'existing players';
+        const weakness = report.competitorIntelligence?.[0]?.weakness || 'complexity and high pricing';
 
-        return `
-${opener} 
+        return `${template.opener}
 
-Honestly, the ${lead.niche} space is tricky right now. Based on some internal market data I was looking at (I use a tool called MarketVibe for this), the annual market potential here is roughly $${nicheData}. 
+The ${lead.niche || 'SaaS'} space has roughly $${nicheData} in annual market potential. The real opportunity isn't just building the product — it's solving for ${painPoint}. ${competitor} are vulnerable because of their ${weakness}, which means there's a real gap for a focused solution.
 
-The real opportunity isn't just "building the app," but solving for ${report.targetAudience?.painPoints?.[0] || 'customer friction'}. Most people fail because they don't see that ${report.competitorIntelligence?.[0]?.name || 'existing players'} are vulnerable in their ${report.competitorIntelligence?.[0]?.weakness || 'complexity'}.
+${template.cta}
 
-If I were starting this, I'd focus purely on Week 1 visibility. No links here to avoid the spam filter, but hopefully those data points help you refine the angle!
-        `.trim();
+Happy to share more thoughts if you want to brainstorm the go-to-market strategy!`;
     }
 }
 
