@@ -1,176 +1,98 @@
 /**
- * 🤖 MarketVibe Reddit Herald (Browser Profile Mode)
- * Uses the user's existing browser session — no login needed.
+ * 🤖 MarketVibe Reddit Herald (Edge Remote Debugging)
+ * Connects to the user's running Edge browser and posts replies.
  * 
- * Launches a headless browser using the user's Chrome/Edge profile,
- * which already has Reddit cookies from their normal browsing.
+ * Setup: Create an Edge shortcut with --remote-debugging-port=9222 flag.
+ * Then the bot connects to your running browser and posts autonomously.
  */
 
 import puppeteer from 'puppeteer-core';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 dotenv.config();
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const humanDelay = (min = 1000, max = 3000) => sleep(min + Math.random() * (max - min));
 
-/**
- * Find the user's browser executable
- */
-function findBrowserPath() {
-    const paths = [
-        // Edge (most likely on Windows)
-        'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-        'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
-        // Chrome
-        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-        `${process.env.LOCALAPPDATA || ''}\\Google\\Chrome\\Application\\chrome.exe`,
-    ];
-
-    for (const p of paths) {
-        if (fs.existsSync(p)) return p;
-    }
-    return null;
-}
+const EDGE_DEBUG_PORT = process.env.EDGE_DEBUG_PORT || 9222;
 
 /**
- * Get the user data directory for Edge/Chrome
+ * Connect to existing Edge browser via remote debugging
  */
-function getUserDataDir() {
-    const localApp = process.env.LOCALAPPDATA || `C:\\Users\\${process.env.USERNAME}\\AppData\\Local`;
-    const edgePath = path.join(localApp, 'Microsoft', 'Edge', 'User Data');
-    const chromePath = path.join(localApp, 'Google', 'Chrome', 'User Data');
-
-    if (fs.existsSync(edgePath)) return { dir: edgePath, name: 'Edge' };
-    if (fs.existsSync(chromePath)) return { dir: chromePath, name: 'Chrome' };
-    return null;
-}
-
-/**
- * Launch browser with user's existing profile (already logged into Reddit)
- */
-async function launchWithProfile() {
-    const browserPath = findBrowserPath();
-    const userData = getUserDataDir();
-
-    if (!browserPath) {
-        console.error('❌ Could not find Chrome or Edge. Install one to use auto-posting.');
-        return null;
-    }
-
-    if (!userData) {
-        console.error('❌ Could not find browser user data directory.');
-        return null;
-    }
-
-    console.log(`🌐 Using ${userData.name} from: ${userData.dir}`);
-
+async function connectToEdge() {
     try {
-        const browser = await puppeteer.launch({
-            executablePath: browserPath,
-            headless: true,
-            userDataDir: userData.dir,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
-                '--profile-directory=Default'
-            ]
-        });
+        const resp = await fetch(`http://127.0.0.1:${EDGE_DEBUG_PORT}/json/version`);
+        const data = await resp.json();
 
-        return browser;
-    } catch (err) {
-        // If profile is locked (browser already open), use a copy approach
-        if (err.message.includes('already running') || err.message.includes('lock')) {
-            console.log('⚠️ Browser profile is locked (browser is open). Using cookie export approach...');
+        if (!data.webSocketDebuggerUrl) {
+            console.error('No debugger URL found');
             return null;
         }
-        throw err;
-    }
-}
 
-/**
- * Fallback: Launch with chromium and manually extracted cookies
- */
-async function launchWithChromium() {
-    try {
-        const chromium = await import('chromium');
-        const browser = await puppeteer.launch({
-            executablePath: chromium.default.path,
-            headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+        const browser = await puppeteer.connect({
+            browserWSEndpoint: data.webSocketDebuggerUrl,
+            defaultViewport: null
         });
+
+        console.log('Connected to Edge browser');
         return browser;
     } catch (e) {
-        console.error('❌ Could not launch chromium either:', e.message);
+        console.error('Cannot connect to Edge. Make sure Edge is running with --remote-debugging-port=' + EDGE_DEBUG_PORT);
+        console.error('Add this flag to your Edge shortcut target.');
         return null;
     }
 }
 
 /**
- * Post a reply to a Reddit thread
+ * Post a reply to a Reddit thread using the connected Edge browser
  */
 export const postRedditReply = async (postId, content) => {
     let browser = null;
+    let page = null;
 
     try {
-        // Try to use the user's existing browser profile
-        browser = await launchWithProfile();
-
-        if (!browser) {
-            // Fallback: try chromium with saved cookies
-            console.log('📦 Falling back to standalone Chromium...');
-            browser = await launchWithChromium();
-        }
+        browser = await connectToEdge();
 
         if (!browser) {
             return { success: false, error: 'MISSING_API_KEYS' };
         }
 
-        const page = await browser.newPage();
+        // Open a new tab (don't interfere with existing tabs)
+        page = await browser.newPage();
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36');
 
-        // Verify we're logged in by checking Reddit API
-        console.log('🔍 Herald: Checking Reddit session...');
+        // Check login status
+        console.log('Checking Reddit session...');
         await page.goto('https://old.reddit.com/api/me.json', {
             waitUntil: 'domcontentloaded',
             timeout: 15000
         });
 
         const meText = await page.evaluate(() => document.body.innerText);
-        let loggedIn = false;
-        let username = 'unknown';
+        let username = null;
 
         try {
             const me = JSON.parse(meText);
             if (me?.data?.name) {
-                loggedIn = true;
                 username = me.data.name;
-                console.log(`✅ Logged in as u/${username}`);
+                console.log('Logged in as u/' + username);
             }
         } catch { }
 
-        if (!loggedIn) {
-            console.error('❌ Not logged into Reddit. Close your browser briefly so we can use your profile.');
-            console.error('   Or manually add REDDIT_SESSION_COOKIE to .env');
-            await browser.close();
+        if (!username) {
+            console.error('Not logged into Reddit in Edge.');
+            await page.close();
+            browser.disconnect();
             return { success: false, error: 'MISSING_API_KEYS' };
         }
 
         // Humanistic pause
         const delay = 3000 + Math.random() * 5000;
-        console.log(`⏳ Herald: Waiting ${(delay / 1000).toFixed(1)}s before posting...`);
+        console.log('Waiting ' + (delay / 1000).toFixed(1) + 's before posting...');
         await sleep(delay);
 
         // Navigate to thread
-        console.log(`📡 Herald: Opening thread t3_${postId}...`);
-        await page.goto(`https://old.reddit.com/comments/${postId}`, {
+        console.log('Opening thread t3_' + postId + '...');
+        await page.goto('https://old.reddit.com/comments/' + postId, {
             waitUntil: 'domcontentloaded',
             timeout: 15000
         });
@@ -183,8 +105,9 @@ export const postRedditReply = async (postId, content) => {
         });
 
         if (!hasCommentBox) {
-            console.error('❌ No comment box. Thread may be locked/archived.');
-            await browser.close();
+            console.error('No comment box found. Thread may be locked.');
+            await page.close();
+            browser.disconnect();
             return { success: false, error: 'NO_COMMENT_BOX' };
         }
 
@@ -204,8 +127,9 @@ export const postRedditReply = async (postId, content) => {
         });
 
         if (!submitted) {
-            console.error('❌ Could not find submit button');
-            await browser.close();
+            console.error('Could not find submit button');
+            await page.close();
+            browser.disconnect();
             return { success: false, error: 'NO_SUBMIT_BUTTON' };
         }
 
@@ -218,18 +142,21 @@ export const postRedditReply = async (postId, content) => {
         });
 
         if (errors.some(e => e.toLowerCase().includes('too fast') || e.toLowerCase().includes('wait'))) {
-            console.warn(`⏱️ Rate limited: ${errors.join('; ')}`);
-            await browser.close();
+            console.warn('Rate limited: ' + errors.join('; '));
+            await page.close();
+            browser.disconnect();
             return { success: false, error: 'RATE_LIMITED', waitMinutes: 10 };
         }
 
-        console.log(`✅ Herald: Reply posted to t3_${postId}!`);
-        await browser.close();
+        console.log('Reply posted to t3_' + postId + '!');
+        await page.close();
+        browser.disconnect();
         return { success: true };
 
     } catch (err) {
-        console.error('❌ Herald Error:', err.message);
-        if (browser) await browser.close().catch(() => { });
+        console.error('Herald Error:', err.message);
+        if (page) await page.close().catch(() => { });
+        if (browser) browser.disconnect();
         return { success: false, error: err.message };
     }
 };
