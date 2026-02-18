@@ -1,72 +1,72 @@
 [
   {
-    "niche": "Marketing/Service Agency",
-    "volume": 109,
-    "velocity": 109,
-    "avgInterest": "6.8",
-    "heatScore": 333.76146788990826
-  },
-  {
     "niche": "SaaS / Micro-SaaS",
-    "volume": 103,
-    "velocity": 103,
-    "avgInterest": "7.4",
-    "heatScore": 316.43689320388347
+    "volume": 104,
+    "velocity": 104,
+    "avgInterest": "7.0",
+    "heatScore": 318.9807692307692
   },
   {
-    "niche": "AI/Automation Agent",
-    "volume": 87,
-    "velocity": 87,
-    "avgInterest": "7.3",
-    "heatScore": 268.2988505747126
-  },
-  {
-    "niche": "High-Value Venture",
-    "volume": 86,
-    "velocity": 86,
-    "avgInterest": "5.8",
-    "heatScore": 263.77906976744185
+    "niche": "Stationery & Writing Tools",
+    "volume": 102,
+    "velocity": 102,
+    "avgInterest": "9.6",
+    "heatScore": 315.55882352941177
   },
   {
     "niche": "Indie Project",
-    "volume": 74,
-    "velocity": 74,
-    "avgInterest": "5.9",
-    "heatScore": 227.9189189189189
+    "volume": 95,
+    "velocity": 95,
+    "avgInterest": "5.5",
+    "heatScore": 290.4947368421053
   },
   {
-    "niche": "Home Improvement",
-    "volume": 68,
-    "velocity": 68,
-    "avgInterest": "5.4",
-    "heatScore": 209.4264705882353
-  },
-  {
-    "niche": "Streaming & Content Creation",
-    "volume": 66,
-    "velocity": 66,
-    "avgInterest": "6.5",
-    "heatScore": 204.5151515151515
-  },
-  {
-    "niche": "Productivity Tool",
-    "volume": 65,
-    "velocity": 65,
-    "avgInterest": "6.8",
-    "heatScore": 201.76923076923077
+    "niche": "AI/Automation Agent",
+    "volume": 83,
+    "velocity": 83,
+    "avgInterest": "7.3",
+    "heatScore": 256.32530120481925
   },
   {
     "niche": "AI Agent",
-    "volume": 58,
-    "velocity": 58,
+    "volume": 65,
+    "velocity": 65,
     "avgInterest": "5.0",
-    "heatScore": 179
+    "heatScore": 200
   },
   {
-    "niche": "Service Business (Cleaning)",
-    "volume": 32,
-    "velocity": 32,
-    "avgInterest": "7.8",
-    "heatScore": 103.78125
+    "niche": "Pet Tech",
+    "volume": 59,
+    "velocity": 59,
+    "avgInterest": "6.8",
+    "heatScore": 183.8135593220339
+  },
+  {
+    "niche": "Streaming & Content Creation",
+    "volume": 36,
+    "velocity": 36,
+    "avgInterest": "5.6",
+    "heatScore": 113.58333333333333
+  },
+  {
+    "niche": "Home Improvement",
+    "volume": 31,
+    "velocity": 31,
+    "avgInterest": "5.3",
+    "heatScore": 98.3225806451613
+  },
+  {
+    "niche": "Fintech",
+    "volume": 27,
+    "velocity": 27,
+    "avgInterest": "5.9",
+    "heatScore": 86.88888888888889
+  },
+  {
+    "niche": "Marketing Agency",
+    "volume": 24,
+    "velocity": 24,
+    "avgInterest": "6.3",
+    "heatScore": 78.29166666666667
   }
 ]

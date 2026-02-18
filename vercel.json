@@ -4,18 +4,5 @@
             "source": "/(.*)",
             "destination": "/index.html"
         }
-    ],
-    "redirects": [
-        {
-            "source": "/:path*",
-            "has": [
-                {
-                    "type": "host",
-                    "value": "www.marketvibe1.com"
-                }
-            ],
-            "destination": "https://marketvibe1.com/:path*",
-            "permanent": true
-        }
     ]
 }
