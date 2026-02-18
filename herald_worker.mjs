@@ -59,10 +59,23 @@ async function runHeraldCycle() {
                     .from('growth_leads')
                     .update({ is_posted: true, posted_at: new Date().toISOString() })
                     .eq('id', lead.id);
+                console.log(`✅ Herald: Successfully posted to ${lead.username}'s thread`);
             } else if (result.error === 'MISSING_API_KEYS') {
-                console.log(`⏭️ Herald: Skipping ${lead.username} (Missing API keys)`);
-                // We keep is_posted = false so we can try again once keys are added
-                break; // Stop cycle if keys are missing to avoid log spam
+                console.log(`⏭️ Herald: Skipping ${lead.username} (Missing credentials)`);
+                break; // Stop cycle if keys are missing
+            } else if (result.error === 'RATE_LIMITED') {
+                console.log(`⏱️ Herald: Rate limited. Stopping cycle — will retry in ${result.waitMinutes || 10} minutes.`);
+                break; // Stop cycle on rate limit
+            } else if (result.error === 'EXPIRED_COOKIE') {
+                console.log(`🔑 Herald: Session expired. Please refresh your REDDIT_SESSION_COOKIE in .env`);
+                break;
+            }
+
+            // Humanistic gap between posts (30-90 seconds)
+            if (leads.indexOf(lead) < leads.length - 1) {
+                const gap = 30000 + Math.random() * 60000;
+                console.log(`⏳ Herald: Waiting ${(gap / 1000).toFixed(0)}s before next post...`);
+                await new Promise(r => setTimeout(r, gap));
             }
         }
 
