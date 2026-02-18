@@ -349,6 +349,9 @@ function App() {
     } else if (path === '/admin/social') {
       setStep('social-command')
       document.title = 'Social Command Center | MarketVibe'
+    } else if (path === '/admin' || path === '/admin/') {
+      setStep('admin')
+      document.title = 'Command Center | MarketVibe'
     }
 
     // Capture Referral Code
