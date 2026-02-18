@@ -37,7 +37,7 @@ const CONFIG = {
         `Great point. For angels looking for early validated deals — we just launched a private feed at marketvibe1.com/investors 🚀`,
     ],
 
-    logFile: './twitter_bot_log.json',
+    logFile: './public/twitter_bot_log.json',
     edgeDebugPort: process.env.EDGE_DEBUG_PORT || 9222,
 };
 
