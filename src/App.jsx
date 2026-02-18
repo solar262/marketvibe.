@@ -22,7 +22,7 @@ import ReferralHub from './components/ReferralHub';
 import AdminDashboard from './components/AdminDashboard';
 import LaunchpadDirectory from './components/LaunchpadDirectory';
 import LaunchpadSubmit from './components/LaunchpadSubmit';
-import LaunchpadListing from './components/LaunchpadListing';
+// import LaunchpadListing from './components/LaunchpadListing';
 import EmailCapturePopup from './components/EmailCapturePopup';
 import { popularNiches } from './lib/niches'
 
@@ -335,8 +335,8 @@ function App() {
     } else if (path === '/launchpad/submit') {
       setStep('launchpad-submit')
       document.title = 'Submit to Launchpad | MarketVibe'
-    } else if (path.startsWith('/launchpad/listing/')) {
-      setStep('launchpad-listing')
+      /* } else if (path.startsWith('/launchpad/listing/')) {
+        setStep('launchpad-listing') */
     }
 
     // Capture Referral Code
@@ -974,13 +974,13 @@ function App() {
       {step === 'hub' && <CaseStudyHub />}
       {step === 'launchpad' && <LaunchpadDirectory supabase={supabase} />}
       {step === 'launchpad-submit' && <LaunchpadSubmit supabase={supabase} />}
-      {step === 'launchpad-listing' && (
+      {/* {step === 'launchpad-listing' && (
         <LaunchpadListing
           listingId={window.location.pathname.split('/').pop()}
           onBack={() => window.location.href = '/launchpad'}
           supabase={supabase}
         />
-      )}
+      )} */}
 
       <section className="features">
         <div className="feature-card">
