@@ -957,10 +957,7 @@ function App() {
         </div>
       )}
 
-      {step === 'admin' && <AdminDashboard />}
-      {step === 'privacy' && <PrivacyPolicy />}
-      {step === 'terms' && <TermsOfService />}
-      {step === 'hub' && <CaseStudyHub />}
+
       {step === 'market-size' && <MarketSizeCalculator onGetBlueprint={() => {
         setStep('setup');
         window.scrollTo({ top: 0, behavior: 'smooth' });
