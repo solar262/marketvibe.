@@ -30,6 +30,14 @@ import TwitterBotDashboard from './components/TwitterBotDashboard';
 import EmailCapturePopup from './components/EmailCapturePopup';
 import { popularNiches } from './lib/niches'
 
+const VerifyingPortal = () => {
+  useEffect(() => {
+    const timer = setTimeout(() => window.location.reload(), 4000);
+    return () => clearTimeout(timer);
+  }, []);
+  return null;
+};
+
 function App() {
   const [step, setStep] = useState(() => {
     const rawPath = window.location.pathname.toLowerCase();
@@ -436,7 +444,7 @@ function App() {
                   <h2 style={{ marginBottom: '1rem' }}>⚡ Verifying Investor Access...</h2>
                   <p style={{ color: '#64748b' }}>Securing your private deal flow link. Please wait a moment.</p>
                   <div style={{ marginTop: '2rem', fontSize: '2rem', animation: 'spin 2s linear infinite' }}>⌛</div>
-                  <script>{`setTimeout(() => window.location.reload(), 3000)`}</script>
+                  <VerifyingPortal />
                   <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
                 </div>
               );
