@@ -36,9 +36,8 @@ function App() {
     const p = rawPath.replace(/\/$/, '') || '/';
     console.log('[Router] Initializing path:', p);
 
-    // Support /investor, /investors, /investor.html, etc.
+    // Priority: Specific sub-routes first
     if (p.includes('/investor')) return 'investors';
-    if (p.includes('/dashboard') && p.includes('/investor')) return 'investor-dashboard';
 
     if (rawPath.startsWith('/og-preview/')) return 'og-preview';
     if (p === '/tools/naming') return 'tools-naming';
@@ -133,14 +132,48 @@ function App() {
       setEmail(finalEmail)
       localStorage.setItem('marketvibe_lead_email', finalEmail)
     }
-    if (status === 'success') setPaid(true)
 
     // 2. Fetch Critical Data (Spots + State recovery)
     const fetchData = async () => {
       if (!supabase) return;
       setLoading(true)
       try {
-        // Fetch Current Spots
+        const lid = params.get('lid') || localStorage.getItem('mv_lead_id');
+        const urlEmail = params.get('email');
+
+        let record = null;
+        if (lid) {
+          const { data } = await supabase.from('leads').select('*').eq('id', lid).single();
+          record = data;
+        } else if (urlEmail) {
+          const { data } = await supabase.from('leads').select('*').eq('email', urlEmail).order('created_at', { ascending: false }).limit(1).single();
+          record = data;
+        }
+
+        if (record) {
+          setEmail(record.email);
+          setResults(record.results);
+          setCurrentLeadId(record.id);
+
+          const { data: leadRecords } = await supabase.from('leads').select('*').eq('email', record.email);
+          const anyPaidRecord = leadRecords?.find(l => l.paid || l.status === 'paid');
+
+          if (anyPaidRecord) {
+            setPaid(true);
+            setPlanType(anyPaidRecord.plan_type || 'founder');
+            if (anyPaidRecord.plan_type === 'investor' && window.location.pathname.toLowerCase().includes('/investor')) {
+              setStep('investor-dashboard');
+            }
+          } else if (status === 'success') {
+            setPlanType('verifying');
+          }
+          setUsageCount(leadRecords?.length || 0);
+          setHistory(leadRecords?.filter(l => l.results) || []);
+        } else if (status === 'success') {
+          setPlanType('verifying');
+        }
+
+        // Global Settings
         const { data: settings } = await supabase.from('app_settings').select('key, value');
         if (settings) {
           const ldr = settings.find(s => s.key === 'lifetime_deals_remaining');
@@ -148,35 +181,8 @@ function App() {
           if (ldr) setSpots(ldr.value);
           if (isr) setInvestorSpots(isr.value);
         }
-
-        const leadId = params.get('lid') || localStorage.getItem('mv_lead_id')
-        if (leadId) {
-          const { data: leadToRecover } = await supabase.from('leads').select('*').eq('id', leadId).single()
-          if (leadToRecover) {
-            setEmail(leadToRecover.email)
-            setResults(leadToRecover.results)
-            setPlanType(leadToRecover.plan_type || 'free')
-            setCurrentLeadId(leadToRecover.id)
-
-            // Recover history and paid status
-            const { data: leadRecords } = await supabase.from('leads').select('*').eq('email', leadToRecover.email)
-            const anyPaidRecord = leadRecords?.find(l => l.paid || l.status === 'paid')
-            if (anyPaidRecord || status === 'success') {
-              setPaid(true)
-              setPlanType(anyPaidRecord?.plan_type || 'founder')
-              const { data: feed } = await supabase.from('growth_leads').select('*').order('created_at', { ascending: false }).limit(5)
-              setLeadsFeed(feed || [])
-            }
-            setUsageCount(leadRecords?.length || 0)
-            setHistory(leadRecords?.filter(l => l.results) || [])
-
-            if (leadToRecover.results && (window.location.pathname === '/' || window.location.pathname === '')) {
-              setStep('fulfillment')
-            }
-          }
-        }
       } catch (err) {
-        console.error('Data sync error:', err)
+        console.error('Data check error:', err)
       } finally {
         setLoading(false)
       }
@@ -219,12 +225,11 @@ function App() {
   const activePath = window.location.pathname.toLowerCase().replace(/\/$/, '') || '/'
 
   useEffect(() => {
-    if (activePath === '/investor' || activePath === '/investors') {
+    if (activePath === '/investor' || activePath === '/investors' || activePath === '/investor/dashboard') {
+      // We set the step to 'investors' (Landing) first. 
+      // It will only upgrade to 'investor-dashboard' in fetchData if the DB confirms them.
       setStep('investors')
       document.title = 'Investor Access | MarketVibe Deal Flow'
-    } else if (activePath === '/investor/dashboard') {
-      setStep('investor-dashboard')
-      document.title = 'Investor Dashboard | MarketVibe'
     } else if (activePath.startsWith('/og-preview/')) {
       const id = activePath.split('/').pop()
       setPreviewId(parseInt(id, 10))
@@ -423,7 +428,21 @@ function App() {
       {(() => {
         switch (step) {
           case 'investors': return <InvestorLanding onNavigate={(p) => { window.location.href = p; }} spots={investorSpots} />;
-          case 'investor-dashboard': return <InvestorDashboard supabase={supabase} />;
+          case 'investor-dashboard':
+            // SECURITY GUARD: Only trust the DB planType, not just 'paid' UI state
+            if (planType === 'verifying') {
+              return (
+                <div style={{ textAlign: 'center', padding: '10rem', background: '#0a0a1a', minHeight: '100vh', color: 'white' }}>
+                  <h2 style={{ marginBottom: '1rem' }}>⚡ Verifying Investor Access...</h2>
+                  <p style={{ color: '#64748b' }}>Securing your private deal flow link. Please wait a moment.</p>
+                  <div style={{ marginTop: '2rem', fontSize: '2rem', animation: 'spin 2s linear infinite' }}>⌛</div>
+                  <script>{`setTimeout(() => window.location.reload(), 3000)`}</script>
+                  <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+                </div>
+              );
+            }
+            if (planType !== 'investor') return <InvestorLanding onNavigate={(p) => { window.location.href = p; }} spots={investorSpots} />;
+            return <InvestorDashboard supabase={supabase} />;
           case 'setup': return <ProjectForm onSubmit={handleProjectSubmit} submitting={submitting} email={email} usageCount={usageCount} history={history} onSelectProject={handleProjectSelect} />;
           case 'fulfillment': return <ResultsView results={results} email={email} onUnlock={handleUnlock} paid={paid} planType={planType} history={history} onSelectProject={handleProjectSelect} />;
           case 'admin-leads': return <LeadsDashboard supabase={supabase} />;
