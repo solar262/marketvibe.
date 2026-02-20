@@ -25,8 +25,38 @@ const LaunchpadSubmit = ({ supabase }) => {
         // Check URL for pre-selected tier
         const params = new URLSearchParams(window.location.search);
         const urlTier = params.get('tier');
+        const status = params.get('status');
+
         if (urlTier && ['free', 'featured', 'validated'].includes(urlTier)) {
             setTier(urlTier);
+        }
+
+        // Handle Stripe Return
+        if (status === 'success') {
+            const handleReturn = async () => {
+                const pendingId = localStorage.getItem('lp_pending_id');
+                if (pendingId) {
+                    setSubmitting(true);
+                    try {
+                        const { error } = await supabase
+                            .from('launchpad_listings')
+                            .update({ status: 'approved' })
+                            .eq('id', pendingId);
+
+                        if (error) throw error;
+
+                        localStorage.removeItem('lp_pending_id');
+                        localStorage.removeItem('lp_pending_submission'); // Cleanup legacy if exists
+                        setSubmitted(true);
+                    } catch (err) {
+                        console.error('Error activating listing:', err);
+                        setError('Payment received, but we failed to activate your listing. Please contact support.');
+                    } finally {
+                        setSubmitting(false);
+                    }
+                }
+            };
+            handleReturn();
         }
     }, []);
 
@@ -60,19 +90,27 @@ const LaunchpadSubmit = ({ supabase }) => {
                     validated: `https://buy.stripe.com/test_validated?prefilled_email=${encodeURIComponent(formData.founder_email)}`,
                 };
 
-                // For now, save with pending status and show success
-                // In production, this would redirect to Stripe and handle webhooks
-                const { error: dbError } = await supabase
+                // Insert with pending status first
+                const { data, error: dbError } = await supabase
                     .from('launchpad_listings')
                     .insert({
                         ...formData,
                         tier,
-                        status: 'approved', // Auto-approve paid listings
+                        status: 'pending', // Wait for payment
                         upvotes: tier === 'featured' ? 5 : 10, // Boost for paid tiers
-                    });
+                    })
+                    .select()
+                    .single();
 
                 if (dbError) throw dbError;
-                setSubmitted(true);
+
+                // Save ID for return handler
+                if (data?.id) {
+                    localStorage.setItem('lp_pending_id', data.id);
+                }
+
+                // Redirecting to Stripe checkout
+                window.location.href = stripeLinks[tier];
                 return;
             }
 

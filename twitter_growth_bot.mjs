@@ -74,36 +74,53 @@ async function connectToEdge() {
         log(`❌ Cannot connect to Edge on port ${CONFIG.edgeDebugPort}.`);
         log('   Make sure Edge is running with: --remote-debugging-port=9222');
         log('   (Same setup as the Reddit bot)');
-        process.exit(1);
+        return null; // Return null instead of exiting
     }
 }
 
 // ── REPLY TO LATEST TWEET ────────────────────────────────────────────────────
-async function replyToLatestTweet(page, replyText) {
+// ── SEND NEW TWEET ──────────────────────────────────────────────────────────
+export async function sendTweet(text) {
+    let browser = null;
     try {
-        const replyBtn = await page.$('[data-testid="reply"]');
-        if (!replyBtn) return false;
+        browser = await connectToEdge();
+        if (!browser) return false;
+        const page = await browser.newPage();
 
-        await replyBtn.click();
+        await page.goto('https://x.com/compose/tweet', { waitUntil: 'domcontentloaded' });
+        await sleep(4000);
+
+        // Check for login
+        if (page.url().includes('login')) {
+            console.error('❌ Not logged in to Twitter/X in Edge.');
+            await page.close();
+            return false;
+        }
+
+        // Wait for composer
+        const textBoxSelector = '[data-testid="tweetTextarea_0"]';
+        await page.waitForSelector(textBoxSelector, { timeout: 10000 });
+
+        // Type text
+        await page.click(textBoxSelector);
+        await page.keyboard.type(text, { delay: 30 });
         await sleep(2000);
 
-        const replyBox = await page.$('[data-testid="tweetTextarea_0"]');
-        if (!replyBox) return false;
+        // Click Tweet
+        const tweetBtnSelector = '[data-testid="tweetButton"]';
+        await page.click(tweetBtnSelector);
+        await sleep(5000); // Wait for send
 
-        await replyBox.click();
-        await page.keyboard.type(replyText, { delay: 40 });
-        await sleep(1500);
+        log(`✅ Tweet sent: "${text}"`);
+        await page.close();
+        browser.disconnect();
+        return true;
 
-        const submitBtn = await page.$('[data-testid="tweetButton"]');
-        if (submitBtn) {
-            await submitBtn.click();
-            await sleep(2000);
-            return true;
-        }
     } catch (err) {
-        log(`Reply error: ${err.message}`);
+        log(`❌ Tweet failed: ${err.message}`);
+        if (browser) browser.disconnect();
+        return false;
     }
-    return false;
 }
 
 // ── MAIN BOT ─────────────────────────────────────────────────────────────────
@@ -111,6 +128,7 @@ async function runTwitterGrowthBot() {
     log('🚀 Twitter Growth Bot starting...');
 
     const browser = await connectToEdge();
+    if (!browser) return;
     const page = await browser.newPage();
     page.setDefaultTimeout(60000); // Increased timeout to 60s
 

@@ -7,6 +7,8 @@ dotenv.config();
 const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY);
 const resend = new Resend(process.env.VITE_RESEND_API_KEY);
 
+const SITE_URL = process.env.VITE_SITE_URL || 'https://www.marketvibe1.com';
+
 const DRIP_SEQUENCE = [
     {
         step: 1,
@@ -21,7 +23,7 @@ The blueprint includes:
 - Pricing strategy for maximum profit
 - Step-by-step launch roadmap
 
-Don't leave your success to chance. Unlock it here: https://www.marketvibe1.com`
+Don't leave your success to chance. Unlock it here: ${SITE_URL}`
     },
     {
         step: 2,
@@ -33,7 +35,7 @@ You have the ${name} idea. You have the revenue forecast. Now you just need the 
 
 We've helped 100+ founders skip the guesswork. Grab your blueprint before the lifetime deal expires!
 
-https://www.marketvibe1.com`
+${SITE_URL}`
     },
     {
         step: 3,
@@ -48,7 +50,7 @@ Here's what founders who upgraded are saying:
 - "The competitor analysis alone saved me from building the wrong thing" — Mike R.
 
 Lock in the $49 lifetime deal before it's gone:
-https://www.marketvibe1.com
+${SITE_URL}
 
 — The MarketVibe Team
 

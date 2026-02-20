@@ -1,44 +1,49 @@
-import dotenv from 'dotenv';
+
 import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
 dotenv.config();
 
 const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY);
 
-async function checkStatus() {
-    console.log('--- 🤖 AUTONOMOUS STATUS REPORT ---');
+async function report() {
+    try {
+        const { count: total, error: e1 } = await supabase.from('growth_leads').select('*', { count: 'exact', head: true });
+        if (e1) console.error('Error total:', e1);
 
-    // 1. Check Sentinel Discoveries
-    const { data: leads, error: leadError } = await supabase
-        .from('growth_leads')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(5);
+        const { count: contacted, error: e2 } = await supabase.from('growth_leads').select('*', { count: 'exact', head: true }).eq('status', 'contacted');
+        if (e2) console.error('Error contacted:', e2);
 
-    if (leadError) console.error('Error fetching leads:', leadError);
-    else {
-        console.log(`\n🔎 LATEST SENTINEL DISCOVERIES (${leads.length}):`);
-        leads.forEach(l => {
-            console.log(`- [${new Date(l.created_at).toLocaleString()}] Found ${l.username} on ${l.platform} (Niche: ${l.niche})`);
-        });
+        const { count: qualified, error: e3 } = await supabase.from('growth_leads').select('*', { count: 'exact', head: true }).eq('status', 'qualified');
+        if (e3) console.error('Error qualified:', e3);
+
+        const { data: recent, error: e4 } = await supabase.from('growth_leads').select('username, platform, status, created_at').order('created_at', { ascending: false }).limit(5);
+        if (e4) console.error('Error recent:', e4);
+
+        const { data: launchpad, error: e5 } = await supabase.from('launchpad_listings').select('product_name, tier, status, created_at').order('created_at', { ascending: false }).limit(5);
+        if (e5) console.error('Error launchpad:', e5);
+
+        console.log('\n--- PIPELINE STATUS ---');
+        console.log(`Total Leads Found: ${total || 0}`);
+        console.log(`Qualified Leads:   ${qualified || 0}`);
+        console.log(`Contacted Leads:   ${contacted || 0}`);
+
+        console.log('\n--- RECENT LEADS ---');
+        if (recent && recent.length > 0) {
+            recent.forEach(l => console.log(`- [${l.platform}] ${l.username} (${l.status})`));
+        } else {
+            console.log('No recent leads found.');
+        }
+
+        console.log('\n--- LAUNCHPAD SUBMISSIONS ---');
+        if (launchpad && launchpad.length > 0) {
+            launchpad.forEach(l => console.log(`- ${l.product_name} (${l.tier}) - ${l.status}`));
+        } else {
+            console.log('No launchpad submissions yet.');
+        }
+
+    } catch (err) {
+        console.error('Report failed:', err);
     }
-
-    // 2. Check Nurturer Activity
-    const { data: nurtured, error: nurtureError } = await supabase
-        .from('leads')
-        .select('email, last_nurture_step, last_nurtured_at')
-        .not('last_nurtured_at', 'is', null)
-        .order('last_nurtured_at', { ascending: false })
-        .limit(5);
-
-    if (nurtureError) console.error('Error fetching nurtured leads:', nurtureError);
-    else {
-        console.log(`\n📧 LATEST NURTURER (EMAIL) ACTIONS (${nurtured.length}):`);
-        nurtured.forEach(n => {
-            console.log(`- [${new Date(n.last_nurtured_at).toLocaleString()}] Sent Drip #${n.last_nurture_step} to ${n.email}`);
-        });
-    }
-
-    console.log('\n-----------------------------------');
 }
 
-checkStatus();
+report();

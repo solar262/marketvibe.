@@ -11,6 +11,8 @@ import { runHeraldCycle } from './herald_worker.mjs';
 import { generateAuthorityPosts } from './generate_authority_posts.mjs';
 import { MarketVibeShadowAgent } from './shadow_agent.mjs';
 import { runTrendAudit } from './trend_agent.mjs';
+import { runSocialAutopilot } from './social_poster.mjs';
+import { selectScript } from './src/lib/dm_scripts.js';
 
 dotenv.config();
 
@@ -25,9 +27,13 @@ async function runMasterCycle() {
 
     try {
         // 1. Discovery Phase (Reddit/X)
-        console.log("\n--- 🛰️ PHASE 1: DISCOVERY ---");
-        const sentinel = new MarketVibeSentinel();
-        await sentinel.runCycle();
+        if (process.env.ENABLE_REDDIT !== 'false') {
+            console.log("\n--- 🛰️ PHASE 1: DISCOVERY ---");
+            const sentinel = new MarketVibeSentinel();
+            await sentinel.runCycle();
+        } else {
+            console.log("\n--- 🛰️ PHASE 1: DISCOVERY SKIPPED (Reddit Disabled) ---");
+        }
 
         // 2. Trend-Jacking Phase (Breakout Detection)
         console.log("\n--- 📰 PHASE 2: TREND-JACKING ---");
@@ -51,19 +57,35 @@ async function runMasterCycle() {
         console.log("\n--- 🧹 PHASE 6: CLOSER SWEEP ---");
         const { data: sweepLeads } = await supabase
             .from('growth_leads')
-            .select('id')
+            .select('*')
             .eq('status', 'pending')
             .gte('interest_score', 6);
 
         if (sweepLeads && sweepLeads.length > 0) {
-            const sweepIds = sweepLeads.map(l => l.id);
-            await supabase.from('growth_leads').update({ status: 'contacted' }).in('id', sweepIds);
-            console.log(`✅ Swept ${sweepLeads.length} high-intent leads to 'contacted'.`);
+            console.log(`🎯 Identified ${sweepLeads.length} high-intent targets.`);
+
+            for (const lead of sweepLeads) {
+                const dmContent = selectScript(lead);
+
+                await supabase
+                    .from('growth_leads')
+                    .update({
+                        status: 'contacted',
+                        draft_reply: dmContent
+                    })
+                    .eq('id', lead.id);
+
+                console.log(`✅ Processed ${lead.username}: Generated draft DM.`);
+            }
         }
 
         // 7. Live Engagement Phase (Herald Bot)
         console.log("\n--- 📣 PHASE 7: HERALD BOT (LIVE ENGAGEMENT) ---");
         await runHeraldCycle();
+
+        // 8. Viral Social Phase (Social Poster)
+        console.log("\n--- 🐦 PHASE 8: VIRAL SOCIAL POSTING ---");
+        await runSocialAutopilot();
 
     } catch (err) {
         console.error("\n❌ GLOBAL CYCLE FAILED:", err.message);

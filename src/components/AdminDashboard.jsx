@@ -144,6 +144,13 @@ const AdminDashboard = () => {
                             <p style={{ color: '#94a3b8' }}>Post · Queue · Automate</p>
                         </div>
                     </a>
+                    <a href="/admin/twitter-bot" style={{ textDecoration: 'none' }}>
+                        <div style={{ background: 'rgba(29, 161, 242, 0.1)', padding: '2rem', borderRadius: '1rem', border: '1px solid #1da1f2', textAlign: 'center', transition: 'transform 0.2s', cursor: 'pointer' }} onMouseOver={e => e.currentTarget.style.transform = 'translateY(-5px)'} onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}>
+                            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🐦</div>
+                            <h3 style={{ color: 'white', margin: 0 }}>Twitter Bot</h3>
+                            <p style={{ color: '#94a3b8' }}>Follow · Reply · Grow</p>
+                        </div>
+                    </a>
 
                 </div>
 

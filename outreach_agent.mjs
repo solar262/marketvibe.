@@ -354,33 +354,27 @@ class MarketVibeSentinel {
         // Force production domain for outreach
         const SITE_URL = 'https://marketvibe1.com';
 
-        const templates = [
-            `hey @${lead.username}, ${intent.opener} i was actually looking at some growth data for the ${niche} space earlier and it honestly looks like there's solid six-figure potential here if you nail the audience (${report.targetAudience.primarySegment}). i mapped out a quick revenue forecast for a similar concept here if you want to check it out: ${SITE_URL}`,
-            `hi @${lead.username}, ${intent.opener} i was just looking at some market trends for ${niche} and it's looking pretty bullish tbh. i actually have a few data-backed insights on how to scale this kind of play here: ${SITE_URL}`,
-            `tagging @${lead.username} because i love this concept. ${intent.opener} the ${niche} space is wider than people think imo. i pulled some numbers on the yearly potential for this niche if you want to see the breakdown: ${SITE_URL}`,
-            `hey @${lead.username}, ${intent.opener} i noticed you're building in ${niche}. if you're looking for a name later on, i built an AI generator that just dropped some cool ones for this niche: ${SITE_URL}/tools/naming`,
-            `saw your post @${lead.username}. if you're still mapping out the ${niche} market, i built a free TAM calculator that might save you some time on the research: ${SITE_URL}/tools/market-size`,
-            `really interesting play @${lead.username}. ${intent.opener} i've been tracking momentum in the ${niche} space and it's breakout season. check out these live data signals i found: ${SITE_URL}/newsroom`
-        ];
+        // 🛡️ HUMANIZED REDDIT STRATEGY: No direct link in 50% of posts to build trust/karma
+        const roll = Math.random();
 
-        // 🧠 Strategic Template Injection (High Context)
-        if (intent.type === 'troubleshooting') {
-            templates.unshift(`hi @${lead.username}, ${intent.opener} if you're auditing your ${niche} funnel, i built a free TAM calculator that might help you find where the target audience is actually hanging out: ${SITE_URL}/tools/market-size`);
-            templates.unshift(`hey @${lead.username}, ${intent.opener} scaling ${niche} is usually a data game. check out these live breakout trends for your space, might give you an edge on the ads: ${SITE_URL}/newsroom`);
+        if (roll < 0.5) {
+            // "Value First" - No Link
+            const valueTemplates = [
+                `hey @${lead.username}, ${intent.opener} i actually pulled some growth data for the ${niche} space recently. looks like a solid six-figure play if you focus on ${report.targetAudience.primarySegment}. would you be interested in the full revenue forecast breakdown?`,
+                `hi @${lead.username}, ${intent.opener} the ${niche} trends are looking pretty bullish right now tbh. i mapped out a quick 30-day execution plan for a similar concept - lmk if you want me to send it over.`,
+                `tagging @${lead.username} because i love this idea. ${intent.opener} i'm seeing some interesting signals in the ${niche} market that most people miss. i have the TAM numbers if you want to see them?`,
+                `saw your post @${lead.username}. if you're navigating the ${niche} market, i've got a free toolkit for mapping out market limits. happy to share the link if it helps with your research.`
+            ];
+            return valueTemplates[Math.floor(Math.random() * valueTemplates.length)];
+        } else {
+            // "Soft CTA" - Link included but wrapped in context
+            const softTemplates = [
+                `hey @${lead.username}, ${intent.opener} i was looking at ${niche} data earlier and the potential for ${report.targetAudience.primarySegment} is huge. i put the full revenue analysis in this research hub if you're interested: ${SITE_URL}/hub`,
+                `hi @${lead.username}, ${intent.opener} tracking ${niche} breakout momentum right now. saw some live signals that might give you an edge on the ads/outreach: ${SITE_URL}/newsroom`,
+                `really solid play @${lead.username}. ${intent.opener} i actually built a free research tool for ${niche} founders to avoid the validation grind. you can run your niche through it here: ${SITE_URL}`
+            ];
+            return softTemplates[Math.floor(Math.random() * softTemplates.length)];
         }
-
-        // Contextual Tool Injection 🛠️
-        if (lead.post_content.match(/name|naming|brand/i)) {
-            templates.push(`hey @${lead.username}, ${intent.opener} naming is always the hardest part tbh. i actually built a free AI generator specifically for ${niche} ventures if you want to try it: ${SITE_URL}/tools/naming`);
-        }
-        if (lead.post_content.match(/market size|tam|investor|pitch/i)) {
-            templates.push(`saw your post @${lead.username}. if you're pitching this, i built a free TAM calculator that maps out the ${niche} market limit in seconds: ${SITE_URL}/tools/market-size`);
-        }
-        if (lead.post_content.match(/trend|demand|growing|popular/i)) {
-            templates.push(`really interesting play @${lead.username}. tracking breakout momentum in the ${niche} space right now. check out these live data signals i found: ${SITE_URL}/newsroom`);
-        }
-
-        return templates[Math.floor(Math.random() * templates.length)];
     }
 
     calculateInterestScore(text) {

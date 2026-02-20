@@ -1,0 +1,37 @@
+
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+import path from 'path';
+
+// Load .env from root
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+    console.error('Missing Supabase credentials in .env');
+    process.exit(1);
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+async function checkTable() {
+    console.log('Checking launchpad_listings table...');
+    const { data, error } = await supabase
+        .from('launchpad_listings')
+        .select('count')
+        .limit(1);
+
+    if (error) {
+        if (error.code === '42P01') { // undefined_table
+            console.log('❌ Table launchpad_listings does not exist.');
+        } else {
+            console.error('❌ Error checking table:', error.message);
+        }
+    } else {
+        console.log('✅ Table launchpad_listings exists.');
+    }
+}
+
+checkTable();

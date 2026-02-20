@@ -47,6 +47,10 @@ async function runHeraldCycle() {
             let result = { success: false };
 
             if (lead.platform === 'reddit') {
+                if (process.env.ENABLE_REDDIT === 'false') {
+                    console.log(`⏭️ Herald: Skipping Reddit reply for ${lead.username} (Reddit Disabled)`);
+                    continue;
+                }
                 const redditId = lead.platform_id.replace('rd_', '');
                 result = await postRedditReply(redditId, lead.draft_reply);
             } else if (lead.platform === 'twitter') {
@@ -71,10 +75,11 @@ async function runHeraldCycle() {
                 break;
             }
 
-            // Humanistic gap between posts (30-90 seconds)
+            // Humanistic gap between posts (5 - 12 minutes)
             if (leads.indexOf(lead) < leads.length - 1) {
-                const gap = 30000 + Math.random() * 60000;
-                console.log(`⏳ Herald: Waiting ${(gap / 1000).toFixed(0)}s before next post...`);
+                const gap = 300000 + Math.random() * 420000; // 5m base + up to 7m random
+                const mins = (gap / 60000).toFixed(1);
+                console.log(`⏳ Herald: Cooling down for ${mins} minutes before next post...`);
                 await new Promise(r => setTimeout(r, gap));
             }
         }

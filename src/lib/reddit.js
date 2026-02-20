@@ -96,7 +96,17 @@ export const postRedditReply = async (postId, content) => {
             waitUntil: 'domcontentloaded',
             timeout: 15000
         });
-        await humanDelay(2000, 4000);
+
+        // 🛡️ ANTI-BOT: Human-like scrolling behavior
+        console.log('Simulating reading... (scrolling)');
+        await page.evaluate(async () => {
+            const scrollHeight = document.body.scrollHeight;
+            window.scrollBy(0, Math.random() * 500);
+            await new Promise(r => setTimeout(r, 1000 + Math.random() * 2000));
+            window.scrollBy(0, Math.random() * 500);
+        });
+
+        await humanDelay(2000, 5000);
 
         // Type comment
         const hasCommentBox = await page.evaluate(() => {
@@ -111,13 +121,11 @@ export const postRedditReply = async (postId, content) => {
             return { success: false, error: 'NO_COMMENT_BOX' };
         }
 
-        await page.evaluate((text) => {
-            const ta = document.querySelector('.usertext-edit textarea, textarea[name="text"]');
-            ta.focus();
-            ta.value = text;
-            ta.dispatchEvent(new Event('input', { bubbles: true }));
-        }, content);
-        await humanDelay(1000, 2000);
+        // 🛡️ ANTI-BOT: Type with human-like speed
+        console.log('Typing response...');
+        await page.type('.usertext-edit textarea, textarea[name="text"]', content, { delay: 50 + Math.random() * 100 });
+
+        await humanDelay(1500, 3000);
 
         // Submit
         const submitted = await page.evaluate(() => {

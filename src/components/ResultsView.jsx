@@ -3,7 +3,7 @@ import { generateScorecard } from '../lib/scorecard';
 import VerificationBadge from './VerificationBadge';
 import { generateMVPCode } from '../lib/mvp_templates';
 
-const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = 'founder', leads = [], usageCount = 0, leadId = null }) => {
+const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = 'founder', leads = [], usageCount = 0, leadId = null, fomoTimer }) => {
     // Add safe defaults for old data migration
     const {
         landingPage = { headline: '', subheadline: '', features: [], cta: '', socialProof: '' },
@@ -59,19 +59,55 @@ const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = '
                 `}
             </style>
 
-            {!unlocked && usageCount >= 3 && (
+            {!unlocked && (
                 <div style={{
-                    background: 'rgba(239, 68, 68, 0.1)',
-                    border: '1px solid #ef4444',
-                    padding: '1.5rem',
-                    borderRadius: '12px',
-                    marginBottom: '2rem',
-                    textAlign: 'center'
+                    background: 'rgba(99, 102, 241, 0.05)',
+                    border: '1px solid rgba(99, 102, 241, 0.2)',
+                    padding: '2rem',
+                    borderRadius: '24px',
+                    marginBottom: '3rem',
+                    textAlign: 'left',
+                    position: 'relative',
+                    overflow: 'hidden'
                 }}>
-                    <h3 style={{ color: '#ef4444', marginBottom: '0.5rem' }}>⚠️ Validation Limit Reached</h3>
-                    <p style={{ fontSize: '0.9rem', color: '#f87171' }}>
-                        Free accounts are limited to 3 validations. Upgrade to **Founder** to unlock unlimited tests and your full execution roadmap.
+                    <div style={{ position: 'absolute', top: 0, right: 0, padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', fontWeight: 'bold', borderBottomLeftRadius: '24px', fontSize: '0.75rem' }}>
+                        ⭐ SPECIAL FOUNDER OFFER
+                    </div>
+                    <h3 style={{ color: '#fff', marginBottom: '1rem', fontSize: '1.5rem' }}>Your Idea is Validated. Now Build It. 🛠️</h3>
+                    <p style={{ color: '#94a3b8', marginBottom: '2rem', fontSize: '0.9rem' }}>
+                        You've unlocked the surface level data. To actually launch, you need the **Execution Engine**.
                     </p>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.5rem', fontSize: '0.85rem' }}>
+                        <div style={{ color: '#64748b', fontWeight: 'bold' }}>Feature</div>
+                        <div style={{ color: '#64748b', textAlign: 'center' }}>Free</div>
+                        <div style={{ color: '#6366f1', textAlign: 'center', fontWeight: 'bold' }}>Founder</div>
+
+                        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '0.5rem 0' }}>Revenue Forecast</div>
+                        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'center', color: '#10b981' }}>✅</div>
+                        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'center', color: '#10b981' }}>✅ High Precision</div>
+
+                        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '0.5rem 0' }}>30-Day Execution Roadmap</div>
+                        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'center' }}>❌ Locked</div>
+                        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'center', color: '#10b981' }}>✅ Full Playbook</div>
+
+                        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '0.5rem 0' }}>Copy-Paste Outreach Scripts</div>
+                        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'center' }}>❌ Locked</div>
+                        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'center', color: '#10b981' }}>✅ Reddit & X Scripts</div>
+
+                        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '0.5rem 0' }}>React MVP Boilerplate (Code)</div>
+                        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'center' }}>❌ Locked</div>
+                        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'center', color: '#10b981' }}>✅ Export Project</div>
+                    </div>
+
+                    <div style={{ marginTop: '2rem', textAlign: 'center' }}>
+                        <button className="btn-primary" onClick={() => onUnlock('founder')} style={{ width: '100%', padding: '1.25rem', fontSize: '1.1rem' }}>
+                            Unlock Full Execution Playbook — $49
+                        </button>
+                        <p style={{ marginTop: '0.75rem', fontSize: '0.7rem', color: '#475569' }}>
+                            Prices are rising. Secure your lifetime access now.
+                        </p>
+                    </div>
                 </div>
             )}
             <div style={{ marginBottom: '3rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '2rem' }}>

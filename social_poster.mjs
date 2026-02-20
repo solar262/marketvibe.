@@ -8,7 +8,7 @@ const supabase = createClient(
     process.env.VITE_SUPABASE_ANON_KEY
 );
 
-async function runSocialAutopilot() {
+export async function runSocialAutopilot() {
     console.log("🐦 Starting Social Autopilot...");
 
     // 1. Find un-posted "Unicorn" leads (>$1M Revenue)
@@ -70,4 +70,9 @@ function generateViralTweet(niche, revenue, score) {
     return templates[Math.floor(Math.random() * templates.length)];
 }
 
-runSocialAutopilot();
+const isDirectRun = import.meta.url.includes(process.argv[1]?.replace(/\\/g, '/')) ||
+    import.meta.url.endsWith(process.argv[1]?.split(/[\\/]/).pop());
+
+if (isDirectRun) {
+    runSocialAutopilot();
+}

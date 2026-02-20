@@ -1,4 +1,4 @@
-const SITE_URL = import.meta.env.VITE_SITE_URL || 'https://marketvibe1.com';
+const SITE_URL = (import.meta.env && import.meta.env.VITE_SITE_URL) || (typeof process !== 'undefined' && process.env ? process.env.VITE_SITE_URL : undefined) || 'https://marketvibe1.com';
 
 export const dmScripts = {
     // 1. High Intent (They asked for help/validation)

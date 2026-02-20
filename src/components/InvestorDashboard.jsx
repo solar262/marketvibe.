@@ -11,10 +11,16 @@ const InvestorDashboard = ({ supabase }) => {
     const [sortBy, setSortBy] = useState('score');
     const [interestSent, setInterestSent] = useState({});
     const [searchQuery, setSearchQuery] = useState('');
+    const [showWelcome, setShowWelcome] = useState(false);
 
     const categories = ['All', 'SaaS', 'AI', 'FinTech', 'E-commerce', 'Health', 'Education', 'Marketing', 'Developer Tools'];
 
     useEffect(() => {
+        const hasSeenWelcome = localStorage.getItem('mv_investor_welcomed');
+        if (!hasSeenWelcome) {
+            setShowWelcome(true);
+            localStorage.setItem('mv_investor_welcomed', 'true');
+        }
         fetchListings();
     }, []);
 
@@ -216,6 +222,42 @@ const InvestorDashboard = ({ supabase }) => {
                     </div>
                 )}
             </div>
+
+            {/* Premium Welcome Modal */}
+            {showWelcome && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    background: 'rgba(0,0,0,0.9)', zIndex: 100000,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    backdropFilter: 'blur(10px)'
+                }}>
+                    <div style={{
+                        background: '#0f172a', padding: '3rem', borderRadius: '2rem',
+                        border: '1px solid rgba(245,158,11,0.3)', maxWidth: '500px', width: '90%',
+                        textAlign: 'center', boxShadow: '0 25px 50px -12px rgba(245, 158, 11, 0.2)'
+                    }}>
+                        <div style={{ fontSize: '4rem', marginBottom: '1.5rem' }}>🔐</div>
+                        <h2 style={{ fontSize: '2rem', fontWeight: 900, marginBottom: '1rem', background: 'linear-gradient(135deg, #f59e0b, #ec4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                            Welcome to the Inner Circle
+                        </h2>
+                        <p style={{ color: '#94a3b8', fontSize: '1.1rem', lineHeight: 1.6, marginBottom: '2rem' }}>
+                            You now have a <strong>48-hour head start</strong> on the latest validated startup deals.
+                            Browse the data, review revenue forecasts, and express interest to be introduced to founders before their public launch.
+                        </p>
+                        <button
+                            onClick={() => setShowWelcome(false)}
+                            style={{
+                                width: '100%', padding: '1.25rem', borderRadius: '1rem',
+                                border: 'none', background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                                color: '#000', fontWeight: 800, fontSize: '1.1rem', cursor: 'pointer',
+                                boxShadow: '0 10px 20px rgba(245, 158, 11, 0.2)'
+                            }}
+                        >
+                            Enter Deal Flow →
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

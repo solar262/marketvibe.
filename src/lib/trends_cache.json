@@ -1,72 +1,72 @@
 [
   {
-    "niche": "SaaS / Micro-SaaS",
-    "volume": 104,
-    "velocity": 104,
-    "avgInterest": "7.0",
-    "heatScore": 318.9807692307692
-  },
-  {
-    "niche": "Stationery & Writing Tools",
-    "volume": 102,
-    "velocity": 102,
-    "avgInterest": "9.6",
-    "heatScore": 315.55882352941177
+    "niche": "AI/Automation Agent",
+    "volume": 134,
+    "velocity": 134,
+    "avgInterest": "6.5",
+    "heatScore": 408.53731343283584
   },
   {
     "niche": "Indie Project",
-    "volume": 95,
-    "velocity": 95,
-    "avgInterest": "5.5",
-    "heatScore": 290.4947368421053
-  },
-  {
-    "niche": "AI/Automation Agent",
-    "volume": 83,
-    "velocity": 83,
-    "avgInterest": "7.3",
-    "heatScore": 256.32530120481925
+    "volume": 123,
+    "velocity": 123,
+    "avgInterest": "5.6",
+    "heatScore": 374.5772357723577
   },
   {
     "niche": "AI Agent",
-    "volume": 65,
-    "velocity": 65,
+    "volume": 116,
+    "velocity": 116,
     "avgInterest": "5.0",
-    "heatScore": 200
+    "heatScore": 353
   },
   {
-    "niche": "Pet Tech",
-    "volume": 59,
-    "velocity": 59,
-    "avgInterest": "6.8",
-    "heatScore": 183.8135593220339
+    "niche": "SaaS / Micro-SaaS",
+    "volume": 99,
+    "velocity": 99,
+    "avgInterest": "7.0",
+    "heatScore": 304.030303030303
   },
   {
     "niche": "Streaming & Content Creation",
-    "volume": 36,
-    "velocity": 36,
-    "avgInterest": "5.6",
-    "heatScore": 113.58333333333333
+    "volume": 94,
+    "velocity": 94,
+    "avgInterest": "6.3",
+    "heatScore": 288.3404255319149
   },
   {
     "niche": "Home Improvement",
-    "volume": 31,
-    "velocity": 31,
-    "avgInterest": "5.3",
-    "heatScore": 98.3225806451613
+    "volume": 87,
+    "velocity": 87,
+    "avgInterest": "6.1",
+    "heatScore": 267.11494252873564
   },
   {
     "niche": "Fintech",
-    "volume": 27,
-    "velocity": 27,
-    "avgInterest": "5.9",
-    "heatScore": 86.88888888888889
+    "volume": 57,
+    "velocity": 57,
+    "avgInterest": "6.6",
+    "heatScore": 177.59649122807016
   },
   {
     "niche": "Marketing Agency",
-    "volume": 24,
-    "velocity": 24,
-    "avgInterest": "6.3",
-    "heatScore": 78.29166666666667
+    "volume": 41,
+    "velocity": 41,
+    "avgInterest": "7.0",
+    "heatScore": 129.9512195121951
+  },
+  {
+    "niche": "Pet Tech",
+    "volume": 39,
+    "velocity": 39,
+    "avgInterest": "5.5",
+    "heatScore": 122.46153846153847
+  },
+  {
+    "niche": "Service Business (Cleaning)",
+    "volume": 31,
+    "velocity": 31,
+    "avgInterest": "6.2",
+    "heatScore": 99.2258064516129
   }
 ]

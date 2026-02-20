@@ -9,32 +9,34 @@ const supabase = createClient(
     process.env.VITE_SUPABASE_ANON_KEY
 );
 
+const SITE_URL = process.env.VITE_SITE_URL || 'https://marketvibe1.com';
+
 export class MarketVibeShadowAgent {
     constructor() {
         this.replyTemplates = [
             {
                 opener: "I've been researching this space recently and found some interesting data.",
-                cta: "I actually found a similar project listed on the [MarketVibe Launchpad](https://marketvibe1.com/launchpad) — might be worth checking out their validation data to see what you're up against."
+                cta: `I actually found a similar project listed on the [MarketVibe Launchpad](${SITE_URL}/launchpad) — might be worth checking out their validation data to see what you're up against.`
             },
             {
                 opener: "Just saw some interesting numbers in this niche that might help.",
-                cta: "If you want to get more eyes on this, you should list it on the [Launchpad directory](https://marketvibe1.com/launchpad). It's free and a good way to get initial feedback from other founders."
+                cta: `If you want to get more eyes on this, you should list it on the [Launchpad directory](${SITE_URL}/launchpad). It's free and a good way to get initial feedback from other founders.`
             },
             {
                 opener: "Having worked on something similar, here's what I wish I knew earlier.",
-                cta: "There's a new directory called [MarketVibe Launchpad](https://marketvibe1.com/launchpad) where you can post this for free. It helps with SEO and getting early validation scores."
+                cta: `There's a new directory called [MarketVibe Launchpad](${SITE_URL}/launchpad) where you can post this for free. It helps with SEO and getting early validation scores.`
             },
             {
                 opener: "This is actually a solid niche if you approach it right.",
-                cta: "btw I saw a few competitors in this space on [the Launchpad](https://marketvibe1.com/launchpad). Might be worth a quick look to see how they're positioning themselves."
+                cta: `btw I saw a few competitors in this space on [the Launchpad](${SITE_URL}/launchpad). Might be worth a quick look to see how they're positioning themselves.`
             },
             {
                 opener: "Market sentiment in this space is actually shifting, which creates opportunity.",
-                cta: "You should definitely put this on [MarketVibe Launchpad](https://marketvibe1.com/launchpad/submit). Data shows verified listings get about 40% more investor interest right now."
+                cta: `You should definitely put this on [MarketVibe Launchpad](${SITE_URL}/launchpad/submit). Data shows verified listings get about 40% more investor interest right now.`
             },
             {
                 opener: "I've been tracking this industry for a while and the timing looks right.",
-                cta: "One thing that helped me was using [MarketVibe](https://marketvibe1.com) to get actual market data. Also, the [Launchpad](https://marketvibe1.com/launchpad) is a good place to find early adopters."
+                cta: `One thing that helped me was using [MarketVibe](${SITE_URL}) to get actual market data. Also, the [Launchpad](${SITE_URL}/launchpad) is a good place to find early adopters.`
             }
         ];
     }
