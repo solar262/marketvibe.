@@ -410,10 +410,9 @@ function App() {
 
       {/* Main Content Router */}
       {(() => {
-        if (isInvestorDashboard) return <InvestorDashboard supabase={supabase} />;
-        if (isInvestorRoute) return <InvestorLanding onNavigate={(p) => { window.location.href = p; }} />;
-
         switch (step) {
+          case 'investors': return <InvestorLanding onNavigate={(p) => { window.location.href = p; }} />;
+          case 'investor-dashboard': return <InvestorDashboard supabase={supabase} />;
           case 'setup': return <ProjectForm onSubmit={handleProjectSubmit} submitting={submitting} email={email} usageCount={usageCount} history={history} onSelectProject={handleProjectSelect} />;
           case 'fulfillment': return <ResultsView results={results} email={email} onUnlock={handleUnlock} paid={paid} planType={planType} history={history} onSelectProject={handleProjectSelect} />;
           case 'admin-leads': return <LeadsDashboard supabase={supabase} />;
@@ -468,7 +467,7 @@ function App() {
       {!isInvestorRoute && !isInvestorDashboard && (
         <footer style={{ marginTop: '6rem', padding: '4rem 0', borderTop: '1px solid rgba(255,255,255,0.05)', textAlign: 'center' }}>
           <div style={{ display: 'flex', justifyContent: 'center', gap: '2rem', flexWrap: 'wrap', marginBottom: '2rem' }}>
-            <a href="/investors" onClick={(e) => { e.preventDefault(); setStep('investors'); }} style={{ color: '#f59e0b', fontWeight: 'bold', textDecoration: 'none' }}>Investor Portal</a>
+            <a href="/investors" style={{ color: '#f59e0b', fontWeight: 'bold', textDecoration: 'none' }}>Investor Portal</a>
             <a href="/privacy" onClick={(e) => { e.preventDefault(); setStep('privacy'); }} style={{ color: '#64748b', textDecoration: 'none' }}>Privacy</a>
             <a href="/terms" onClick={(e) => { e.preventDefault(); setStep('terms'); }} style={{ color: '#64748b', textDecoration: 'none' }}>Terms</a>
           </div>
