@@ -176,7 +176,7 @@ function App() {
     // Increment Website Hits (Non-blocking)
     const hasCounted = sessionStorage.getItem('vibe_session_counted');
     if (!hasCounted && supabase) {
-      (async () => {
+      /* (async () => {
         try {
           const { error } = await supabase.rpc('increment_hits');
           if (error) {
@@ -186,7 +186,7 @@ function App() {
         } catch (e) {
           console.error("Hit counter error:", e);
         }
-      })();
+      })(); */
       sessionStorage.setItem('vibe_session_counted', 'true');
     }
 
@@ -343,7 +343,7 @@ function App() {
       const { data: latestRecords } = await supabase.from('leads').select('id').eq('email', email).order('created_at', { ascending: false }).limit(1);
       const targetId = latestRecords?.[0]?.id;
       if (targetId) {
-        try { await supabase.rpc('increment_usage', { lead_id: targetId }); } catch (e) { }
+        // try { await supabase.rpc('increment_usage', { lead_id: targetId }); } catch (e) { }
         await supabase.from('leads').update({ project_name: projectData.name, project_description: projectData.description, target_audience: projectData.audience, results: report, status: 'completed_validation' }).eq('id', targetId);
       }
       setResults(report)
