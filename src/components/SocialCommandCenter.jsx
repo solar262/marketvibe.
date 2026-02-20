@@ -222,7 +222,7 @@ const SocialCommandCenter = () => {
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                             {PLATFORMS.map(p => (
                                 <button key={p} onClick={() => setPlatform(p)} style={{
-                                    padding: '8px 20px', borderRadius: '20px', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem',
+                                    padding: '8px 20px', borderRadius: '20px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem',
                                     background: platform === p ? (p === 'Twitter/X' ? 'rgba(29,161,242,0.15)' : 'rgba(10,102,194,0.15)') : 'rgba(255,255,255,0.04)',
                                     color: platform === p ? (p === 'Twitter/X' ? '#1da1f2' : '#0a66c2') : '#64748b',
                                     border: platform === p ? `1px solid ${p === 'Twitter/X' ? '#1da1f2' : '#0a66c2'}44` : '1px solid transparent',
@@ -283,8 +283,10 @@ const SocialCommandCenter = () => {
                                 {generating ? '⏳ Generating...' : '🤖 AI Generate'}
                             </button>
                             <button onClick={handleAddToQueue} disabled={!postText.trim()} style={{
-                                padding: '12px 20px', borderRadius: '10px', border: 'none', background: 'rgba(245,158,11,0.15)',
-                                color: '#f59e0b', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem', border: '1px solid rgba(245,158,11,0.3)',
+                                padding: '12px 20px', borderRadius: '10px',
+                                background: 'rgba(245,158,11,0.15)',
+                                color: '#f59e0b', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem',
+                                border: '1px solid rgba(245,158,11,0.3)',
                             }}>
                                 📅 Add to Queue
                             </button>
