@@ -69,25 +69,21 @@
   <meta property="twitter:description" content="Get your free revenue forecast and 30-day blueprint.">
   <meta property="twitter:image" content="https://www.marketvibe1.com/og-preview.png">
 
-  <!-- Global Error Catch for Debugging -->
-  <script>
-    window.onerror = function (msg, url, lineNo, columnNo, error) {
-      const message = [
-        'Message: ' + msg,
-        'URL: ' + url,
-        'Line: ' + lineNo,
-        'Column: ' + columnNo,
-        'Error object: ' + JSON.stringify(error)
-      ].join('\n');
-      alert('⚠️ APP CRASH DETECTED:\n\n' + message);
-      return false;
-    };
-  </script>
+  <!-- Hide Vercel Development Toolbar -->
+  <style>
+    #vercel-speed-insights-widget,
+    .vercel-toolbar-root {
+      display: none !important;
+      visibility: hidden !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+  </style>
 </head>
 
 <body>
   <div id="root"></div>
-  <script type="module" src="/src/main.jsx?v=3.51"></script>
+  <script type="module" src="/src/main.jsx?v=3.53"></script>
 </body>
 
 </html>
