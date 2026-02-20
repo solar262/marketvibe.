@@ -4,7 +4,7 @@ import React, { useState } from 'react';
  * 🏦 InvestorLanding — The supply side of the two-sided marketplace.
  * Sells $299/month Investor Access subscriptions to VCs and angels.
  */
-const InvestorLanding = ({ onNavigate }) => {
+const InvestorLanding = ({ onNavigate, spots }) => {
     const [email, setEmail] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
@@ -64,6 +64,10 @@ const InvestorLanding = ({ onNavigate }) => {
         { quote: "I love that founders have already validated demand before listing. It filters out 90% of the noise.", name: "James T.", role: "Micro-VC, $8M fund" },
     ];
 
+    // Simulated social proof (Last active investor)
+    const locations = ['San Francisco', 'London', 'Berlin', 'Austin', 'Singapore', 'New York', 'Dubai'];
+    const randomLocation = locations[Math.floor(Math.random() * locations.length)];
+
     return (
         <div style={{
             minHeight: '100vh',
@@ -92,9 +96,15 @@ const InvestorLanding = ({ onNavigate }) => {
             {/* Hero */}
             <div style={{ maxWidth: '900px', margin: '0 auto', padding: '5rem 2rem 3rem', textAlign: 'center' }}>
                 {/* Badge */}
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: '20px', padding: '6px 16px', marginBottom: '2rem' }}>
-                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b', display: 'inline-block', animation: 'pulse 2s infinite' }} />
-                    <span style={{ color: '#f59e0b', fontSize: '0.8rem', fontWeight: 700 }}>INVESTOR ACCESS — LIMITED SPOTS</span>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: '20px', padding: '6px 16px' }}>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b', display: 'inline-block', animation: 'pulse 2s infinite' }} />
+                        <span style={{ color: '#f59e0b', fontSize: '0.8rem', fontWeight: 700 }}>{spots} SPOTS REMAINING FOR Q1</span>
+                    </div>
+
+                    <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 500 }}>
+                        📍 Last investor access granted in <span style={{ color: '#f59e0b' }}>{randomLocation}</span> · 3 minutes ago
+                    </div>
                 </div>
 
                 <h1 style={{ fontSize: 'clamp(2.2rem, 5vw, 3.8rem)', fontWeight: 900, lineHeight: 1.1, margin: '0 0 1.5rem' }}>

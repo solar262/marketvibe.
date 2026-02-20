@@ -65,6 +65,7 @@ function App() {
 
   const [email, setEmail] = useState('')
   const [spots, setSpots] = useState(20)
+  const [investorSpots, setInvestorSpots] = useState(12) // Default starting FOMO
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
@@ -139,6 +140,15 @@ function App() {
       if (!supabase) return;
       setLoading(true)
       try {
+        // Fetch Current Spots
+        const { data: settings } = await supabase.from('app_settings').select('key, value');
+        if (settings) {
+          const ldr = settings.find(s => s.key === 'lifetime_deals_remaining');
+          const isr = settings.find(s => s.key === 'investor_seats_remaining');
+          if (ldr) setSpots(ldr.value);
+          if (isr) setInvestorSpots(isr.value);
+        }
+
         const leadId = params.get('lid') || localStorage.getItem('mv_lead_id')
         if (leadId) {
           const { data: leadToRecover } = await supabase.from('leads').select('*').eq('id', leadId).single()
@@ -196,6 +206,7 @@ function App() {
       subscription = supabase.channel('app_settings_changes')
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'app_settings' }, payload => {
           if (payload.new.key === 'lifetime_deals_remaining') setSpots(payload.new.value)
+          if (payload.new.key === 'investor_seats_remaining') setInvestorSpots(payload.new.value)
         }).subscribe()
     }
 
@@ -411,7 +422,7 @@ function App() {
       {/* Main Content Router */}
       {(() => {
         switch (step) {
-          case 'investors': return <InvestorLanding onNavigate={(p) => { window.location.href = p; }} />;
+          case 'investors': return <InvestorLanding onNavigate={(p) => { window.location.href = p; }} spots={investorSpots} />;
           case 'investor-dashboard': return <InvestorDashboard supabase={supabase} />;
           case 'setup': return <ProjectForm onSubmit={handleProjectSubmit} submitting={submitting} email={email} usageCount={usageCount} history={history} onSelectProject={handleProjectSelect} />;
           case 'fulfillment': return <ResultsView results={results} email={email} onUnlock={handleUnlock} paid={paid} planType={planType} history={history} onSelectProject={handleProjectSelect} />;
