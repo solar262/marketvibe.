@@ -8,7 +8,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <title>MarketVibe 3.3 (Nuclear Cache Bust)</title>
+  <title>MarketVibe | AI Startup Validation & Revenue Forecasting</title>
   <meta name="description"
     content="Stop guessing and start building. MarketVibe helps you validate your ideas with data-driven revenue forecasts and execution plans.">
 
@@ -69,16 +69,20 @@
   <meta property="twitter:description" content="Get your free revenue forecast and 30-day blueprint.">
   <meta property="twitter:image" content="https://www.marketvibe1.com/og-preview.png">
 
-  <!-- Hide Vercel Development Toolbar -->
-  <style>
-    #vercel-speed-insights-widget,
-    .vercel-toolbar-root {
-      display: none !important;
-      visibility: hidden !important;
-      opacity: 0 !important;
-      pointer-events: none !important;
-    }
-  </style>
+  <!-- Global Error Catch for Debugging -->
+  <script>
+    window.onerror = function (msg, url, lineNo, columnNo, error) {
+      const message = [
+        'Message: ' + msg,
+        'URL: ' + url,
+        'Line: ' + lineNo,
+        'Column: ' + columnNo,
+        'Error object: ' + JSON.stringify(error)
+      ].join('\n');
+      alert('⚠️ APP CRASH DETECTED:\n\n' + message);
+      return false;
+    };
+  </script>
 </head>
 
 <body>
