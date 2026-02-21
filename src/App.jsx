@@ -452,7 +452,7 @@ function App() {
             if (planType !== 'investor') return <InvestorLanding onNavigate={(p) => { window.location.href = p; }} spots={investorSpots} />;
             return <InvestorDashboard supabase={supabase} />;
           case 'setup': return <ProjectForm onSubmit={handleProjectSubmit} submitting={submitting} email={email} usageCount={usageCount} history={history} onSelectProject={handleProjectSelect} />;
-          case 'fulfillment': return <ResultsView results={results} email={email} onUnlock={handleUnlock} paid={paid} planType={planType} history={history} onSelectProject={handleProjectSelect} />;
+          case 'fulfillment': return <ResultsView results={results} email={email} onUnlock={handleUnlock} unlocked={paid} planType={planType} history={history} onSelectProject={handleProjectSelect} />;
           case 'admin-leads': return <LeadsDashboard supabase={supabase} />;
           case 'og-preview': return previewId ? <GrowthScorecard leadId={previewId} supabase={supabase} /> : null;
           case 'tools-naming': return <NameGenerator onSelectName={(n) => { setSelectedProjectName(n); setStep('setup'); }} />;
