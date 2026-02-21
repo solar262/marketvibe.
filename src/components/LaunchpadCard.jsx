@@ -10,19 +10,22 @@ const LaunchpadCard = ({ listing, onUpvote }) => {
             border: '2px solid #f59e0b',
             badge: '⭐ FEATURED',
             badgeBg: 'linear-gradient(135deg, #f59e0b, #d97706)',
-            glow: '0 0 20px rgba(245, 158, 11, 0.15)',
+            glow: '0 0 25px rgba(245, 158, 11, 0.2)',
+            premiumClass: 'featured-shine'
         },
         validated: {
             border: '2px solid #a855f7',
             badge: '✓ VERIFIED',
             badgeBg: 'linear-gradient(135deg, #a855f7, #7c3aed)',
-            glow: '0 0 20px rgba(168, 85, 247, 0.15)',
+            glow: '0 0 25px rgba(168, 85, 247, 0.2)',
+            premiumClass: 'premium-shine'
         },
         free: {
             border: '1px solid rgba(255,255,255,0.08)',
             badge: null,
             badgeBg: null,
             glow: 'none',
+            premiumClass: ''
         },
     };
 
@@ -44,6 +47,45 @@ const LaunchpadCard = ({ listing, onUpvote }) => {
 
     const nicheColor = nicheColors[listing.niche] || '#6366f1';
 
+    const getLogo = () => {
+        if (listing.logo_url) return <img src={listing.logo_url} alt={listing.name} style={{ width: '100%', height: '100%', borderRadius: '12px', objectFit: 'cover' }} />;
+
+        // Premium Mapping for Featured/Verified Startups
+        const logoMap = {
+            'ContentFlow AI': '🌊',
+            'DevHealth Monitor': '🩺',
+            'CryptoTax Solver': '🪙',
+            'AlphaBot Pro': '🤖',
+            'InvoiceSnap': '📸',
+            'NicheHunt': '🎯',
+            'LeadSentinel': '🛡️',
+            'SparkScribe': '✍️',
+            'Invoice flow': '📊'
+        };
+
+        const nicheIconMap = {
+            'SaaS': '☁️', 'AI': '🧠', 'FinTech': '💳',
+            'E-commerce': '🛒', 'Health': '🏥', 'Education': '🎓',
+            'Marketing': '📢', 'Developer Tools': '🛠️'
+        };
+
+        const icon = logoMap[listing.name] || nicheIconMap[listing.niche] || '🚀';
+
+        return (
+            <div style={{
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.6rem',
+                filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))'
+            }}>
+                {icon}
+            </div>
+        );
+    };
+
     return (
         <div style={{
             background: 'rgba(255,255,255,0.03)',
@@ -58,6 +100,7 @@ const LaunchpadCard = ({ listing, onUpvote }) => {
             cursor: 'pointer',
             position: 'relative',
         }}
+            className={tier.premiumClass}
             onClick={() => { window.location.href = `/launchpad/listing/${listing.id}`; }}
             onMouseOver={(e) => {
                 e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
@@ -100,20 +143,22 @@ const LaunchpadCard = ({ listing, onUpvote }) => {
                 }}>{listing.upvotes}</span>
             </div>
 
-            {/* Product icon placeholder */}
+            {/* Product Logo / Graphic */}
             <div style={{
-                width: '52px',
-                height: '52px',
-                borderRadius: '14px',
-                background: `linear-gradient(135deg, ${nicheColor}33, ${nicheColor}11)`,
-                border: `1px solid ${nicheColor}44`,
+                width: '56px',
+                height: '56px',
+                borderRadius: '16px',
+                background: `linear-gradient(135deg, ${nicheColor}44, ${nicheColor}11)`,
+                border: `1px solid ${nicheColor}55`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '1.4rem',
                 flexShrink: 0,
+                boxShadow: `0 4px 15px ${nicheColor}22`,
+                overflow: 'hidden',
+                position: 'relative'
             }}>
-                {listing.name?.charAt(0)?.toUpperCase() || '🚀'}
+                {getLogo()}
             </div>
 
             {/* Content */}
