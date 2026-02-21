@@ -28,6 +28,7 @@ import InvestorDashboard from './components/InvestorDashboard';
 import SocialCommandCenter from './components/SocialCommandCenter';
 import TwitterBotDashboard from './components/TwitterBotDashboard';
 import EmailCapturePopup from './components/EmailCapturePopup';
+import Library from './components/Library';
 import { popularNiches } from './lib/niches'
 
 const VerifyingPortal = () => {
@@ -273,6 +274,9 @@ function App() {
         const title = `Validate your ${foundNiche.name} Business Idea - MarketVibe`
         document.title = title
       }
+    } else if (activePath === '/library') {
+      setStep('library')
+      document.title = 'MarketVibe Intelligence Library - 100+ Startup Blueprints'
     } else if (activePath === '/newsroom') {
       setStep('newsroom')
       document.title = 'The Newsroom: Breaking Market Trends | MarketVibe'
@@ -436,7 +440,7 @@ function App() {
               borderRadius: '20px',
               boxShadow: '0 4px 15px rgba(99, 102, 241, 0.3)'
             }}>🚀 Launchpad</a>
-            <a href="/validate/saas" onClick={(e) => { e.preventDefault(); setStep('p-seo'); }} style={{ color: '#94a3b8', textDecoration: 'none', fontWeight: 600, fontSize: '0.9rem' }}>📚 Library</a>
+            <a href="/library" onClick={(e) => { e.preventDefault(); setStep('library'); }} style={{ color: '#94a3b8', textDecoration: 'none', fontWeight: 600, fontSize: '0.9rem' }}>📚 Library</a>
           </div>
         </header>
       )}
@@ -470,7 +474,8 @@ function App() {
           case 'terms': return <TermsOfService />;
           case 'hub': return <CaseStudyHub />;
           case 'market-size': return <MarketSizeCalculator onGetBlueprint={() => { setStep('setup'); window.scrollTo(0, 0); }} />;
-          case 'p-seo': return <NicheValidator />;
+          case 'library': return <Library onSelectNiche={(n) => { setActiveNiche(n); setStep('p-seo'); window.scrollTo(0, 0); }} />;
+          case 'p-seo': return <NicheValidator niche={activeNiche} />;
           case 'insights': return <AuthorityInsights />;
           case 'newsroom': return <Newsroom />;
           case 'blog-index': return <BlogIndex />;

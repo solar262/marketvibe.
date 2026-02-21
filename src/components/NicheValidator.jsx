@@ -2,14 +2,18 @@ import React, { useEffect, useState } from 'react';
 import { popularNiches } from '../lib/niches';
 import { generateValidationReport } from '../lib/generator';
 
-const NicheValidator = () => {
+const NicheValidator = ({ niche }) => {
     const [nicheData, setNicheData] = useState(null);
     const [report, setReport] = useState(null);
 
     useEffect(() => {
+        // Find niche from prop or URL path (e.g., /validate/saas)
         const pathParts = window.location.pathname.split('/');
         const slugFromUrl = pathParts[pathParts.length - 1];
-        const found = popularNiches.find(n => n.slug === slugFromUrl) || popularNiches.find(n => n.slug === 'saas');
+
+        // Use niche prop if provided, otherwise fallback to URL or 'saas'
+        const found = niche || popularNiches.find(n => n.slug === slugFromUrl) || popularNiches.find(n => n.slug === 'saas');
+
         setNicheData(found);
 
         try {
@@ -25,7 +29,7 @@ const NicheValidator = () => {
         }
 
         document.title = `Validate ${found.name} Startup Idea - MarketVibe`;
-    }, []);
+    }, [niche]);
 
     if (!nicheData || !report) {
         return (
@@ -199,18 +203,6 @@ const NicheValidator = () => {
                 </div>
 
                 <div style={{ display: 'grid', gap: '3rem', position: 'relative' }}>
-                    {/* Vertical Line for Timeline */}
-                    <div style={{
-                        position: 'absolute',
-                        left: '0',
-                        top: '0',
-                        bottom: '0',
-                        width: '2px',
-                        background: 'linear-gradient(to bottom, transparent, #6366f1, transparent)',
-                        opacity: 0.3,
-                        display: 'none' // Hidden on mobile, can be shown with media queries
-                    }}></div>
-
                     {report.executionPlan?.map((phase, idx) => (
                         <div key={idx} style={{ position: 'relative', paddingLeft: '0' }}>
                             <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start' }}>
