@@ -1,6 +1,59 @@
 import React, { useState } from 'react';
 import { popularNiches } from '../lib/niches';
 
+const IntelligenceFeed = () => {
+    const feeds = [
+        { niche: 'AI SaaS', action: 'Market size verified', status: '$4.2B', city: 'San Francisco' },
+        { niche: 'FinTech', action: 'Ad conversion test', status: 'High', city: 'London' },
+        { niche: 'E-commerce', action: 'Revenue forecast updated', status: '85th Percentile', city: 'Berlin' },
+        { niche: 'HealthTech', action: 'Competitor sweep', status: 'Done', city: 'Singapore' },
+        { niche: 'CleanTech', action: 'Regulatory scan', status: 'Clear', city: 'Austin' },
+        { niche: 'LegalTech', action: 'User persona mapped', status: 'Expert', city: 'Oxford' }
+    ];
+
+    const [index, setIndex] = React.useState(0);
+
+    React.useEffect(() => {
+        const timer = setInterval(() => {
+            setIndex((prev) => (prev + 1) % feeds.length);
+        }, 3000);
+        return () => clearInterval(timer);
+    }, []);
+
+    const item = feeds[index];
+
+    return (
+        <div style={{
+            background: 'rgba(99, 102, 241, 0.05)',
+            border: '1px solid rgba(99, 102, 241, 0.1)',
+            borderRadius: '100px',
+            padding: '8px 20px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '12px',
+            fontSize: '0.8rem',
+            marginBottom: '2rem',
+            backdropFilter: 'blur(5px)',
+            animation: 'fadeIn 0.5s ease'
+        }}>
+            <span style={{
+                color: '#6366f1',
+                fontWeight: '900',
+                textTransform: 'uppercase',
+                fontSize: '0.65rem',
+                border: '1px solid rgba(99, 102, 241, 0.4)',
+                padding: '2px 6px',
+                borderRadius: '4px'
+            }}>Live Intelligence</span>
+            <span style={{ color: '#fff', fontWeight: '500' }}>
+                <span style={{ color: '#a5b4fc' }}>{item.niche}:</span> {item.action}...
+            </span>
+            <span style={{ color: '#10b981', fontWeight: '800' }}>[{item.status}]</span>
+            <span style={{ color: '#444', fontSize: '0.7rem' }}>• {item.city}</span>
+        </div>
+    );
+};
+
 const Library = ({ onSelectNiche }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filter, setFilter] = useState('All');
@@ -16,6 +69,8 @@ const Library = ({ onSelectNiche }) => {
     return (
         <div style={{ padding: '4rem 1rem', maxWidth: '1200px', margin: '0 auto', color: 'white' }}>
             <div style={{ textAlign: 'center', marginBottom: '5rem' }}>
+                <IntelligenceFeed />
+                <br />
                 <span style={{ color: '#6366f1', fontWeight: 'bold', letterSpacing: '0.2em', textTransform: 'uppercase', fontSize: '0.8rem' }}>
                     Market Intelligence Vault
                 </span>
