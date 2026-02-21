@@ -48,9 +48,16 @@ const LaunchpadCard = ({ listing, onUpvote }) => {
     const nicheColor = nicheColors[listing.niche] || '#6366f1';
 
     const getLogo = () => {
+        // 1. Check for real logo_url column
         if (listing.logo_url) return <img src={listing.logo_url} alt={listing.name} style={{ width: '100%', height: '100%', borderRadius: '12px', objectFit: 'cover' }} />;
 
-        // Premium Mapping for Featured/Verified Startups
+        // 2. Check description for embedded metadata (the "hacker" schema extension)
+        const metaMatch = listing.description?.match(/\|\|metadata:logo=(.*?)\|\|/);
+        if (metaMatch && metaMatch[1]) {
+            return <img src={metaMatch[1]} alt={listing.name} style={{ width: '100%', height: '100%', borderRadius: '12px', objectFit: 'cover' }} />;
+        }
+
+        // 3. Fallback to Premium Icon Mapping
         const logoMap = {
             'ContentFlow AI': '🌊',
             'DevHealth Monitor': '🩺',
@@ -85,6 +92,9 @@ const LaunchpadCard = ({ listing, onUpvote }) => {
             </div>
         );
     };
+
+    // Clean description for display (remove metadata tags)
+    const cleanDescription = listing.description?.split('||metadata:')[0]?.trim() || listing.tagline;
 
     return (
         <div style={{

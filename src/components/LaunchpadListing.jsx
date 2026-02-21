@@ -70,6 +70,29 @@ const LaunchpadListing = ({ listingId, onBack, supabase }) => {
             ? { label: '✓ VERIFIED', bg: 'linear-gradient(135deg, #a855f7, #7c3aed)' }
             : null;
 
+    const getLogo = () => {
+        if (listing.logo_url) return <img src={listing.logo_url} alt={listing.name} style={{ width: '100%', height: '100%', borderRadius: '15px', objectFit: 'cover' }} />;
+
+        const metaMatch = listing.description?.match(/\|\|metadata:logo=(.*?)\|\|/);
+        if (metaMatch && metaMatch[1]) {
+            return <img src={metaMatch[1]} alt={listing.name} style={{ width: '100%', height: '100%', borderRadius: '15px', objectFit: 'cover' }} />;
+        }
+        // 3. Fallback to Premium Icon Mapping
+        const iconMap = {
+            'ContentFlow AI': '🌊', 'DevHealth Monitor': '🩺', 'CryptoTax Solver': '🪙',
+            'AlphaBot Pro': '🤖', 'InvoiceSnap': '📸', 'NicheHunt': '🎯',
+            'LeadSentinel': '🛡️', 'SparkScribe': '✍️', 'Invoice flow': '📊'
+        };
+        const nicheIconMap = {
+            'SaaS': '☁️', 'AI': '🧠', 'FinTech': '💳', 'E-commerce': '🛒',
+            'Health': '🏥', 'Education': '🎓', 'Marketing': '📢', 'Developer Tools': '🛠️'
+        };
+        const icon = iconMap[listing.name] || nicheIconMap[listing.niche] || '🚀';
+        return <span style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))' }}>{icon}</span>;
+    };
+
+    const cleanDescription = listing.description?.split('||metadata:')[0]?.trim() || listing.tagline;
+
     return (
         <div style={containerStyle}>
             {/* Back button */}
@@ -86,13 +109,14 @@ const LaunchpadListing = ({ listingId, onBack, supabase }) => {
                     <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
                         {/* Icon */}
                         <div style={{
-                            width: '72px', height: '72px', borderRadius: '18px', flexShrink: 0,
+                            width: '80px', height: '80px', borderRadius: '20px', flexShrink: 0,
                             background: `linear-gradient(135deg, ${nicheColor}55, ${nicheColor}22)`,
                             border: `1px solid ${nicheColor}44`,
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontSize: '2rem', fontWeight: 'bold', color: '#fff',
+                            fontSize: '2.4rem', fontWeight: 'bold', color: '#fff',
+                            overflow: 'hidden', boxShadow: `0 8px 25px ${nicheColor}22`
                         }}>
-                            {listing.name ? listing.name.charAt(0).toUpperCase() : '🚀'}
+                            {getLogo()}
                         </div>
 
                         {/* Title block */}
@@ -133,10 +157,10 @@ const LaunchpadListing = ({ listingId, onBack, supabase }) => {
                 </div>
 
                 {/* Description */}
-                {listing.description && (
+                {(cleanDescription || listing.tagline) && (
                     <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '16px', padding: '2rem', marginBottom: '1.5rem' }}>
                         <h3 style={{ margin: '0 0 1rem', color: '#e2e8f0', fontSize: '1rem', fontWeight: 700 }}>About this idea</h3>
-                        <p style={{ margin: 0, color: '#94a3b8', lineHeight: 1.8, fontSize: '1rem', whiteSpace: 'pre-line' }}>{listing.description}</p>
+                        <p style={{ margin: 0, color: '#94a3b8', lineHeight: 1.8, fontSize: '1rem', whiteSpace: 'pre-line' }}>{cleanDescription || listing.tagline}</p>
                     </div>
                 )}
 
