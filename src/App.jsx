@@ -426,7 +426,16 @@ function App() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-            <a href="/launchpad" style={{ color: '#a5b4fc', textDecoration: 'none', fontWeight: 600, fontSize: '0.9rem' }}>🚀 Launchpad</a>
+            <a href="/launchpad" style={{
+              color: '#fff',
+              textDecoration: 'none',
+              fontWeight: 700,
+              fontSize: '0.9rem',
+              background: 'linear-gradient(135deg, #6366f1, #a855f7)',
+              padding: '6px 14px',
+              borderRadius: '20px',
+              boxShadow: '0 4px 15px rgba(99, 102, 241, 0.3)'
+            }}>🚀 Launchpad</a>
             <a href="/validate/saas" onClick={(e) => { e.preventDefault(); setStep('p-seo'); }} style={{ color: '#94a3b8', textDecoration: 'none', fontWeight: 600, fontSize: '0.9rem' }}>📚 Library</a>
           </div>
         </header>
@@ -494,6 +503,12 @@ function App() {
                       <button type="submit" className="btn-primary" disabled={submitting}>{submitting ? 'Connecting...' : 'Get My Free Report'}</button>
                     </form>
                     {errorMessage && <p className="error-text">{errorMessage}</p>}
+                    <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                      <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.75rem' }}>Want to launch a validated idea instead?</p>
+                      <a href="/launchpad" style={{ color: '#a5b4fc', fontSize: '0.85rem', fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                        Browse Recent Launches →
+                      </a>
+                    </div>
                   </div>
                 </section>
                 <PricingTable onSelectPlan={handleSelectPlan} spots={spots} />
