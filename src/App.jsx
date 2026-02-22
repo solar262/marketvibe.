@@ -529,7 +529,7 @@ function App() {
             <a href="/privacy" onClick={(e) => { e.preventDefault(); setStep('privacy'); }} style={{ color: '#64748b', textDecoration: 'none' }}>Privacy</a>
             <a href="/terms" onClick={(e) => { e.preventDefault(); setStep('terms'); }} style={{ color: '#64748b', textDecoration: 'none' }}>Terms</a>
           </div>
-          <p style={{ color: '#475569', fontSize: '0.8rem' }}>&copy; 2026 MarketVibe. Built for the survivors. v3.5 (RESCUE BUILD)</p>
+          <p style={{ color: '#475569', fontSize: '0.8rem' }}>&copy; 2026 MarketVibe. Built for the survivors. v3.5</p>
         </footer>
       )}
 
