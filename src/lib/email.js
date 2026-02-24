@@ -198,13 +198,13 @@ export const sendCloserEmail = async (email, niche, revenuePotential) => {
         if (!response.ok) {
             const error = await response.json();
             console.error('Resend API error:', error);
-            return { success: false, error };
+            return { success: false, error: error.message || error.name || 'API Error' };
         }
 
         const data = await response.json();
         return { success: true, data };
     } catch (err) {
         console.error('Unexpected error sending closer email:', err);
-        return { success: false, error: err };
+        return { success: false, error: err.message || 'Network error' };
     }
 };

@@ -140,7 +140,7 @@ const LeadsDashboard = () => {
                 // Optional: Update a status in 'leads' table if you want to track contacted organic signups
                 await supabase.from('leads').update({ status: 'contacted' }).eq('id', lead.id);
             } else {
-                showFeedback(`Failed to send: ${error?.message || 'Check Resend API Key'}`, 'error');
+                showFeedback(`Failed to send: ${error}`, 'error');
                 setSentLeads(prev => {
                     const next = new Set(prev);
                     next.delete(lead.id);
