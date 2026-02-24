@@ -18,17 +18,42 @@ const supabase = createClient(
 class MarketVibeSentinel {
     constructor() {
         this.keywords = [
-            "Roast my landing page",
-            "Ads are not converting",
-            "Why is nobody buying my SaaS",
-            "Validating business idea before building",
-            "Alternative to SurveySparrow",
-            "best way to validate a niche",
-            "looking for first 10 customers",
-            "conversion rate is too low",
-            "feedback on my startup idea"
+            // High Intent / Direct Help
+            "Roast my landing page", "Ads are not converting", "Why is nobody buying my SaaS",
+            "Validating business idea before building", "Alternative to SurveySparrow", "best way to validate a niche",
+            "looking for first 10 customers", "conversion rate is too low", "feedback on my startup idea",
+            "how to get beta testers", "product market fit help", "competitor research", "niche validation",
+            "market research tools", "customer discovery tips", "low landing page conversion", "Facebook ads help",
+            "Google ads failing", "marketing strategy for saas", "growth hacking for startups", "b2b outreach strategy",
+
+            // New Scaling Keywords (50+)
+            "how to get first customers", "SaaS marketing feedback", "landing page roast",
+            "marketing for startups", "cold outreach strategy", "B2B growth hacking",
+            "market validation tips", "customer acquisition cost help", "low trial conversion",
+            "how to sell software", "competitor analysis tool", "niche research guide",
+            "SaaS growth strategies", "product market fit validation", "lean startup framework",
+            "hated marketing", "ads ROI help", "Stripe integration tips", "founder mindset",
+            "solopreneur tools", "indie biz", "startup launch checklist", "mvp validation",
+            "user feedback tools", "profitable niches", "micro saas ideas 2024",
+            "no-code tools for startups", "automation for sales", "ai tools for founders",
+            "best cold email stack", "high converting landing pages", "startup directories",
+            "product hunt launch tips", "appsumo alternatives", "marketing automation for saas",
+            "growth lead generation", "sales funnel optimization", "cpc is too high",
+            "facebook ad library research", "twitter monetization for founders", "linkedin lead gen",
+            "email outreach automation", "scalpable niches", "marketing on reddit", "organic growth for saas",
+            "validate startup idea", "saas acquisition marketplace", "micro saas for sale",
+            "indie hacker revenue", "building a saas in 30 days", "validation dashboard",
+            "market intelligence for startups", "automated competitor tracking"
         ];
-        this.targetSubreddits = ['saas', 'Entrepreneur', 'indiehackers', 'startups', 'SideProject', 'MicroSaaS'];
+        this.targetSubreddits = [
+            'saas', 'Entrepreneur', 'indiehackers', 'startups', 'SideProject', 'MicroSaaS',
+            'digitalmarketing', 'growthhacking', 'GrowthHackingSub', 'ecommerce', 'EmailMarketing',
+            'SaaSMarketing', 'smallbusiness', 'ProductManagement', 'marketing', 'Business_Ideas',
+            'startups_help', 'indiemakers', 'SoloDevelopers', 'NoCode', 'buildinginpublic',
+            // New Scaled Subreddits
+            'Sales', 'GrowthHacking', 'Agency', 'Business', 'Solopreneurs', 'WebDev',
+            'AppDevelopment', 'StartupIdeas', 'builders', 'foundermindset', 'leanstartup'
+        ];
     }
 
     async runCycle() {
@@ -65,7 +90,7 @@ class MarketVibeSentinel {
                 const draftReply = this.generateDraftReply(rawLead, report);
                 const draftReplyTwitter = this.generateTwitterReply(rawLead, report);
 
-                const interestScore = this.calculateInterestScore(rawLead.post_content);
+                const { score: interestScore, reason: scoreReason } = this.calculateInterestScore(rawLead.post_content);
                 const isSystemSpam = this.isSpammy(rawLead.post_content);
 
                 const { error } = await supabase.from('growth_leads').upsert({
@@ -75,23 +100,19 @@ class MarketVibeSentinel {
                     post_content: rawLead.post_content,
                     niche: rawLead.niche,
                     interest_score: interestScore,
+                    score_reason: scoreReason,
                     teaser_report: report,
                     draft_reply: draftReply,
                     draft_reply_twitter: draftReplyTwitter,
-                    status: (process.env.CLOSER_MODE === 'true' && interestScore >= 6 && !isSystemSpam) ? 'contacted' : 'pending'
+                    status: 'pending' // ALWAYS pending for human review (Safety First)
                 }, { onConflict: 'platform_id', ignoreDuplicates: true });
 
                 if (error) throw error;
-                console.log(`✅ Persisted lead from ${rawLead.username} (Spam: ${isSystemSpam})`);
+                console.log(`✅ Persisted lead from ${rawLead.username} (Score: ${interestScore})`);
 
-                // 5. "The Closer" Auto-Pilot (Optional/Experimental)
-                if (process.env.CLOSER_MODE === 'true' && interestScore >= 6 && !isSystemSpam) {
-                    console.log(`🤖 THE CLOSER: Auto-replying to high-intent lead @${rawLead.username}...`);
-                    // In a production environment, this would call the Reddit/Twitter API
-                    // For now, we update the status to 'contacted' to signal it's handled.
-                    await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API delay
-                } else if (isSystemSpam) {
-                    console.log(`🛡️ ANTI-SPAM: Filtered low-quality post from @${rawLead.username}`);
+                // 5. Audit Log (No auto-dispatches to prevent bans)
+                if (interestScore >= 8 && !isSystemSpam) {
+                    console.log(`🎯 HIGH VALUE TARGET: @${rawLead.username} - Draft saved for review.`);
                 }
             } catch (err) {
                 console.error(`❌ Error processing lead ${rawLead.platform_id}:`, err.message);
@@ -102,24 +123,36 @@ class MarketVibeSentinel {
     }
 
     async discoverLeads() {
-        console.log("🔍 Searching Reddit for High-Intent Founders...");
+        console.log(`🔍 Sentinel Scale-Search: Scanning ${this.targetSubreddits.length} subreddits with ${this.keywords.length} signals...`);
         const allResults = [];
 
-        // 1. General Keyword Search (Cross-Reddit)
-        for (const query of this.keywords.slice(0, 3)) { // Top 3 keywords globally
+        // 1. Vortex Keyword Search (Cross-Reddit)
+        // Increased to 25 keywords per cycle for maximum reach
+        const randomKeywords = this.keywords.sort(() => 0.5 - Math.random()).slice(0, 25);
+
+        for (const query of randomKeywords) {
             try {
-                const response = await fetch(`https://www.reddit.com/search.json?q=${encodeURIComponent(query)}&sort=new&limit=5`);
+                // ADDED: include_over_18=false & nsfw=0 for brand safety
+                const response = await fetch(`https://www.reddit.com/search.json?q=${encodeURIComponent(query)}&sort=new&limit=25&include_over_18=false&nsfw=0`);
+                if (!response.ok) continue;
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) continue;
                 const json = await response.json();
                 if (json.data?.children) this.processRedditResults(json.data.children, allResults);
             } catch (err) { console.error(`Reddit global search error: ${err.message}`); }
         }
 
-        // 2. Subreddit Laser Targeting (Niche Communities)
+        // 2. Subreddit Deep Dive (Laser Targeting)
         for (const sub of this.targetSubreddits) {
-            for (const query of this.keywords.slice(0, 3)) {
+            const subKeywords = this.keywords.sort(() => 0.5 - Math.random()).slice(0, 2);
+            for (const query of subKeywords) {
                 try {
                     const fullQuery = `subreddit:${sub} ${query}`;
-                    const response = await fetch(`https://www.reddit.com/search.json?q=${encodeURIComponent(fullQuery)}&sort=new&limit=5`);
+                    // ADDED: include_over_18=false & nsfw=0 for brand safety
+                    const response = await fetch(`https://www.reddit.com/search.json?q=${encodeURIComponent(fullQuery)}&sort=new&limit=10&include_over_18=false&nsfw=0`);
+                    if (!response.ok) continue;
+                    const contentType = response.headers.get('content-type');
+                    if (!contentType || !contentType.includes('application/json')) continue;
                     const json = await response.json();
                     if (json.data?.children) this.processRedditResults(json.data.children, allResults);
                 } catch (err) { console.error(`Reddit sub search error [${sub}]: ${err.message}`); }
@@ -317,33 +350,40 @@ class MarketVibeSentinel {
 
     isSpammy(text) {
         const textLower = text.toLowerCase();
-        // 1. Length Check (Ignore extremely short/vague posts)
-        if (text.length < 40) return true;
 
-        // 2. Sentiment/Hostility Guard
-        const hostileWords = ['stupid', 'dumb', 'scam', 'hate', 'terrible', 'worst', 'sucks', 'bitter'];
+        // 1. Context Check (Phase 32 Hardening)
+        if (text.length < 50) return true; // Too vague
+        if (text.length > 2500) return true; // Too much of a personal essay
+
+        // 2. Strict Toxicity / NSFW Filter (Brand Safety)
+        const safetyBlacklist = [
+            'piss', 'cum', 'spit', 'tits', 'boobs', 'milkers', 'nsfw', 'porn', 'sex', 'nude', 'adult',
+            'daddy', 'spanking', 'fetish', 'hentai', 'drugs', 'illegal', 'scam', 'crypto moon', 'pump and dump'
+        ];
+        if (safetyBlacklist.some(word => textLower.includes(word))) {
+            console.warn(`🛡️ SAFETY VOID: Flagged content for toxicity/NSFW.`);
+            return true;
+        }
+
+        // 3. Anti-Self-Promoter Guard (Avoid replying to other bots or sellers)
+        const sellerSignals = ['check out my', 'we launched', 'built this tool', 'hiring for my agency', 'dm me for', 'use my link', 'i made a', 'heres the link'];
+        if (sellerSignals.some(s => textLower.includes(s))) return true;
+
+        // 3. Toxic/Hostile Gate
+        const hostileWords = ['stupid', 'dumb', 'scam', 'hate', 'terrible', 'worst', 'sucks', 'bitter', 'trash', 'garbage'];
         if (hostileWords.some(word => textLower.includes(word))) return true;
 
-        // 3. Academic/Emotional Venting & Life Crisis Guard (Phase 32 Hardening)
-        const ventingSignals = [
+        // 4. Academic/Meme/Personal Crisis Filter
+        const noiseSignals = [
             'phd', 'harvard', 'admissions', 'rejections', 'venting', 'university', 'professor',
-            'medicine', 'doctor', 'medical school', 'graduate entry', 'husband', 'children',
-            'family', 'dream', 'fulfil', 'nhs', 'pharmacy', 'radiography', 'physicians associate',
-            'career advice', 'life advice', 'not realistic', 'settled', 'disturb my family'
+            'medicine', 'doctor', 'medical school', 'husband', 'children', 'family', 'dream',
+            'fulfil', 'nhs', 'pharmacy', 'career advice', 'life advice', 'meme', 'joke', 'funny'
         ];
-        if (ventingSignals.some(signal => textLower.includes(signal))) return true;
+        if (noiseSignals.some(signal => textLower.includes(signal))) return true;
 
-        // 4. Personal Narrative Guard (Long posts with "I" and "My")
-        const iCount = (textLower.match(/\b(i|my|we|husband)\b/g) || []).length;
-        if (textLower.length > 500 && iCount > 15) return true; // Likely a personal story, not a business pitch
-
-        // 4. Repetition Check (Basic) - If they repeat the same word 5+ times
-        const words = textLower.split(/\s+/);
-        const counts = {};
-        for (const w of words) {
-            counts[w] = (counts[w] || 0) + 1;
-            if (counts[w] > 5 && w.length > 3) return true;
-        }
+        // 5. Personal Narrative Density Check
+        const iCount = (textLower.match(/\b(i|my|we)\b/g) || []).length;
+        if (textLower.length > 800 && iCount > 25) return true; // Likely a life story, not a business need
 
         return false;
     }
@@ -354,15 +394,15 @@ class MarketVibeSentinel {
         // Force production domain for outreach
         const SITE_URL = 'https://marketvibe1.com';
 
-        // 🛡️ HUMANIZED REDDIT STRATEGY: No direct link in 50% of posts to build trust/karma
+        // 🛡️ HUMANIZED REDDIT STRATEGY: Link-less 80% of the time to build karma/trust
         const roll = Math.random();
 
-        if (roll < 0.5) {
-            // "Value First" - No Link
+        if (roll < 0.8) {
+            // "Conversation Starters" - Pure Value
             const valueTemplates = [
-                `hey @${lead.username}, ${intent.opener} i actually pulled some growth data for the ${niche} space recently. looks like a solid six-figure play if you focus on ${report.targetAudience.primarySegment}. would you be interested in the full revenue forecast breakdown?`,
+                `hey @${lead.username}, ${intent.opener} i actually pulled some growth data for ${niche} concepts recently. the ${report.targetAudience.primarySegment} segment looks like the lowest hanging fruit. would you be interested in the full revenue forecast breakdown?`,
                 `hi @${lead.username}, ${intent.opener} the ${niche} trends are looking pretty bullish right now tbh. i mapped out a quick 30-day execution plan for a similar concept - lmk if you want me to send it over.`,
-                `tagging @${lead.username} because i love this idea. ${intent.opener} i'm seeing some interesting signals in the ${niche} market that most people miss. i have the TAM numbers if you want to see them?`,
+                `tagging @${lead.username} because i love this idea. ${intent.opener} i'm seeing some interesting signals in the ${niche} market that most people miss. i have the TAM/SAM numbers if you want to see them?`,
                 `saw your post @${lead.username}. if you're navigating the ${niche} market, i've got a free toolkit for mapping out market limits. happy to share the link if it helps with your research.`
             ];
             return valueTemplates[Math.floor(Math.random() * valueTemplates.length)];
@@ -370,8 +410,7 @@ class MarketVibeSentinel {
             // "Soft CTA" - Link included but wrapped in context
             const softTemplates = [
                 `hey @${lead.username}, ${intent.opener} i was looking at ${niche} data earlier and the potential for ${report.targetAudience.primarySegment} is huge. i put the full revenue analysis in this research hub if you're interested: ${SITE_URL}/hub`,
-                `hi @${lead.username}, ${intent.opener} tracking ${niche} breakout momentum right now. saw some live signals that might give you an edge on the ads/outreach: ${SITE_URL}/newsroom`,
-                `really solid play @${lead.username}. ${intent.opener} i actually built a free research tool for ${niche} founders to avoid the validation grind. you can run your niche through it here: ${SITE_URL}`
+                `really solid play @${lead.username}. ${intent.opener} i actually built a free research tool for ${niche} founders to avoid the validation grind. you can run your concept through it here: ${SITE_URL}`
             ];
             return softTemplates[Math.floor(Math.random() * softTemplates.length)];
         }
@@ -379,58 +418,72 @@ class MarketVibeSentinel {
 
     calculateInterestScore(text) {
         let score = 5; // Base score
+        let reasons = [];
         const textLower = text.toLowerCase();
 
-        // 1. Transactional Weighting (Founder + Question = High Intent)
+        // 1. TRANSACTIONAL INTENT (The "Help Me" Signal)
         const hasQuestion = text.includes('?');
-        const founderSignals = ['stuck', 'how do i', 'help with', 'advice on', 'struggling', 'validation', 'feedback'];
-        if (hasQuestion && founderSignals.some(s => textLower.includes(s))) {
-            score += 5; // Huge boost for direct questions from founders
+        const painSignals = ['stuck', 'how do i', 'help with', 'advice on', 'struggling', 'validation', 'feedback', 'not working'];
+        if (hasQuestion && painSignals.some(s => textLower.includes(s))) {
+            score += 5; // Massive boost for direct founder questions
+            reasons.push("Direct Help Signal 🆘");
         }
 
-        // 2. High intent keywords (+2)
-        const highIntent = [
-            'validate', 'feedback', 'struggling', 'stuck',
-            'customer', 'revenue', 'launch', 'market', 'competitor', 'business model'
-        ];
-        highIntent.forEach(word => {
-            if (textLower.includes(word)) score += 1;
-        });
+        // 2. HIGH VALUE SIGNALS (+2)
+        const highValue = ['validate', 'revenue', 'launch', 'market gap', 'competitor', 'business design', 'saas idea', 'monetize'];
+        let matchedHV = highValue.filter(word => textLower.includes(word));
+        if (matchedHV.length > 0) {
+            score += matchedHV.length;
+            reasons.push(`Market Signals: ${matchedHV.slice(0, 2).join(', ')}`);
+        }
 
-        // 2b. HIGH TICKET SIGNALS (+3) - The "Money" keywords
-        const moneyWords = ['budget', 'hiring', 'investing', 'pricing', 'pay for', 'willing to pay', 'cost'];
+        // 2b. WALLET SIGNALS (+3)
+        const moneyWords = ['budget', 'hiring', 'investing', 'pricing', 'paying for', 'software cost'];
         if (moneyWords.some(w => textLower.includes(w))) {
-            score += 3; // These people have wallets open
+            score += 3;
+            reasons.push("Wallet Signal 💰");
         }
 
-        // 3. Negative Semantic Mapping (The "Advice-Giver" Filter) -7 to -10
-        const adviceSignals = [
-            'my tips', 'i learned', 'how to build', 'how to scale', 'lesson',
-            'thread:', 'sharing this', 'guide', 'tutorial', 'case study',
-            'not shiny new hacks', 'instead of just reading', 'generic advice'
+        // 3. THE "ADVICE-GIVER" PENALTY (-10)
+        const educationalSignals = [
+            'my tips', 'i learned', 'how to build', 'lesson', 'thread:', 'guide', 'tutorial',
+            'case study', 'heres how', '10 steps', 'best way to'
         ];
-        if (adviceSignals.some(s => textLower.includes(s))) {
-            score -= 8; // Heavy penalty for advice-giving/educational content
+        if (educationalSignals.some(s => textLower.includes(s))) {
+            score -= 10;
+            reasons.push("Advice/Guide Penalty ❌");
         }
 
-        // 4. Listicle Detection (Often signals advice/guides)
-        const listMatches = text.match(/\d+\.\s+\*\*/g); // Matches "1. **" style lists
-        const hashMatches = text.match(/#\s+\d+\./g); // Matches "# 1." style headers
-        if ((listMatches && listMatches.length >= 2) || (hashMatches && hashMatches.length >= 2)) {
-            score -= 6;
+        // 4. LENGTH & LISTICLE PENALTY (-5)
+        if (text.length > 1200) {
+            score -= 3;
+            reasons.push("Essay Penalty");
+        }
+        const listMatches = text.match(/\d+\.\s/g);
+        if (listMatches && listMatches.length >= 3) {
+            score -= 5;
+            reasons.push("Listicle Detected");
         }
 
-        // 5. Semantic Proximity to "Founder Pain"
-        const painPoints = ['losing money', 'no users', 'zero traffic', 'quitting', 'fail', 'burn rate'];
-        if (painPoints.some(p => textLower.includes(p))) score += 3;
+        // 5. SELF-PROMOTER PENALTY (-8) [Critical for avoiding spam]
+        const promoSignals = ['check it out', 'my tool', 'i built', 'free beta', 'feedback wanted on my', 'heres the link'];
+        if (promoSignals.some(s => textLower.includes(s))) {
+            score -= 8;
+            reasons.push("Self-Promotion Detected");
+        }
 
-        // 6. Curiosity/Vague only (-3)
-        const lowIntent = ['just curious', 'wondering', 'thinking about', 'someday', 'theoretical'];
-        lowIntent.forEach(word => {
-            if (textLower.includes(word)) score -= 2;
-        });
+        // 6. FOUNDER PAIN AMPLIFIER (+4)
+        const extremePain = ['losing money', 'zero traffic', 'quitting', 'fail', 'burn rate', 'waste of time'];
+        let matchedPain = extremePain.filter(p => textLower.includes(p));
+        if (matchedPain.length > 0) {
+            score += 4;
+            reasons.push("Extreme Pain Signal 🔥");
+        }
 
-        return Math.min(10, Math.max(1, score));
+        return {
+            score: Math.min(10, Math.max(1, score)),
+            reason: reasons.join(' • ') || "General Discussion"
+        };
     }
 
     generateTwitterReply(lead, report) {
@@ -476,11 +529,11 @@ if (isDirectRun) {
     if (isOnce) {
         sentinel.runCycle();
     } else {
-        // Normal continuous mode (Loop every 10 minutes)
-        console.log("🔄 Starting Continuous Sentinel Mode (10m Interval)...");
+        // Normal continuous mode (Loop every 5 minutes for higher volume)
+        console.log("🔄 Starting Continuous Sentinel Mode (5m Interval)...");
         sentinel.runCycle(); // Run immediately first
         setInterval(() => {
             sentinel.runCycle();
-        }, 10 * 60 * 1000);
+        }, 5 * 60 * 1000);
     }
 }

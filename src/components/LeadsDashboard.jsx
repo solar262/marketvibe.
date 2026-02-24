@@ -62,6 +62,7 @@ const LeadsDashboard = () => {
                 const result = await supabase
                     .from('leads')
                     .select('*')
+                    .neq('status', 'contacted')
                     .order('created_at', { ascending: false })
                     .range(isLoadMore ? leads.length : 0, (isLoadMore ? leads.length : 0) + LEADS_PER_PAGE - 1);
                 data = result.data;
@@ -381,25 +382,29 @@ const LeadsDashboard = () => {
                                     {filter === 'inbound' && !lead.paid && (
                                         <button
                                             onClick={() => handleSendCloser(lead)}
+                                            disabled={sentLeads.has(lead.id)}
                                             style={{
-                                                background: '#6366f1',
+                                                background: sentLeads.has(lead.id) ? '#10b981' : 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
                                                 color: 'white',
                                                 border: 'none',
-                                                padding: '0.6rem 1.2rem',
-                                                borderRadius: '0.5rem',
-                                                cursor: 'pointer',
+                                                padding: '0.8rem 1.5rem',
+                                                borderRadius: '0.75rem',
+                                                cursor: sentLeads.has(lead.id) ? 'default' : 'pointer',
                                                 fontWeight: 'bold',
-                                                fontSize: '0.9rem',
-                                                boxShadow: '0 4px 14px 0 rgba(99, 102, 241, 0.39)',
-                                                transition: 'transform 0.2s',
+                                                fontSize: '1rem',
+                                                boxShadow: '0 4px 15px rgba(99, 102, 241, 0.3)',
+                                                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                                                 display: 'flex',
                                                 alignItems: 'center',
-                                                gap: '0.5rem'
+                                                gap: '0.5rem',
+                                                width: '100%',
+                                                justifyContent: 'center',
+                                                opacity: sentLeads.has(lead.id) ? 0.7 : 1
                                             }}
-                                            onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-                                            onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                                            onMouseOver={(e) => !sentLeads.has(lead.id) && (e.currentTarget.style.transform = 'scale(1.02)')}
+                                            onMouseOut={(e) => !sentLeads.has(lead.id) && (e.currentTarget.style.transform = 'scale(1)')}
                                         >
-                                            ✉️ Send Professional Closer
+                                            {sentLeads.has(lead.id) ? '✅ Sent' : '✉️ Send Professional Closer'}
                                         </button>
                                     )}
                                     {lead.status === 'pending' && filter !== 'inbound' && (
