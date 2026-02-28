@@ -20,9 +20,9 @@ async function checkHealth() {
 
     // 1. Check Supabase Connection
     try {
-        const { data, error } = await supabase.from('growth_leads').select('count', { count: 'exact', head: true });
+        const { count, error } = await supabase.from('growth_leads').select('*', { count: 'exact', head: true });
         if (error) throw error;
-        console.log("✅ Supabase: Connected (Found", data || 0, "leads)");
+        console.log("✅ Supabase: Connected (Found", count || 0, "leads)");
     } catch (err) {
         console.error("❌ Supabase: Connection Failed -", err.message);
         healthy = false;
@@ -70,8 +70,13 @@ async function checkHealth() {
 
     // 5. Check "Shadow Reputation" Columns
     const { error: columnError } = await supabase.from('growth_leads').select('is_posted').limit(1);
-    if (columnError && columnError.message.includes('column "is_posted" does not exist')) {
-        console.warn("⚠️ Column: 'is_posted' missing in 'growth_leads'. (Live Engagement will be skipped)");
+    if (columnError) {
+        if (columnError.message && columnError.message.includes('column "is_posted" does not exist')) {
+            console.warn("⚠️ Column: 'is_posted' missing in 'growth_leads'. (Live Engagement will be skipped)");
+        } else {
+            console.error("❌ Column check error:", columnError);
+            healthy = false;
+        }
     } else {
         console.log("✅ Column: 'is_posted' exists.");
     }

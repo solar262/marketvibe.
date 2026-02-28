@@ -19,7 +19,7 @@ async function report() {
         const { data: recent, error: e4 } = await supabase.from('growth_leads').select('username, platform, status, created_at').order('created_at', { ascending: false }).limit(5);
         if (e4) console.error('Error recent:', e4);
 
-        const { data: launchpad, error: e5 } = await supabase.from('launchpad_listings').select('product_name, tier, status, created_at').order('created_at', { ascending: false }).limit(5);
+        const { data: launchpad, error: e5 } = await supabase.from('launchpad_listings').select('name, tier, status, created_at').order('created_at', { ascending: false }).limit(5);
         if (e5) console.error('Error launchpad:', e5);
 
         console.log('\n--- PIPELINE STATUS ---');
@@ -36,7 +36,7 @@ async function report() {
 
         console.log('\n--- LAUNCHPAD SUBMISSIONS ---');
         if (launchpad && launchpad.length > 0) {
-            launchpad.forEach(l => console.log(`- ${l.product_name} (${l.tier}) - ${l.status}`));
+            launchpad.forEach(l => console.log(`- ${l.name} (${l.tier}) - ${l.status}`));
         } else {
             console.log('No launchpad submissions yet.');
         }
