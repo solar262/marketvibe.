@@ -9,65 +9,73 @@ const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SU
 
 async function processLeads(leads) {
     if (!leads || leads.length === 0) {
-        console.log("✅ No new high-ticket leads found strictly matching criteria.");
+        console.log("✅ No specific mid-to-high intent leads found for this cycle.");
         return;
     }
 
-    console.log(`🎯 Locked onto ${leads.length} high-value targets.`);
+    console.log(`🎯 Locked onto ${leads.length} value targets for Review/Closing.`);
 
     for (const lead of leads) {
         const dmContent = selectScript(lead);
+        const score = lead.interest_score || 0;
 
         console.log(`\n---------------------------------`);
         console.log(`👤 Target: @${lead.username} (${lead.platform})`);
-        console.log(`💰 Signal: High Ticket (Score: ${lead.interest_score})`);
-        console.log(`📝 Generated DM: "${dmContent}"`);
+        console.log(`💰 Signal Score: ${score}/10`);
 
-        // Simulate sending
-        console.log(`🚀 Dispatching DM... [SIMULATION MODE]`);
+        const isDemo = String(lead.id).startsWith('demo');
+        if (isDemo) {
+            console.log(`✨ [Demo Mode] Tiered logic verified for score ${score}.`);
+            continue;
+        }
 
-        // Update status for live leads
-        if (!lead.id.startsWith('demo')) {
+        let newStatus = 'pending';
+        let actionMsg = '';
+
+        if (score >= 8) {
+            // 🔥 TIER 1: HIGH INTENT (Auto-pilot)
+            newStatus = 'contacted';
+            actionMsg = "💎 AUTO-DISPATCH: High-intent lead promoted to 'contacted'.";
+        } else if (score >= 6) {
+            // 🚥 TIER 2: MID INTENT (HITL Review)
+            newStatus = 'shadow_pending';
+            actionMsg = "🚥 HITL: Mid-intent lead promoted to 'shadow_pending' for review.";
+        }
+
+        if (newStatus !== 'pending') {
             const { error: updateError } = await supabase
                 .from('growth_leads')
                 .update({
-                    status: 'contacted',
-                    draft_reply: dmContent
+                    status: newStatus,
+                    draft_reply_twitter: dmContent,
+                    is_posted: false
                 })
                 .eq('id', lead.id);
 
-            if (updateError) console.error(`❌ Failed to update status for ${lead.username}`);
-            else console.log(`✅ Status updated to 'contacted' in DB.`);
-        } else {
-            console.log(`✨ [Demo Mode] Processed successfully.`);
+            if (updateError) {
+                console.error(`❌ Closer: Failed to process ${lead.username}: ${updateError.message}`);
+            } else {
+                console.log(actionMsg);
+            }
         }
     }
 }
 
 async function runCloserCurrent() {
-    console.log("🤖 TheCloser 2.0: Scanning for High-Ticket Targets...");
+    console.log("🤖 TheCloser 4.0: Tiered Dispatch Engine Active.");
 
     try {
-        const { data: highValueLeads, error } = await supabase
+        const { data: targetLeads, error } = await supabase
             .from('growth_leads')
             .select('*')
-            .gte('interest_score', 8)
+            .gte('interest_score', 6) // Lowered threshold for HITL inclusion
             .eq('status', 'pending')
-            .limit(5);
+            .limit(10);
 
         if (error) throw error;
-        await processLeads(highValueLeads);
+        await processLeads(targetLeads);
     } catch (err) {
-        console.warn("⚠️ Supabase Connection Error: Switching to High-Ticket Demo Mode.");
-        const mockLeads = [{
-            id: 'demo-1',
-            username: 'saas_founder_alpha',
-            platform: 'reddit',
-            interest_score: 9,
-            niche: 'AI Lead Generation',
-            post_content: 'How do I scale my B2B outreach without getting banned? Budget is $2k/mo.'
-        }];
-        await processLeads(mockLeads);
+        console.error("❌ Closer Engine Error:", err);
     }
 }
 

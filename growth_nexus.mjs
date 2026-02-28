@@ -25,6 +25,14 @@ async function runMasterCycle() {
     const timestamp = new Date().toLocaleString();
     console.log(`\n--- 🚀 GLOBAL GROWTH CYCLE STARTED: ${timestamp} ---`);
 
+    // CI/Headless Guard
+    const isCI = process.env.GITHUB_ACTIONS === 'true';
+    const isHeadless = process.env.HEADLESS === 'true';
+
+    if (isCI) {
+        console.log("🛡️ CI Detected: Hardening cycle for headless environment.");
+    }
+
     try {
         // 1. Discovery Phase (Reddit/X)
         if (process.env.ENABLE_REDDIT !== 'false') {
@@ -80,12 +88,29 @@ async function runMasterCycle() {
         }
 
         // 7. Live Engagement Phase (Herald Bot)
-        console.log("\n--- 📣 PHASE 7: HERALD BOT (LIVE ENGAGEMENT) ---");
-        await runHeraldCycle();
+        if (isCI && process.env.ENABLE_REDDIT === 'false') {
+            console.log("\n--- 📣 PHASE 7: HERALD BOT SKIPPED (CI Mode) ---");
+        } else {
+            console.log("\n--- 📣 PHASE 7: HERALD BOT (LIVE ENGAGEMENT) ---");
+            await runHeraldCycle();
+        }
 
         // 8. Viral Social Phase (Social Poster)
         console.log("\n--- 🐦 PHASE 8: VIRAL SOCIAL POSTING ---");
         await runSocialAutopilot();
+
+        // 9. YouTube Autopilot (Dynamic Video Generation)
+        if (isCI || isHeadless) {
+            console.log("\n--- 📺 PHASE 9: YOUTUBE AUTOPILOT SKIPPED (No Browser) ---");
+        } else {
+            console.log("\n--- 📺 PHASE 9: YOUTUBE AUTOPILOT ---");
+            try {
+                const { generateVideo } = await import('./youtube_worker.mjs');
+                await generateVideo();
+            } catch (ytErr) {
+                console.error("⚠️ YouTube Phase Failed:", ytErr.message);
+            }
+        }
 
     } catch (err) {
         console.error("\n❌ GLOBAL CYCLE FAILED:", err.message);

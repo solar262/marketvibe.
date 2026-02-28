@@ -90,8 +90,10 @@ To win in this space, we recommend the 30-day playbook generated in the full rep
 }
 
 // Auto-run if executed directly
-const isDirectRun = import.meta.url.includes(process.argv[1]?.replace(/\\/g, '/')) ||
-    import.meta.url.endsWith(process.argv[1]?.split(/[\\/]/).pop());
+const isDirectRun = process.argv[1] && (
+    import.meta.url.includes(process.argv[1].replace(/\\/g, '/')) ||
+    import.meta.url.endsWith(process.argv[1].split(/[\\/]/).pop())
+);
 
 if (isDirectRun) {
     generateAuthorityPosts();

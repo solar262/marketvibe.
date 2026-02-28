@@ -67,6 +67,7 @@ async function connectToEdge() {
         const browser = await puppeteer.connect({
             browserWSEndpoint: data.webSocketDebuggerUrl,
             defaultViewport: null,
+            protocolTimeout: 0
         });
         log('✅ Connected to Edge browser');
         return browser;
@@ -87,29 +88,32 @@ export async function sendTweet(text) {
         if (!browser) return false;
         const page = await browser.newPage();
 
+        log('🐦 Opening Twitter composer...');
         await page.goto('https://x.com/compose/tweet', { waitUntil: 'domcontentloaded' });
-        await sleep(4000);
+        await sleep(6000);
 
         // Check for login
         if (page.url().includes('login')) {
-            console.error('❌ Not logged in to Twitter/X in Edge.');
+            log('❌ Not logged in to Twitter/X in Edge.');
             await page.close();
             return false;
         }
 
-        // Wait for composer
+        log('⌨️ Waiting for text area...');
         const textBoxSelector = '[data-testid="tweetTextarea_0"]';
-        await page.waitForSelector(textBoxSelector, { timeout: 10000 });
+        await page.waitForSelector(textBoxSelector, { timeout: 15000 });
 
-        // Type text
+        log('📝 Typing tweet...');
         await page.click(textBoxSelector);
-        await page.keyboard.type(text, { delay: 30 });
+        await page.keyboard.type(text, { delay: 50 });
         await sleep(2000);
 
-        // Click Tweet
+        log('🔘 Clicking tweet button...');
         const tweetBtnSelector = '[data-testid="tweetButton"]';
         await page.click(tweetBtnSelector);
-        await sleep(5000); // Wait for send
+
+        log('⏳ Waiting for confirmation...');
+        await sleep(6000); // Wait for send
 
         log(`✅ Tweet sent: "${text}"`);
         await page.close();
@@ -252,9 +256,16 @@ async function runScheduled() {
 }
 
 // ── ENTRY ────────────────────────────────────────────────────────────────────
-const args = process.argv.slice(2);
-if (args.includes('--scheduled')) {
-    runScheduled();
-} else {
-    runTwitterGrowthBot();
+const isMain = process.argv[1] && (
+    import.meta.url.includes(process.argv[1].replace(/\\/g, '/')) ||
+    import.meta.url.endsWith(process.argv[1].split(/[\\/]/).pop())
+);
+
+if (isMain) {
+    const args = process.argv.slice(2);
+    if (args.includes('--scheduled')) {
+        runScheduled();
+    } else {
+        runTwitterGrowthBot();
+    }
 }

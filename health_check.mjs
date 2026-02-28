@@ -92,7 +92,7 @@ async function checkHealth() {
     return healthy;
 }
 
-if (import.meta.url.includes(process.argv[1]?.replace(/\\/g, '/'))) {
+if (process.argv[1] && import.meta.url.includes(process.argv[1].replace(/\\/g, '/'))) {
     checkHealth().then(isHealthy => process.exit(isHealthy ? 0 : 1));
 }
 

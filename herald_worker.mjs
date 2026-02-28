@@ -180,8 +180,7 @@ async function runHeraldCycle() {
 export { runHeraldCycle };
 
 // Run immediately if called directly
-const isDirectRun = import.meta.url.includes(process.argv[1].replace(/\\/g, '/')) ||
-    import.meta.url.endsWith(process.argv[1].split(/[\\/]/).pop());
+const isDirectRun = process.argv[1] && (import.meta.url.includes(process.argv[1].replace(/\\/g, '/')) || import.meta.url.endsWith(process.argv[1].split(/[\\/]/).pop()));
 
 if (isDirectRun) {
     runHeraldCycle().then(() => {

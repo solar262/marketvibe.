@@ -36,25 +36,37 @@ You have the ${name} idea. You have the revenue forecast. Now you just need the 
 We've helped 100+ founders skip the guesswork. Grab your blueprint before the lifetime deal expires!
 
 ${SITE_URL}`
+    }
+];
+
+const DATA_PACK_DRIP = [
+    {
+        step: 1,
+        delayHours: 1,
+        subject: "Your [NICHE] Data Pack is inside! 🎁",
+        template: (niche) => `Hi there!
+        
+Thanks for requesting the ${niche} Data Pack. As promised, I've attached the core market signals we've identified for this niche.
+
+Beyond the raw data, the real "unfair advantage" is having an execution playbook. 
+
+I've generated a full 30-day roadmap specifically for the ${niche} space here:
+${SITE_URL}/blog/${niche.toLowerCase().replace(/[^a-z0-9]/g, '-')}
+
+Go get 'em!
+— MarketVibe Team`
     },
     {
-        step: 3,
-        delayHours: 48,
-        subject: "Last chance: Your validation report expires in 24 hours ⏰",
-        template: (name) => `Quick heads-up — the free validation report you generated for ${name} will expire from our servers in 24 hours.
+        step: 2,
+        delayHours: 24,
+        subject: "Found a new signal for [NICHE] 📡",
+        template: (niche) => `Quick update on ${niche}!
 
-After that, you'd need to regenerate it (and the lifetime deal pricing might not be available).
+Our discovery engine just flagged 3 new high-intent discussions in this niche. It's moving faster than we expected.
 
-Here's what founders who upgraded are saying:
-- "I launched 3 weeks faster because of the execution blueprint" — Sarah K.
-- "The competitor analysis alone saved me from building the wrong thing" — Mike R.
+If you're serious about capturing this market, you should check the latest revenue forecasts.
 
-Lock in the $49 lifetime deal before it's gone:
-${SITE_URL}
-
-— The MarketVibe Team
-
-P.S. This is genuinely the lowest price we'll ever offer. After this batch, it goes to $99/mo.`
+Unlock the full report here: ${SITE_URL}`
     }
 ];
 
@@ -62,89 +74,120 @@ class MarketVibeNurturer {
     async runCycle() {
         console.log("💌 Nurture Cycle Started...");
 
-        // 1. Fetch leads that need nurturing
+        // 1. WARM NURTURE (Email)
+        await this.runEmailNurture();
+
+        // 2. COLD NURTURE (Social Nudge)
+        await this.runSocialNurture();
+
+        console.log("🏁 Nurture Cycle Complete.");
+    }
+
+    async runEmailNurture() {
+        console.log("📨 Evaluating Email Leads...");
         const { data: leads, error } = await supabase
             .from('leads')
             .select('*')
-            .eq('paid', false)
-            .lt('last_nurture_step', DRIP_SEQUENCE.length);
+            .eq('paid', false);
 
         if (error) {
-            console.error("❌ Error fetching leads:", error);
+            console.error("❌ Error fetching email leads:", error);
             return;
         }
 
-        console.log(`🎯 Found ${leads.length} leads to evaluate.`);
-
         for (const lead of leads) {
-            const nextStep = DRIP_SEQUENCE.find(s => s.step === (lead.last_nurture_step + 1));
+            const isDataPack = lead.source === 'popup';
+            const sequence = isDataPack ? DATA_PACK_DRIP : DRIP_SEQUENCE;
+
+            if (lead.last_nurture_step >= sequence.length) continue;
+
+            const nextStep = sequence.find(s => s.step === (lead.last_nurture_step + 1));
             if (!nextStep) continue;
 
             const lastContact = new Date(lead.last_nurtured_at || lead.created_at);
             const hoursSinceLastContact = (new Date() - lastContact) / (1000 * 60 * 60);
 
             if (hoursSinceLastContact >= nextStep.delayHours) {
-                await this.sendNurtureEmail(lead, nextStep);
-                // Respect Resend rate limits (free tier: 2 requests/sec) - using 2.5s for extreme safety
+                const niche = lead.results?.niche || 'your chosen niche';
+                const subject = nextStep.subject.replace('[NICHE]', niche);
+                const body = nextStep.template(niche || lead.project_name);
+
+                await this.sendNurtureEmail(lead, nextStep.step, subject, body);
                 await new Promise(resolve => setTimeout(resolve, 2500));
             }
         }
-
-        console.log("🏁 Nurture Cycle Complete.");
     }
 
-    async sendNurtureEmail(lead, stepInfo, retryCount = 0) {
-        console.log(`📧 Sending Drip #${stepInfo.step} to ${lead.email}...`);
+    async runSocialNurture() {
+        console.log("📡 Evaluating Cold Social Leads for Nudges...");
+        // Look for leads that were contacted but not yet closed/qualified
+        // and have been sitting for 48+ hours
+        const { data: leads, error } = await supabase
+            .from('growth_leads')
+            .select('*')
+            .eq('status', 'contacted')
+            .eq('is_posted', true);
+
+        if (error) {
+            console.error("❌ Error fetching social leads:", error);
+            return;
+        }
+
+        for (const lead of leads) {
+            const lastContact = new Date(lead.created_at);
+            const hoursSinceLastContact = (new Date() - lastContact) / (1000 * 60 * 60);
+
+            if (hoursSinceLastContact >= 48) {
+                console.log(`🤖 Generating Social Nudge for @${lead.username} on ${lead.platform}...`);
+
+                const nudge = `Hey @${lead.username}, just checking in—was that ${lead.niche} data I shared helpful? No pressure at all, just wanted to make sure it reached you!`;
+
+                // Update the draft reply to the nudge so the Herald can pick it up
+                // We mark it as 'pending_nudge' so it stands out in the dashboard
+                await supabase
+                    .from('growth_leads')
+                    .update({
+                        draft_reply: nudge,
+                        draft_reply_twitter: nudge,
+                        status: 'pending_nudge',
+                        is_posted: false // Reset so Herald tries again
+                    })
+                    .eq('id', lead.id);
+
+                console.log(`✅ Nudge queued for ${lead.username}`);
+            }
+        }
+    }
+
+    async sendNurtureEmail(lead, step, subject, body, retryCount = 0) {
+        console.log(`📧 Sending Drip #${step} to ${lead.email}...`);
 
         try {
             const { data, error } = await resend.emails.send({
                 from: 'founder@marketvibe1.com',
                 to: lead.email,
-                subject: stepInfo.subject,
-                text: stepInfo.template(lead.project_name || 'your project'),
+                subject: subject,
+                text: body,
             });
 
-            // Robust check for rate limiting (429) across different SDK error formats
-            const isRateLimit = error && (
-                error.statusCode === 429 ||
-                error.status === 429 ||
-                error.name === 'rate_limit_exceeded' ||
-                (typeof error === 'string' && error.includes('429'))
-            );
-
-            if (isRateLimit && retryCount < 5) {
-                const backoff = Math.pow(2, retryCount) * 5000; // Exponential backoff starting at 5s
-                console.log(`⚠️ Resend Rate Limited. Backing off ${backoff / 1000}s... (Attempt ${retryCount + 1}/5)`);
-                await new Promise(resolve => setTimeout(resolve, backoff));
-                return this.sendNurtureEmail(lead, stepInfo, retryCount + 1);
+            if (error && retryCount < 5) {
+                console.log(`⚠️ Email error, retrying...`);
+                await new Promise(resolve => setTimeout(resolve, 5000));
+                return this.sendNurtureEmail(lead, step, subject, body, retryCount + 1);
             }
 
-            if (error) {
-                console.error(`❌ Failed to send email to ${lead.email}:`, error);
-                return;
-            }
+            if (error) return;
 
-            // Update database
             await supabase
                 .from('leads')
                 .update({
-                    last_nurture_step: stepInfo.step,
+                    last_nurture_step: step,
                     last_nurtured_at: new Date().toISOString()
                 })
                 .eq('id', lead.id);
 
             console.log(`✅ Nurtured ${lead.email}`);
         } catch (err) {
-            // SDK might throw on 429 instead of returning it in the error object
-            const isRateLimitErr = err.message?.includes('429') || err.name === 'rate_limit_exceeded' || err.statusCode === 429;
-
-            if (isRateLimitErr && retryCount < 5) {
-                const backoff = Math.pow(2, retryCount) * 5000;
-                console.log(`🔥 Rate Limit Exception. Backing off ${backoff / 1000}s... (Attempt ${retryCount + 1}/5)`);
-                await new Promise(resolve => setTimeout(resolve, backoff));
-                return this.sendNurtureEmail(lead, stepInfo, retryCount + 1);
-            }
-
             console.error(`🔥 Unexpected error sending to ${lead.email}:`, err.message || err);
         }
     }
@@ -153,8 +196,10 @@ class MarketVibeNurturer {
 export { MarketVibeNurturer };
 
 // Only run immediately if executed directly
-const isDirectRun = import.meta.url.includes(process.argv[1].replace(/\\/g, '/')) ||
-    import.meta.url.endsWith(process.argv[1].split(/[\\/]/).pop());
+const isDirectRun = process.argv[1] && (
+    import.meta.url.includes(process.argv[1].replace(/\\/g, '/')) ||
+    import.meta.url.endsWith(process.argv[1].split(/[\\/]/).pop())
+);
 
 if (isDirectRun) {
     console.log("🚀 Running Nurturer directly...");

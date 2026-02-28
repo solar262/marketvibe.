@@ -30,7 +30,8 @@ async function connectToEdge() {
 
         const browser = await puppeteer.connect({
             browserWSEndpoint: data.webSocketDebuggerUrl,
-            defaultViewport: null
+            defaultViewport: null,
+            protocolTimeout: 0
         });
 
         console.log('Connected to Edge browser');
@@ -108,17 +109,11 @@ export const postRedditReply = async (postId, content) => {
 
         await humanDelay(2000, 5000);
 
-        // Type comment
-        const hasCommentBox = await page.evaluate(() => {
-            const ta = document.querySelector('.usertext-edit textarea, textarea[name="text"]');
-            return !!ta;
-        });
-
         if (!hasCommentBox) {
-            console.error('No comment box found. Thread may be locked.');
+            console.error('No comment box found. Thread may be locked or deleted.');
             await page.close();
             browser.disconnect();
-            return { success: false, error: 'NO_COMMENT_BOX' };
+            return { success: false, error: 'THREAD_LOCKED' };
         }
 
         // 🛡️ ANTI-BOT: Type with human-like speed
@@ -143,9 +138,9 @@ export const postRedditReply = async (postId, content) => {
 
         await humanDelay(3000, 5000);
 
-        // Check for rate limit errors
+        // Check for rate limit errors or submission failures
         const errors = await page.evaluate(() => {
-            return Array.from(document.querySelectorAll('.error, .status-msg'))
+            return Array.from(document.querySelectorAll('.error, .status-msg, .error-msg'))
                 .map(e => e.innerText).filter(Boolean);
         });
 
@@ -154,6 +149,13 @@ export const postRedditReply = async (postId, content) => {
             await page.close();
             browser.disconnect();
             return { success: false, error: 'RATE_LIMITED', waitMinutes: 10 };
+        }
+
+        if (errors.length > 0) {
+            console.warn('Reddit reported errors: ' + errors.join('; '));
+            await page.close();
+            browser.disconnect();
+            return { success: false, error: 'REDDIT_ERROR', details: errors.join('; ') };
         }
 
         console.log('Reply posted to t3_' + postId + '!');
@@ -165,6 +167,9 @@ export const postRedditReply = async (postId, content) => {
         console.error('Herald Error:', err.message);
         if (page) await page.close().catch(() => { });
         if (browser) browser.disconnect();
-        return { success: false, error: err.message };
+
+        // Distinguish timeouts vs connection errors
+        const errorCode = err.message.includes('timeout') ? 'TIMEOUT' : 'BROWSER_ERROR';
+        return { success: false, error: errorCode, details: err.message };
     }
 };
