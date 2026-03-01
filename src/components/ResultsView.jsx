@@ -130,6 +130,64 @@ const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = '
                 </div>
             </div>
 
+            <div style={{ marginBottom: '3rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '3rem' }}>
+                <h2 style={{ color: '#a855f7', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    🛠️ The Founder's Resource Stack
+                </h2>
+                <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+                    Stop wasting time comparison shopping. These are the exact tools used by high-growth startups to scale from $0 to $10k/mo.
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+                    {[
+                        { 
+                            name: 'Hosting & Domains', 
+                            desc: 'Secure your .com and launch your site in minutes.', 
+                            btn: 'Get Domain', 
+                            link: import.meta.env.VITE_AFFILIATE_HOSTING_LINK || 'https://www.namecheap.com/' 
+                        },
+                        { 
+                            name: 'Email & Growth', 
+                            desc: 'The best platform for scaling your founder newsletter.', 
+                            btn: 'Start Newsletter', 
+                            link: import.meta.env.VITE_AFFILIATE_EMAIL_LINK || 'https://www.beehiiv.com/' 
+                        },
+                        { 
+                            name: 'Sales & CRM', 
+                            desc: 'Manage your leads and close your first clients.', 
+                            btn: 'Setup CRM', 
+                            link: import.meta.env.VITE_AFFILIATE_CRM_LINK || 'https://www.hubspot.com/' 
+                        }
+                    ].map((tool, i) => (
+                        <div key={i} style={{ 
+                            background: 'rgba(168, 85, 247, 0.05)', 
+                            padding: '1.5rem', 
+                            borderRadius: '16px', 
+                            border: '1px solid rgba(168, 85, 247, 0.2)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between'
+                        }}>
+                            <div>
+                                <h4 style={{ color: '#fff', marginBottom: '0.5rem' }}>{tool.name}</h4>
+                                <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '1.25rem' }}>{tool.desc}</p>
+                            </div>
+                            <a href={tool.link} target="_blank" rel="noopener noreferrer" style={{
+                                display: 'block',
+                                textAlign: 'center',
+                                background: 'rgba(255,255,255,0.05)',
+                                color: '#a855f7',
+                                textDecoration: 'none',
+                                padding: '0.6rem',
+                                borderRadius: '8px',
+                                fontSize: '0.85rem',
+                                fontWeight: 'bold',
+                                border: '1px solid rgba(168, 85, 247, 0.3)'
+                            }}>{tool.btn}</a>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
             <div style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '3rem' }}>
                 <h2 style={{ color: '#10b981', marginBottom: '1rem' }}>📈 Revenue Forecast (Year 1)</h2>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '2rem' }}>
