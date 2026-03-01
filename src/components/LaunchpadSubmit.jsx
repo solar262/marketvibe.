@@ -93,8 +93,8 @@ const LaunchpadSubmit = ({ supabase }) => {
                 localStorage.setItem('lp_pending_submission', JSON.stringify({ ...submissionPayload, tier }));
 
                 const stripeLinks = {
-                    featured: `https://buy.stripe.com/test_featured?prefilled_email=${encodeURIComponent(formData.founder_email)}`,
-                    validated: `https://buy.stripe.com/test_validated?prefilled_email=${encodeURIComponent(formData.founder_email)}`,
+                    featured: `${import.meta.env.VITE_STRIPE_FEATURED_LINK || 'https://buy.stripe.com/8x29AT2GXeBI81Q1w63ks04'}?prefilled_email=${encodeURIComponent(formData.founder_email)}`,
+                    validated: `${import.meta.env.VITE_STRIPE_VALIDATED_LINK || 'https://buy.stripe.com/5kQ14nftJ0KS0zo8Yy3ks05'}?prefilled_email=${encodeURIComponent(formData.founder_email)}`,
                 };
 
                 const { data, error: dbError } = await supabase
