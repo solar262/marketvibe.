@@ -29,7 +29,7 @@ import SocialCommandCenter from './components/SocialCommandCenter';
 import TwitterBotDashboard from './components/TwitterBotDashboard';
 import EmailCapturePopup from './components/EmailCapturePopup';
 import Library from './components/Library';
-import VideoPreview from './components/VideoPreview';
+
 import NewsletterSignup from './components/NewsletterSignup';
 import { popularNiches } from './lib/niches'
 
@@ -526,8 +526,7 @@ function App() {
           case 'viral': return <ReferralHub />;
           case 'launchpad': return <LaunchpadDirectory supabase={supabase} />;
           case 'launchpad-submit': return <LaunchpadSubmit supabase={supabase} />;
-          case 'launchpad-listing': return <LaunchpadListing listingId={window.location.pathname.split('/').pop()} onBack={() => { window.location.href = '/launchpad'; }} supabase={supabase} />;
-          case 'video-preview': return <VideoPreview />;
+
           case 'landing':
           default:
             return (
