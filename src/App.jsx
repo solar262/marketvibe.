@@ -29,6 +29,8 @@ import SocialCommandCenter from './components/SocialCommandCenter';
 import TwitterBotDashboard from './components/TwitterBotDashboard';
 import EmailCapturePopup from './components/EmailCapturePopup';
 import Library from './components/Library';
+import VideoPreview from './components/VideoPreview';
+import NewsletterSignup from './components/NewsletterSignup';
 import { popularNiches } from './lib/niches'
 
 const VerifyingPortal = () => {
@@ -37,6 +39,27 @@ const VerifyingPortal = () => {
     return () => clearTimeout(timer);
   }, []);
   return null;
+};
+
+const updateMetaTags = (title, description, image = '/og-preview.png') => {
+  if (title) document.title = title;
+
+  const tags = {
+    'description': description,
+    'og:title': title,
+    'og:description': description,
+    'og:image': image,
+    'twitter:title': title,
+    'twitter:description': description,
+    'twitter:image': image,
+  };
+
+  Object.entries(tags).forEach(([name, value]) => {
+    if (!value) return;
+    let el = document.querySelector(`meta[name="${name}"]`) ||
+      document.querySelector(`meta[property="${name}"]`);
+    if (el) el.setAttribute('content', value);
+  });
 };
 
 function App() {
@@ -63,6 +86,7 @@ function App() {
     if (p === '/launchpad') return 'launchpad';
     if (p === '/launchpad/submit') return 'launchpad-submit';
     if (rawPath.startsWith('/launchpad/listing/')) return 'launchpad-listing';
+    if (p === '/admin/video-preview') return 'video-preview';
     if (p.startsWith('/admin')) {
       if (p.includes('social')) return 'social-command';
       if (p.includes('twitter-bot')) return 'twitter-bot';
@@ -164,6 +188,22 @@ function App() {
           setResults(record.results);
           setCurrentLeadId(record.id);
 
+          // Automated Payment Success Handler
+          if (status === 'success' && !record.paid) {
+            console.log('[Stripe] Payment success detected. Upgrading account...');
+            const { error: upgradeError } = await supabase.from('leads').update({
+              paid: true,
+              status: 'paid',
+              plan_type: localStorage.getItem('mv_pending_plan') || 'founder'
+            }).eq('id', record.id);
+
+            if (!upgradeError) {
+              setPaid(true);
+              setPlanType(localStorage.getItem('mv_pending_plan') || 'founder');
+              localStorage.removeItem('mv_pending_plan');
+            }
+          }
+
           const { data: leadRecords } = await supabase.from('leads').select('*').eq('email', record.email);
           const anyPaidRecord = leadRecords?.find(l => l.paid || l.status === 'paid');
 
@@ -201,7 +241,7 @@ function App() {
     // Increment Website Hits (Non-blocking)
     const hasCounted = sessionStorage.getItem('vibe_session_counted');
     if (!hasCounted && supabase) {
-      /* (async () => {
+      (async () => {
         try {
           const { error } = await supabase.rpc('increment_hits');
           if (error) {
@@ -211,7 +251,7 @@ function App() {
         } catch (e) {
           console.error("Hit counter error:", e);
         }
-      })(); */
+      })();
       sessionStorage.setItem('vibe_session_counted', 'true');
     }
 
@@ -238,15 +278,15 @@ function App() {
       // We set the step to 'investors' (Landing) first. 
       // It will only upgrade to 'investor-dashboard' in fetchData if the DB confirms them.
       setStep('investors')
-      document.title = 'Investor Access | MarketVibe Deal Flow'
+      updateMetaTags('Investor Access | MarketVibe Deal Flow', 'Private access to vetted, data-backed startup opportunities for angel investors.');
     } else if (activePath.startsWith('/og-preview/')) {
       const id = activePath.split('/').pop()
       setPreviewId(parseInt(id, 10))
       setStep('og-preview')
-      document.title = 'MarketVibe Growth Scorecard 📈'
+      updateMetaTags('MarketVibe Growth Scorecard 📈', 'Detailed revenue forecast and market validation report.');
     } else if (activePath === '/tools/naming') {
       setStep('tools-naming')
-      document.title = 'Startup Name Generator - Free Branding Tool | MarketVibe'
+      updateMetaTags('Startup Name Generator - Free Branding Tool | MarketVibe', 'Generate hundreds of catchy, available startup names using AI.');
     } else if (activePath.includes('/admin/leads')) {
       setStep('admin-leads')
       document.title = 'Commander Center - Growth Leads | MarketVibe'
@@ -258,43 +298,45 @@ function App() {
       document.title = 'Terms of Service | MarketVibe'
     } else if (activePath === '/hub') {
       setStep('hub')
-      document.title = 'Hall of Fame - Validated Idea Case Studies | MarketVibe'
+      updateMetaTags('Hall of Fame - Validated Idea Case Studies | MarketVibe', 'See the data behind successful startup ideas validated by MarketVibe AI.');
     } else if (activePath === '/tools/market-size') {
       setStep('market-size')
-      document.title = 'Free TAM SAM SOM Calculator | MarketVibe'
+      updateMetaTags('Free TAM SAM SOM Calculator | MarketVibe', 'Calculate your total addressable market in seconds with live industry data.');
     } else if (activePath === '/insights') {
       setStep('insights')
-      document.title = 'Market Intelligence: Startup Trends 2026 | MarketVibe'
+      updateMetaTags('Market Intelligence: Startup Trends 2026 | MarketVibe', 'Daily updated insights on breakout niches and consumer shifts.');
     } else if (activePath.startsWith('/validate/')) {
       const slug = activePath.split('/').pop()
       const foundNiche = popularNiches.find(n => n.slug === slug)
       if (foundNiche) {
         setStep('p-seo')
         setActiveNiche(foundNiche)
-        const title = `Validate your ${foundNiche.name} Business Idea - MarketVibe`
-        document.title = title
+        updateMetaTags(`Validate your ${foundNiche.name} Business Idea - MarketVibe`, `Get a 30-day execution plan and revenue forecast for the ${foundNiche.name} niche.`);
       }
     } else if (activePath === '/library') {
       setStep('library')
-      document.title = 'MarketVibe Intelligence Library - 100+ Startup Blueprints'
+      updateMetaTags('MarketVibe Intelligence Library - 100+ Startup Blueprints', 'Browse a library of pre-validated startup ideas and execution plans.');
     } else if (activePath === '/newsroom') {
       setStep('newsroom')
-      document.title = 'The Newsroom: Breaking Market Trends | MarketVibe'
+      updateMetaTags('The Newsroom: Breaking Market Trends | MarketVibe', 'Real-time updates on what founders are building and where the money is flowing.');
     } else if (activePath === '/blog') {
       setStep('blog-index')
-      document.title = 'Growth Blog: Market Trends & Analysis | MarketVibe'
+      updateMetaTags('Growth Blog: Market Trends & Analysis | MarketVibe', 'Deep dives into emerging niches and the founders kit for 2026.');
     } else if (activePath.startsWith('/blog/')) {
       setStep('blog-post')
     } else if (activePath === '/viral') {
       setStep('viral')
     } else if (activePath === '/launchpad') {
       setStep('launchpad')
-      document.title = 'MarketVibe Launchpad - Discover Validated Startups'
+      updateMetaTags('MarketVibe Launchpad - Discover Validated Startups', 'The directory of pre-vetted, high-potential startups looking for initial traction.');
     } else if (activePath === '/launchpad/submit') {
       setStep('launchpad-submit')
-      document.title = 'Submit to Launchpad | MarketVibe'
+      updateMetaTags('Submit to Launchpad | MarketVibe', 'List your validated startup and get noticed by early adopters and investors.');
     } else if (activePath.startsWith('/launchpad/listing/')) {
       setStep('launchpad-listing')
+    } else if (activePath === '/admin/video-preview') {
+      setStep('video-preview')
+      document.title = 'Video Producer - Live Preview | MarketVibe'
     } else if (activePath.startsWith('/admin')) {
       if (activePath.includes('social')) {
         setStep('social-command')
@@ -397,6 +439,7 @@ function App() {
 
   const handleSelectPlan = (planId) => {
     const type = planId === 'pro' ? 'founder' : (planId === 'expert' ? 'expert' : 'free');
+    localStorage.setItem('mv_pending_plan', type);
     if (email && email.includes('@')) {
       if (type === 'free') setStep('setup'); else handleUnlock(type);
     } else {
@@ -475,7 +518,7 @@ function App() {
           case 'hub': return <CaseStudyHub />;
           case 'market-size': return <MarketSizeCalculator onGetBlueprint={() => { setStep('setup'); window.scrollTo(0, 0); }} />;
           case 'library': return <Library onSelectNiche={(n) => { setActiveNiche(n); setStep('p-seo'); window.scrollTo(0, 0); }} />;
-          case 'p-seo': return <NicheValidator niche={activeNiche} />;
+          case 'p-seo': return <NicheValidator niche={activeNiche} onUpgrade={() => handleSelectPlan('pro')} spots={spots} />;
           case 'insights': return <AuthorityInsights />;
           case 'newsroom': return <Newsroom />;
           case 'blog-index': return <BlogIndex />;
@@ -484,8 +527,7 @@ function App() {
           case 'launchpad': return <LaunchpadDirectory supabase={supabase} />;
           case 'launchpad-submit': return <LaunchpadSubmit supabase={supabase} />;
           case 'launchpad-listing': return <LaunchpadListing listingId={window.location.pathname.split('/').pop()} onBack={() => { window.location.href = '/launchpad'; }} supabase={supabase} />;
-          case 'social-command': return <SocialCommandCenter />;
-          case 'twitter-bot': return <TwitterBotDashboard />;
+          case 'video-preview': return <VideoPreview />;
           case 'landing':
           default:
             return (
@@ -517,6 +559,7 @@ function App() {
                   </div>
                 </section>
                 <PricingTable onSelectPlan={handleSelectPlan} spots={spots} />
+                <NewsletterSignup />
               </>
             );
         }

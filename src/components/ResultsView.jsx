@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { generateScorecard } from '../lib/scorecard';
-import VerificationBadge from './VerificationBadge';
+import AuthorityInsights from './components/AuthorityInsights';
+import NewsletterSignup from './components/NewsletterSignup';
 import { generateMVPCode } from '../lib/mvp_templates';
 
 const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = 'founder', leads = [], usageCount = 0, leadId = null, fomoTimer }) => {
@@ -124,6 +125,8 @@ const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = '
                             </div>
                         ))}
                     </div>
+
+                    <NewsletterSignup inline />
 
                     <button className="btn-primary" style={{ pointerEvents: 'none' }}>{landingPage.cta}</button>
                     <p style={{ marginTop: '1rem', fontSize: '0.75rem', color: '#475569' }}>{landingPage.socialProof}</p>
