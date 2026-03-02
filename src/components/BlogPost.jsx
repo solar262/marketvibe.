@@ -17,7 +17,51 @@ const BlogPost = () => {
 
                 if (modules[path]) {
                     const mod = await modules[path]();
-                    setPost(mod.default || mod);
+                    const data = mod.default || mod;
+                    setPost(data);
+
+                    // --- SEO/AEO Dynamic Injection ---
+                    document.title = `${data.title} | MarketVibe Analysis`;
+
+                    // Update meta tags manually since utility is in App.jsx
+                    const updateMeta = (name, value) => {
+                        let el = document.querySelector(`meta[name="${name}"]`) || document.querySelector(`meta[property="${name}"]`);
+                        if (el) el.setAttribute('content', value);
+                    };
+                    updateMeta('description', data.content.substring(0, 160).replace(/[#*]/g, ''));
+                    updateMeta('og:title', data.title);
+                    updateMeta('og:description', data.content.substring(0, 160).replace(/[#*]/g, ''));
+
+                    // Inject LD+JSON for AEO
+                    const schema = {
+                        "@context": "https://schema.org",
+                        "@type": "Article",
+                        "headline": data.title,
+                        "datePublished": data.date,
+                        "author": {
+                            "@type": "Person",
+                            "name": data.author
+                        },
+                        "description": data.content.substring(0, 200).replace(/[#*]/g, ''),
+                        "publisher": {
+                            "@type": "Organization",
+                            "name": "MarketVibe",
+                            "logo": {
+                                "@type": "ImageObject",
+                                "url": "https://www.marketvibe1.com/logo.svg"
+                            }
+                        }
+                    };
+
+                    let script = document.getElementById('blog-schema');
+                    if (!script) {
+                        script = document.createElement('script');
+                        script.id = 'blog-schema';
+                        script.type = 'application/ld+json';
+                        document.head.appendChild(script);
+                    }
+                    script.text = JSON.stringify(schema);
+
                 } else {
                     console.error("Post not found:", path);
                 }
@@ -28,6 +72,11 @@ const BlogPost = () => {
             }
         };
         loadPost();
+
+        return () => {
+            const script = document.getElementById('blog-schema');
+            if (script) script.remove();
+        };
     }, [slug]);
 
     if (loading) return <div style={{ color: 'white', textAlign: 'center', padding: '4rem' }}>Loading article...</div>;
@@ -53,7 +102,38 @@ const BlogPost = () => {
                 );
             }
 
-            // Link (Simple check for the CTA at the end)
+            // Link or Email Trigger
+            if (content.includes('trigger_email_capture')) {
+                const text = content.match(/\[\*\*(.*?)\*\*\]/)[1];
+                return (
+                    <div key={i} style={{ marginTop: '2rem', textAlign: 'center' }}>
+                        <button
+                            id="trigger-capture-btn"
+                            className="gated-cta-trigger"
+                            onClick={() => {
+                                // Find and click the hidden close/open trigger if needed, or set global state
+                                // Since EmailCapturePopup is in App.jsx, we can use a custom event
+                                const event = new CustomEvent('mv_trigger_capture');
+                                window.dispatchEvent(event);
+                            }}
+                            style={{
+                                background: 'linear-gradient(135deg, #ec4899, #a855f7)',
+                                color: 'white',
+                                padding: '1rem 2rem',
+                                borderRadius: '0.5rem',
+                                border: 'none',
+                                fontWeight: 'bold',
+                                fontSize: '1.2rem',
+                                cursor: 'pointer',
+                                boxShadow: '0 4px 14px 0 rgba(236, 72, 153, 0.39)'
+                            }}
+                        >
+                            {text} 🔒
+                        </button>
+                    </div>
+                );
+            }
+
             if (content.includes('[**Validate Your')) {
                 const url = content.match(/\((.*?)\)/)[1];
                 const text = content.match(/\[\*\*(.*?)\*\*\]/)[1];

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import LaunchpadCard from './LaunchpadCard';
+import SocialProofToast from './SocialProofToast';
 
 /**
  * 🚀 MarketVibe Launchpad — Product Directory
@@ -79,10 +80,28 @@ const LaunchpadDirectory = ({ supabase }) => {
     return (
         <div style={{
             minHeight: '100vh',
-            background: 'linear-gradient(180deg, #0a0a1a 0%, #111827 100%)',
-            color: '#fff',
-            fontFamily: "'Inter', -apple-system, sans-serif",
         }}>
+            <SocialProofToast />
+
+            {/* Urgency Banner */}
+            <div style={{
+                background: 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)',
+                color: '#fff',
+                padding: '8px',
+                textAlign: 'center',
+                fontSize: '0.75rem',
+                fontWeight: 800,
+                letterSpacing: '0.5px',
+                textTransform: 'uppercase',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+            }}>
+                <span>⚡ Limited Time:</span>
+                <span>Get 50% OFF your first 'Verified' listing with code: <b>LAUNCH2026</b></span>
+                <span style={{ background: 'rgba(0,0,0,0.2)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.65rem' }}>Ends in 04:22:15</span>
+            </div>
             {/* Hero */}
             <div style={{
                 padding: '3rem 2rem 2rem',
@@ -387,8 +406,12 @@ const LaunchpadDirectory = ({ supabase }) => {
                         textDecoration: 'none',
                         fontWeight: 700,
                         fontSize: '0.85rem',
+                        boxShadow: '0 0 15px rgba(168, 85, 247, 0.3)'
                     }}>✓ Get Verified — $99</a>
                 </div>
+                <p style={{ marginTop: '1rem', fontSize: '0.7rem', color: '#475569' }}>
+                    🔒 Secure checkout powered by Stripe. MarketVibe Verification Badge is permanent.
+                </p>
             </div>
         </div>
     );

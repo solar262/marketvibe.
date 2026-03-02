@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { popularNiches } from '../lib/niches';
 import { generateValidationReport } from '../lib/generator';
 
-const NicheValidator = ({ niche }) => {
+const NicheValidator = ({ niche, onUpgrade, spots }) => {
     const [nicheData, setNicheData] = useState(null);
     const [report, setReport] = useState(null);
+    const [showPulse, setShowPulse] = useState(false);
 
     useEffect(() => {
         // Find niche from prop or URL path (e.g., /validate/saas)
@@ -28,7 +29,11 @@ const NicheValidator = ({ niche }) => {
             console.error("[NicheValidator] Failed to generate report:", err);
         }
 
-        document.title = `Validate ${found.name} Startup Idea - MarketVibe`;
+        // Title and Meta tags are now handled by updateMetaTags in App.jsx
+
+        // Trigger FOMO Pulse after 5s
+        const timer = setTimeout(() => setShowPulse(true), 5000);
+        return () => clearTimeout(timer);
     }, [niche]);
 
     if (!nicheData || !report) {
@@ -43,6 +48,42 @@ const NicheValidator = ({ niche }) => {
 
     return (
         <div style={{ padding: '4rem 1rem', maxWidth: '1000px', margin: '0 auto', color: 'white', position: 'relative' }}>
+
+            {/* Founder Pulse Notification */}
+            {showPulse && (
+                <div style={{
+                    position: 'fixed',
+                    bottom: '2rem',
+                    right: '2rem',
+                    background: 'rgba(15, 23, 42, 0.9)',
+                    backdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(99, 102, 241, 0.3)',
+                    padding: '1rem 1.5rem',
+                    borderRadius: '1rem',
+                    zIndex: 100,
+                    animation: 'slideIn 0.5s ease-out',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '1rem',
+                    boxShadow: '0 20px 50px rgba(0,0,0,0.5)'
+                }}>
+                    <div style={{ position: 'relative' }}>
+                        <div style={{ width: '12px', height: '12px', background: '#10b981', borderRadius: '50%' }}></div>
+                        <div style={{
+                            position: 'absolute',
+                            top: 0, left: 0,
+                            width: '12px', height: '12px',
+                            background: '#10b981',
+                            borderRadius: '50%',
+                            animation: 'ping 1.5s infinite'
+                        }}></div>
+                    </div>
+                    <div style={{ fontSize: '0.9rem', fontWeight: '500' }}>
+                        <span style={{ color: '#6366f1', fontWeight: '800' }}>Live Signal:</span> Another founder just validated {nicheData.name}.
+                    </div>
+                </div>
+            )}
+
             {/* Header / Institutional Bar */}
             <div style={{
                 display: 'flex',
@@ -97,19 +138,20 @@ const NicheValidator = ({ niche }) => {
                 </p>
 
                 <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                    <a href="/" style={{
+                    <button onClick={onUpgrade} style={{
                         background: '#6366f1',
                         color: 'white',
                         padding: '1rem 2rem',
                         borderRadius: '0.75rem',
-                        textDecoration: 'none',
+                        border: 'none',
                         fontWeight: '800',
                         fontSize: '1rem',
+                        cursor: 'pointer',
                         boxShadow: '0 10px 30px -10px rgba(99, 102, 241, 0.5)',
                         transition: 'transform 0.2s ease'
                     }} onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}>
-                        Validate Custom Idea
-                    </a>
+                        Download Full Resource Pack 📥
+                    </button>
                     <div style={{
                         background: 'rgba(255,255,255,0.03)',
                         padding: '1rem 1.5rem',
@@ -121,12 +163,12 @@ const NicheValidator = ({ niche }) => {
                         fontSize: '0.9rem',
                         color: '#cbd5e1'
                     }}>
-                        <span style={{ color: '#10b981' }}>🔥</span> High Entry Velocity
+                        <span style={{ color: '#10b981' }}>🔥</span> {spots} Spots Remaining
                     </div>
                 </div>
             </div>
 
-            {/* Executive Summary Grid */}
+            {/* Executive Summary Grid (Unchanged) */}
             <div style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
@@ -236,7 +278,7 @@ const NicheValidator = ({ niche }) => {
                                                 gap: '1rem'
                                             }}>
                                                 <div style={{ color: '#6366f1', fontWeight: 'bold', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
-                                                    {task.day}
+                                                    {task.task.length > 50 ? '📍' : task.day}
                                                 </div>
                                                 <div style={{ color: '#cbd5e1', fontSize: '0.95rem', lineHeight: '1.5' }}>
                                                     {task.task}
@@ -248,6 +290,54 @@ const NicheValidator = ({ niche }) => {
                             </div>
                         </div>
                     ))}
+
+                    {/* Unlock CTA Section */}
+                    <div style={{
+                        marginTop: '4rem',
+                        background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%)',
+                        padding: '3rem',
+                        borderRadius: '1.5rem',
+                        border: '1px solid rgba(99, 102, 241, 0.3)',
+                        textAlign: 'center',
+                        position: 'relative',
+                        overflow: 'hidden'
+                    }}>
+                        <div style={{ position: 'relative', zIndex: 1 }}>
+                            <h3 style={{ fontSize: '1.8rem', fontWeight: '900', marginBottom: '1rem' }}>Ready to build your {nicheData.name} empire?</h3>
+                            <p style={{ color: '#cbd5e1', marginBottom: '2rem', maxWidth: '600px', margin: '0 auto 2rem' }}>
+                                Get the **Founder Kit** for this niche. Includes pre-vetted domain names, ad copy sets,
+                                and the autonomous growth agent configurations for this exact market.
+                            </p>
+                            <button onClick={onUpgrade} style={{
+                                background: 'white',
+                                color: '#000',
+                                padding: '1rem 2.5rem',
+                                borderRadius: '0.75rem',
+                                border: 'none',
+                                fontWeight: '900',
+                                fontSize: '1.1rem',
+                                cursor: 'pointer',
+                                boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+                                transition: 'all 0.2s ease'
+                            }} onMouseOver={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 15px 40px rgba(0,0,0,0.4)'; }} onMouseOut={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 10px 30px rgba(0,0,0,0.3)'; }}>
+                                Unlock Founder Kit (Only $49) 🚀
+                            </button>
+                            <div style={{ marginTop: '1.5rem', fontSize: '0.8rem', color: '#94a3b8' }}>
+                                🔔 {spots} Founder licenses remaining before the price increases to $199.
+                            </div>
+                        </div>
+
+                        {/* Background Decoration */}
+                        <div style={{
+                            position: 'absolute',
+                            top: '-50%',
+                            right: '-10%',
+                            width: '300px',
+                            height: '300px',
+                            background: 'radial-gradient(circle, rgba(99, 102, 241, 0.2) 0%, transparent 70%)',
+                            zIndex: 0
+                        }}></div>
+                    </div>
                 </div>
             </div>
 

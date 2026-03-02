@@ -166,6 +166,13 @@ const NameGenerator = ({ onSelectName }) => {
                 </div>
             )}
 
+            <div style={{ marginTop: '4rem', padding: '2rem', background: 'rgba(99, 102, 241, 0.05)', borderRadius: '1.25rem', border: '1px dashed rgba(99, 102, 241, 0.3)' }}>
+                <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '1rem' }}>Already have a name and a validated product?</p>
+                <a href="/launchpad/submit" style={{ color: '#fff', textDecoration: 'none', fontWeight: 700, fontSize: '0.9rem', background: 'linear-gradient(135deg, #6366f1, #a855f7)', padding: '10px 20px', borderRadius: '10px', display: 'inline-block' }}>
+                    Submit to Launchpad →
+                </a>
+            </div>
+
             {showModal && (
                 <div style={{
                     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,

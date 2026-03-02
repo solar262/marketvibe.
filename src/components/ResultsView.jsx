@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { generateScorecard } from '../lib/scorecard';
-import AuthorityInsights from './components/AuthorityInsights';
-import NewsletterSignup from './components/NewsletterSignup';
+import VerificationBadge from './VerificationBadge';
+import NewsletterSignup from './NewsletterSignup';
 import { generateMVPCode } from '../lib/mvp_templates';
 
 const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = 'founder', leads = [], usageCount = 0, leadId = null, fomoTimer }) => {

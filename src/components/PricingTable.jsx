@@ -47,6 +47,7 @@ const PricingTable = ({ onSelectPlan, spots }) => {
                 '💼 Full Commercial Rights',
                 'Priority Verification Badge',
                 'Ready-to-Post Social Templates',
+                '⭐ 7-Day FEATURED Launchpad Listing',
                 'Lifetime Access + All Updates'
             ],
             cta: 'Secure My Founder Launch Kit',
@@ -68,6 +69,7 @@ const PricingTable = ({ onSelectPlan, spots }) => {
                 'White-label PDF Reports',
                 'Custom Branding',
                 'Early Access to Tools',
+                '✓ Permanent VERIFIED Launchpad Badge',
                 'Dedicated Success Manager'
             ],
             cta: 'Go Expert',

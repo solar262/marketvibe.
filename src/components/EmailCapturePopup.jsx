@@ -10,6 +10,23 @@ const EmailCapturePopup = ({ onEmailCaptured, supabase }) => {
     const [email, setEmail] = useState('');
     const [submitted, setSubmitted] = useState(false);
     const [closing, setClosing] = useState(false);
+    const [timeLeft, setTimeLeft] = useState(600); // 10 minutes in seconds
+
+    useEffect(() => {
+        // Scarcity timer logic
+        if (visible && !submitted && timeLeft > 0) {
+            const timer = setInterval(() => {
+                setTimeLeft(prev => prev - 1);
+            }, 1000);
+            return () => clearInterval(timer);
+        }
+    }, [visible, submitted, timeLeft]);
+
+    const formatTimer = (seconds) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    };
 
     useEffect(() => {
         // Don't show if already dismissed or captured
@@ -28,9 +45,13 @@ const EmailCapturePopup = ({ onEmailCaptured, supabase }) => {
         };
         document.addEventListener('mouseleave', handleMouseLeave);
 
+        const handleTrigger = () => setVisible(true);
+        window.addEventListener('mv_trigger_capture', handleTrigger);
+
         return () => {
             clearTimeout(timer);
             document.removeEventListener('mouseleave', handleMouseLeave);
+            window.removeEventListener('mv_trigger_capture', handleTrigger);
         };
     }, []);
 
@@ -127,18 +148,30 @@ const EmailCapturePopup = ({ onEmailCaptured, supabase }) => {
                 <div style={{ padding: '2rem 2rem 1.5rem' }}>
                     {!submitted ? (
                         <>
-                            {/* Badge */}
-                            <div style={{
-                                display: 'inline-block',
-                                background: 'rgba(99, 102, 241, 0.15)',
-                                border: '1px solid rgba(99, 102, 241, 0.3)',
-                                borderRadius: '20px',
-                                padding: '4px 14px',
-                                fontSize: '12px',
-                                color: '#a5b4fc',
-                                marginBottom: '1rem',
-                                fontWeight: 600,
-                            }}>🎁 FREE FOR FOUNDERS</div>
+                            {/* Badge & Timer Container */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                <div style={{
+                                    background: 'rgba(99, 102, 241, 0.15)',
+                                    border: '1px solid rgba(99, 102, 241, 0.3)',
+                                    borderRadius: '20px',
+                                    padding: '4px 14px',
+                                    fontSize: '12px',
+                                    color: '#a5b4fc',
+                                    fontWeight: 600,
+                                }}>🎁 FREE FOR FOUNDERS</div>
+
+                                <div style={{
+                                    fontSize: '13px',
+                                    color: '#f87171',
+                                    fontWeight: 'bold',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px'
+                                }}>
+                                    <span style={{ fontSize: '16px' }}>⏱️</span>
+                                    <span>{formatTimer(timeLeft)}</span>
+                                </div>
+                            </div>
 
                             <h2 style={{
                                 fontSize: '1.5rem',
@@ -217,7 +250,7 @@ const EmailCapturePopup = ({ onEmailCaptured, supabase }) => {
                                 textAlign: 'center',
                                 margin: '0.75rem 0 0',
                             }}>
-                                🔒 No spam ever. Unsubscribe anytime.
+                                🔒 This offer is only available for the next 10 minutes.
                             </p>
                         </>
                     ) : (
