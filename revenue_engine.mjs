@@ -18,19 +18,22 @@ const SCRIPTS = [
 ];
 
 function runScript(script) {
-    console.log(`\n[${new Date().toLocaleTimeString()}] 🚀 Initiating ${script.name}...`);
+    return new Promise((resolve) => {
+        console.log(`\n[${new Date().toLocaleTimeString()}] 🚀 Initiating ${script.name}...`);
 
-    const cmd = spawn('node', [script.path], {
-        stdio: 'inherit',
-        shell: true
-    });
+        const cmd = spawn('node', [script.path], {
+            stdio: 'inherit',
+            shell: true
+        });
 
-    cmd.on('close', (code) => {
-        if (code === 0) {
-            console.log(`[${new Date().toLocaleTimeString()}] ✅ ${script.name} completed successfully.`);
-        } else {
-            console.error(`[${new Date().toLocaleTimeString()}] ❌ ${script.name} exited with code ${code}`);
-        }
+        cmd.on('close', (code) => {
+            if (code === 0) {
+                console.log(`[${new Date().toLocaleTimeString()}] ✅ ${script.name} completed successfully.`);
+            } else {
+                console.error(`[${new Date().toLocaleTimeString()}] ❌ ${script.name} exited with code ${code}`);
+            }
+            resolve();
+        });
     });
 }
 
@@ -39,11 +42,12 @@ function scheduleNext(script) {
     const jitter = (Math.random() * 0.4 - 0.2) * script.interval; // +/- 20%
     const nextInterval = script.interval + jitter;
 
-    setTimeout(() => {
-        runScript(script);
+    setTimeout(async () => {
+        await runScript(script);
         scheduleNext(script);
     }, nextInterval);
 }
+
 
 function startEngine() {
     console.log(`
@@ -55,11 +59,12 @@ function startEngine() {
 
     // Initial run with slight staggered start
     SCRIPTS.forEach((script, index) => {
-        setTimeout(() => {
-            runScript(script);
+        setTimeout(async () => {
+            await runScript(script);
             scheduleNext(script);
         }, index * 5000); // 5s stagger between starting different agents
     });
 }
+
 
 startEngine();
