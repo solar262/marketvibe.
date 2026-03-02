@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { Analytics } from '@vercel/analytics/react'
 import { supabase } from './lib/supabase'
 import { createCheckoutSession } from './lib/stripe'
 import { sendWelcomeEmail, sendResultsEmail } from './lib/email'
@@ -588,6 +589,7 @@ function App() {
         </div>
       )}
       <EmailCapturePopup supabase={supabase} onEmailCaptured={setEmail} />
+      <Analytics />
     </div>
   )
 }
