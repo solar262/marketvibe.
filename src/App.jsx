@@ -317,8 +317,11 @@ function App() {
               case 'setup': return <ProjectForm onSubmit={handleProjectSubmit} submitting={submitting} />;
               case 'fulfillment': return <ResultsView results={results} email={email} unlocked={paid} />;
               case 'admin': return <AdminDashboard />;
-              case 'launchpad': return <LaunchpadDirectory supabase={supabase} />;
+              case 'launchpad':
+              case 'hub': return <LaunchpadDirectory supabase={supabase} />;
               case 'launchpad-submit': return <LaunchpadSubmit supabase={supabase} />;
+              case 'newsroom': return <Newsroom />;
+              case 'p-seo': return <ResultsView results={generateValidationReport(activeNiche)} email={email} unlocked={true} />;
               case 'video-preview': return <VideoPreview />;
               case 'privacy': return <PrivacyPolicy />;
               case 'terms': return <TermsOfService />;
