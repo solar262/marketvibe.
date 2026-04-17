@@ -32,6 +32,8 @@ import Library from './components/Library';
 import VideoPreview from './components/VideoPreview';
 import LandingPage from './pages/LandingPage';
 import AdminDashboard from './pages/AdminDashboard';
+import About from './components/About';
+import Contact from './components/Contact';
 
 import NewsletterSignup from './components/NewsletterSignup';
 import { popularNiches } from './lib/niches'
@@ -77,6 +79,8 @@ function App() {
     if (p.includes('/admin/leads')) return 'admin-leads';
     if (p.includes('/privacy')) return 'privacy';
     if (p.includes('/terms')) return 'terms';
+    if (p.includes('/about')) return 'about';
+    if (p.includes('/contact')) return 'contact';
     if (p === '/hub') return 'hub';
     if (p === '/tools/market-size') return 'market-size';
     if (p === '/insights') return 'insights';
@@ -221,6 +225,10 @@ function App() {
       setStep('market-size')
     } else if (activePath === '/insights') {
       setStep('insights')
+    } else if (activePath === '/about') {
+      setStep('about')
+    } else if (activePath === '/contact') {
+      setStep('contact')
     } else if (activePath.startsWith('/validate/')) {
       const slug = activePath.split('/').pop()
       const foundNiche = popularNiches.find(n => n.slug === slug)
@@ -312,6 +320,10 @@ function App() {
               case 'launchpad': return <LaunchpadDirectory supabase={supabase} />;
               case 'launchpad-submit': return <LaunchpadSubmit supabase={supabase} />;
               case 'video-preview': return <VideoPreview />;
+              case 'privacy': return <PrivacyPolicy />;
+              case 'terms': return <TermsOfService />;
+              case 'about': return <About />;
+              case 'contact': return <Contact />;
               case 'landing':
               default: return <LandingPage />;
             }
@@ -319,6 +331,37 @@ function App() {
         </main>
 
         <EmailCapturePopup supabase={supabase} onEmailCaptured={setEmail} />
+        
+        {!isInvestorRoute && !isInvestorDashboard && (
+          <footer style={{ marginTop: '5rem', padding: '4rem 0', borderTop: '1px solid #e2e8f0', background: '#fff' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3rem', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#6366f1', marginBottom: '1rem' }}>MarketVibe</div>
+                <div style={{ color: '#94a3b8', fontSize: '0.9rem', maxWidth: '300px' }}>
+                  Autonomous startup validation and revenue intelligence. Built for the 2026 founder.
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '4rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Platform</div>
+                  <a href="/hub" onClick={(e) => { e.preventDefault(); setStep('hub'); }} style={{ color: '#64748b', textDecoration: 'none', fontSize: '0.9rem' }}>Launchpad</a>
+                  <a href="/tools/naming" onClick={(e) => { e.preventDefault(); setStep('tools-naming'); }} style={{ color: '#64748b', textDecoration: 'none', fontSize: '0.9rem' }}>Naming Tool</a>
+                  <a href="/blog" onClick={(e) => { e.preventDefault(); setStep('blog-index'); }} style={{ color: '#64748b', textDecoration: 'none', fontSize: '0.9rem' }}>Intelligence Blog</a>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Company</div>
+                  <a href="/about" onClick={(e) => { e.preventDefault(); setStep('about'); }} style={{ color: '#64748b', textDecoration: 'none', fontSize: '0.9rem' }}>About Us</a>
+                  <a href="/contact" onClick={(e) => { e.preventDefault(); setStep('contact'); }} style={{ color: '#64748b', textDecoration: 'none', fontSize: '0.9rem' }}>Contact</a>
+                  <a href="/privacy" onClick={(e) => { e.preventDefault(); setStep('privacy'); }} style={{ color: '#64748b', textDecoration: 'none', fontSize: '0.9rem' }}>Privacy Policy</a>
+                  <a href="/terms" onClick={(e) => { e.preventDefault(); setStep('terms'); }} style={{ color: '#64748b', textDecoration: 'none', fontSize: '0.9rem' }}>Terms</a>
+                </div>
+              </div>
+            </div>
+            <div style={{ marginTop: '4rem', paddingOver: '2rem', borderTop: '1px solid #f1f5f9', paddingTop: '2rem', textAlign: 'center', color: '#cbd5e1', fontSize: '0.8rem' }}>
+              &copy; 2026 MarketVibe Intelligence Unit. All rights reserved.
+            </div>
+          </footer>
+        )}
       </div>
     </ErrorBoundary>
   )
