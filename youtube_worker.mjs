@@ -130,7 +130,20 @@ async function generateVideo() {
             await titleBox.type(`MarketVibe Daily Gains | ${trend.niche} Breakdown 🚀`);
 
             const descBox = await page.waitForSelector('#description-textarea #textbox', { timeout: 10000 });
-            await descBox.type(`Live market signal detected: ${trend.niche}.\n\nHeat Score: ${trend.heatScore?.toFixed(1) || '8.4'}\nVelocity: +${trend.velocity || '124'}%\n\nGet the full 30-day founder playbook at https://marketvibe1.com\n\n#startups #marketvibe #dailygains`);
+            await descBox.type(`Live market signal detected: ${trend.niche}.\n\nHeat Score: ${trend.heatScore?.toFixed(1) || '8.4'}\nVelocity: +${trend.velocity || '124'}%\n\n✅ Validate this idea at https://marketvibe1.com\n🚀 Get customers autonomously at https://outreach-dashboard-1.onrender.com\n\n#startups #marketvibe #aioutreach #dailygains`);
+
+            console.log("🏷️  Filling official Tags...");
+            try {
+                // Click "Show More" to reveal tags
+                const showMore = await page.waitForSelector('ytcp-button[aria-label="SHOW MORE"], div.show-more-button', { timeout: 5000 });
+                await showMore.click();
+                await new Promise(r => setTimeout(r, 1000));
+
+                const tagsBox = await page.waitForSelector('input[aria-label="Tags"]', { timeout: 5000 });
+                await tagsBox.type(`saas, ai outreach, business ideas, ${trend.niche}, market analysis, growth bot, automation`);
+            } catch (tagErr) {
+                console.warn("⚠️ Could not fill official tags (Optional step):", tagErr.message);
+            }
 
             console.log("🧒 Handling Kids policy...");
             const kidsRadio = await page.waitForSelector('tp-yt-paper-radio-button[name="VIDEO_MADE_FOR_KIDS_NOT_MFK"]', { timeout: 5000 });

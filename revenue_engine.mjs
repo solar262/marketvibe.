@@ -14,7 +14,8 @@ const SCRIPTS = [
     { name: 'THE BLOGGER (Content)', path: 'blog_worker.mjs', interval: 1 * 60 * 1000 }, // Every 1 min
     { name: 'THE NURTURER (Email Drip)', path: 'nurture_worker.mjs', interval: 60 * 60 * 1000 }, // Every 1 hour
     { name: 'THE PRODUCER (YouTube)', path: 'youtube_worker.mjs', interval: 24 * 60 * 60 * 1000 }, // Every 24 hours
-    { name: 'RECOVERY AGENT (Checkout)', path: 'recovery_worker.mjs', interval: 30 * 60 * 1000 } // Every 30 mins
+    { name: 'RECOVERY AGENT (Checkout)', path: 'recovery_worker.mjs', interval: 30 * 60 * 1000 }, // Every 30 mins
+    { name: 'FB DISCOVERY (Facebook)', path: 'facebook_worker.mjs', interval: 20 * 60 * 1000 } // Every 20 mins
 ];
 
 function runScript(script) {
@@ -23,7 +24,10 @@ function runScript(script) {
 
         const cmd = spawn('node', [script.path], {
             stdio: 'inherit',
-            shell: true
+            shell: true,
+            cwd: 'c:/Users/qwerty/Desktop/prototype',
+            windowsHide: true,
+            detached: false // Keep it attached to the engine but hidden
         });
 
         cmd.on('close', (code) => {

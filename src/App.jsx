@@ -3,6 +3,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { supabase } from './lib/supabase'
 import { sendWelcomeEmail, sendResultsEmail } from './lib/email'
 import { generateValidationReport } from './lib/generator'
+import { createCheckoutSession } from './lib/stripe'
 import ProjectForm from './components/ProjectForm'
 import ResultsView from './components/ResultsView'
 import PricingTable from './components/PricingTable'
@@ -237,6 +238,8 @@ function App() {
       setStep('library')
     } else if (activePath === '/newsroom') {
       setStep('newsroom')
+    } else if (activePath.startsWith('/news/')) {
+      setStep('news-article')
     } else if (activePath === '/blog') {
       setStep('blog-index')
     } else if (activePath.startsWith('/blog/')) {
@@ -255,6 +258,23 @@ function App() {
       else setStep('admin');
     }
   }, [activePath])
+
+  const handleUnlock = async (plan = 'founder') => {
+    if (!email) {
+      window.dispatchEvent(new CustomEvent('mv_trigger_capture'));
+      return;
+    }
+    setLoading(true);
+    try {
+      localStorage.setItem('mv_pending_plan', plan);
+      await createCheckoutSession(email, plan);
+    } catch (err) {
+      console.error('Checkout error:', err);
+      alert(err.message || 'Payment engine offline. Please try again or contact support.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (step === 'fulfillment' && !paid) {
@@ -315,13 +335,14 @@ function App() {
               case 'investors': return <InvestorLanding onNavigate={(p) => { window.location.href = p; }} spots={investorSpots} />;
               case 'investor-dashboard': return <InvestorDashboard supabase={supabase} />;
               case 'setup': return <ProjectForm onSubmit={handleProjectSubmit} submitting={submitting} />;
-              case 'fulfillment': return <ResultsView results={results} email={email} unlocked={paid} />;
+              case 'fulfillment': return <ResultsView results={results} email={email} unlocked={paid} onUnlock={handleUnlock} spots={spots} loading={loading} fomoTimer={fomoTimer} />;
               case 'admin': return <AdminDashboard />;
               case 'launchpad':
               case 'hub': return <LaunchpadDirectory supabase={supabase} />;
               case 'launchpad-submit': return <LaunchpadSubmit supabase={supabase} />;
               case 'newsroom': return <Newsroom />;
-              case 'p-seo': return <ResultsView results={generateValidationReport(activeNiche)} email={email} unlocked={true} />;
+              case 'news-article': return <NewsArticle />;
+              case 'p-seo': return <ResultsView results={generateValidationReport(activeNiche)} email={email} unlocked={true} onUnlock={handleUnlock} />;
               case 'video-preview': return <VideoPreview />;
               case 'privacy': return <PrivacyPolicy />;
               case 'terms': return <TermsOfService />;

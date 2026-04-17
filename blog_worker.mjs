@@ -111,6 +111,4 @@ async function runBlogCycle() {
     }
 }
 
-// Run frequently for "One Click" feel
-setInterval(runBlogCycle, 10000); // Every 10 seconds
 runBlogCycle();

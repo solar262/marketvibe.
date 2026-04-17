@@ -42,7 +42,34 @@ async function generateMorningBrief() {
             .select('*', { count: 'exact', head: true })
             .eq('status', 'closed');
 
-        const totalRevenue = closedLeads * 49;
+        const totalRevenue = (closedLeads || 0) * 49;
+
+        // 1b. Fetch Local Growth Metrics (Guest Trials & Roaster Leads)
+        const fs = require('fs');
+        const path = require('path');
+        const DB_ROOT = 'c:/Users/qwerty/Desktop/billion-fixed/saas-server/db';
+
+        let roasterLeads = 0;
+        let guestTrials = 0;
+        let guestUsageCount = 0;
+
+        try {
+            const roastPath = path.join(DB_ROOT, 'roast_leads.json');
+            if (fs.existsSync(roastPath)) {
+                const data = JSON.parse(fs.readFileSync(roastPath, 'utf8'));
+                roasterLeads = data.length;
+            }
+
+            const keysPath = path.join(DB_ROOT, 'provisioned_keys.json');
+            if (fs.existsSync(keysPath)) {
+                const data = JSON.parse(fs.readFileSync(keysPath, 'utf8'));
+                const guestKeys = Object.entries(data).filter(([k]) => k.startsWith('OAS-GUEST-'));
+                guestTrials = guestKeys.length;
+                guestUsageCount = guestKeys.reduce((acc, [_, v]) => acc + (v.usage || 0), 0);
+            }
+        } catch (e) {
+            console.warn("⚠️ Local DB metrics failed:", e.message);
+        }
 
         // 2. Format Email
         const subject = `📊 MarketVibe Morning Brief: +${newLeads} leads today! 🚀`;
@@ -69,9 +96,21 @@ async function generateMorningBrief() {
                     <h2 style="margin: 0; font-size: 2.5rem; color: #10b981;">$${totalRevenue}</h2>
                 </div>
 
+                <div style="margin-top: 2rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div style="background: rgba(236, 72, 153, 0.05); padding: 1rem; border-radius: 0.5rem; border: 1px solid rgba(236, 72, 153, 0.1); text-align: center;">
+                        <span style="display: block; font-size: 0.7rem; color: #ec4899; margin-bottom: 0.3rem;">ROASTER LEADS 🌶️</span>
+                        <h3 style="margin: 0; color: #ec4899;">${roasterLeads}</h3>
+                    </div>
+                    <div style="background: rgba(14, 165, 233, 0.05); padding: 1rem; border-radius: 0.5rem; border: 1px solid rgba(14, 165, 233, 0.1); text-align: center;">
+                        <span style="display: block; font-size: 0.7rem; color: #0ea5e9; margin-bottom: 0.3rem;">GUEST TRIALS 👻</span>
+                        <h3 style="margin: 0; color: #0ea5e9;">${guestTrials}</h3>
+                    </div>
+                </div>
+
                 <div style="margin-top: 2rem; padding: 1rem; background: rgba(255,255,255,0.02); border-radius: 0.5rem;">
                     <p style="margin: 0.5rem 0; font-size: 0.9rem; color: #cbd5e1;">📊 Website Visits: <b>${hitsData?.value || 0}</b></p>
                     <p style="margin: 0.5rem 0; font-size: 0.9rem; color: #cbd5e1;">🎯 Total Lead Pipeline: <b>${totalLeads}</b></p>
+                    <p style="margin: 0.5rem 0; font-size: 0.9rem; color: #cbd5e1;">🛠️ Demo Usage (Total): <b>${guestUsageCount} generations</b></p>
                 </div>
 
                 <div style="margin-top: 2rem; text-align: center;">

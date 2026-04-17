@@ -25,6 +25,6 @@ echo 📧 Nurturer: Active
 echo 📣 Herald: Active
 echo.
 
-node scheduler.mjs
+node revenue_engine.mjs
 
 pause

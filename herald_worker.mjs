@@ -8,7 +8,7 @@ import dotenv from 'dotenv';
 // reddit.js is loaded dynamically to avoid puppeteer-core being required at startup in CI
 import { postTwitterReply } from './src/lib/twitter.js';
 
-dotenv.config();
+dotenv.config({ path: new URL('./.env', import.meta.url) });
 
 const supabase = createClient(
     process.env.VITE_SUPABASE_URL,
@@ -19,10 +19,11 @@ const supabase = createClient(
  * 📢 TWEET TEMPLATES FOR VERIFIED LAUNCHES
  */
 const LAUNCH_TEMPLATES = [
-    (n, t) => `🚀 JUST LAUNCHED: ${n} - ${t}. This startup just hit our "Verified" status with high revenue potential. Explore the analysis: marketvibe1.com/launchpad`,
-    (n, t) => `🔥 NEW VERIFIED STARTUP: ${n} is live on the Launchpad! ${t} 📈 Full validation report & deal flow data available now. #Startup #Validation`,
-    (n, t) => `💎 High-Ticket Opportunity: ${n} (${t}) has officially cleared MarketVibe verification. Check the scorecard: marketvibe1.com/launchpad`,
-    (n, t) => `⚡ BREAKING: ${n} just hit the MarketVibe Launchpad. Niche focus: ${t}. Permanent Verified badge active. ✓`
+    (n, t) => `Saw ${n} is launching in the ${t} space. If you're starting outreach, this free AI pitch roaster is worth a look: marketvibe1.com/roaster`,
+    (n, t) => `Congrats on the ${n} launch! For the cold DMs, you might want to run your pitch through this critique tool first: marketvibe1.com/roaster`,
+    (n, t) => `Interesting niche (${t}). If you're struggling to get replies for ${n}, I've been using this free AI strategy generator: marketvibe1.com`,
+    (n, t) => `Re: ${n}. Just a heads up, the cold outreach market is tough right now. This tool helps roast your bad pitches before you send them: marketvibe1.com/roaster`,
+    (n, t) => `Found ${n} on the launchpad. If you need help with the first 10 customers, this AI studio handles the discovery part: marketvibe1.com`
 ];
 
 async function tweetVerifiedLaunches() {
@@ -92,7 +93,7 @@ async function runHeraldCycle() {
             .select('*')
             .eq('status', 'contacted')
             .eq('is_posted', false)
-            .limit(15);
+            .limit(30);
 
         if (fetchError) {
             if (fetchError.message.includes('column "is_posted" does not exist')) {
@@ -109,6 +110,11 @@ async function runHeraldCycle() {
 
         console.log(`📡 Herald: Identified ${leads.length} leads for live engagement.`);
 
+        const BLACKLIST_SUBS = [
+            'UnearthedArcana', 'gaming', 'DnD', 'roleplaying', 'memes', 'funny',
+            'writingprompts', 'AskReddit', 'worldbuilding', 'Fantasy'
+        ];
+
         for (const lead of leads) {
             let result = { success: false };
 
@@ -117,11 +123,20 @@ async function runHeraldCycle() {
                     console.log(`⏭️ Herald: Skipping Reddit reply for ${lead.username} (Reddit Disabled)`);
                     continue;
                 }
+
+                // Final safety check for blacklisted subreddits
+                if (lead.post_content && BLACKLIST_SUBS.some(s => lead.post_content.toLowerCase().includes(`r/${s.toLowerCase()}`) || (lead.subreddit && lead.subreddit.toLowerCase() === s.toLowerCase()))) {
+                    console.log(`🛡️ Herald: Safety Void. Blacklisted sub detected for ${lead.username}.`);
+                    await supabase.from('growth_leads').update({ is_posted: true, posted_at: 'VOID: Blacklisted Sub' }).eq('id', lead.id);
+                    continue;
+                }
+
                 const redditId = lead.platform_id.replace('rd_', '');
                 const { postRedditReply } = await import('./src/lib/reddit.js');
                 result = await postRedditReply(redditId, lead.draft_reply);
             } else if (lead.platform === 'twitter') {
-                result = await postTwitterReply(lead.draft_reply_twitter || lead.draft_reply);
+                const tweetId = lead.platform_id.replace('tw_', '');
+                result = await postTwitterReply(lead.draft_reply_twitter || lead.draft_reply, tweetId);
             }
 
             if (result.success) {
@@ -162,9 +177,9 @@ async function runHeraldCycle() {
             // Humanistic gap between posts (5 - 12 minutes)
             // If it's a small batch or user-triggered, this could be shortened, but safety first.
             if (leads.indexOf(lead) < leads.length - 1) {
-                const gap = 300000 + Math.random() * 420000; // 5m base + up to 7m random
-                const mins = (gap / 60000).toFixed(1);
-                console.log(`⏳ Herald: Cooling down for ${mins} minutes before next post...`);
+                const gap = 30000 + Math.random() * 30000; // 30s base + up to 30s random
+                const secs = (gap / 1000).toFixed(0);
+                console.log(`⏳ Herald: Cooling down for ${secs} seconds before next post...`);
                 await new Promise(r => setTimeout(r, gap));
             }
         }

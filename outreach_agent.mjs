@@ -7,8 +7,9 @@
 import { createClient } from '@supabase/supabase-js';
 import { generateValidationReport } from './src/lib/generator.js';
 import dotenv from 'dotenv';
+import puppeteer from 'puppeteer-core';
 
-dotenv.config();
+dotenv.config({ path: new URL('./.env', import.meta.url) });
 
 const supabase = createClient(
     process.env.VITE_SUPABASE_URL,
@@ -43,7 +44,9 @@ class MarketVibeSentinel {
             "email outreach automation", "scalpable niches", "marketing on reddit", "organic growth for saas",
             "validate startup idea", "saas acquisition marketplace", "micro saas for sale",
             "indie hacker revenue", "building a saas in 30 days", "validation dashboard",
-            "market intelligence for startups", "automated competitor tracking"
+            "market intelligence for startups", "automated competitor tracking",
+            "pitch feedback", "cold DM roast", "roast my pitch", "pitch deck critique",
+            "why am i getting ignored on linkedin", "cold email not working", "outreach roast"
         ];
         this.targetSubreddits = [
             'saas', 'Entrepreneur', 'indiehackers', 'startups', 'SideProject', 'MicroSaaS',
@@ -54,13 +57,19 @@ class MarketVibeSentinel {
             'Sales', 'GrowthHacking', 'Agency', 'Business', 'Solopreneurs', 'WebDev',
             'AppDevelopment', 'StartupIdeas', 'builders', 'foundermindset', 'leanstartup'
         ];
+        this.blacklistSubreddits = [
+            'UnearthedArcana', 'gaming', 'DnD', 'roleplaying', 'memes', 'funny',
+            'writingprompts', 'AskReddit', 'worldbuilding', 'Fantasy'
+        ];
     }
 
     async runCycle() {
         console.log("🚀 Sentinel Cycle Started...");
 
-        // 1. Discovery (Live Reddit Search)
-        const rawLeads = await this.discoverLeads();
+        // 1. Discovery (Live Reddit & Twitter Search)
+        const redditLeads = await this.discoverLeads();
+        const twitterLeads = await this.discoverTwitterLeads();
+        const rawLeads = [...redditLeads, ...twitterLeads];
 
         for (const rawLead of rawLeads) {
             try {
@@ -126,21 +135,8 @@ class MarketVibeSentinel {
         console.log(`🔍 Sentinel Scale-Search: Scanning ${this.targetSubreddits.length} subreddits with ${this.keywords.length} signals...`);
         const allResults = [];
 
-        // 1. Vortex Keyword Search (Cross-Reddit)
-        // Increased to 25 keywords per cycle for maximum reach
-        const randomKeywords = this.keywords.sort(() => 0.5 - Math.random()).slice(0, 25);
-
-        for (const query of randomKeywords) {
-            try {
-                // ADDED: include_over_18=false & nsfw=0 for brand safety
-                const response = await fetch(`https://www.reddit.com/search.json?q=${encodeURIComponent(query)}&sort=new&limit=25&include_over_18=false&nsfw=0`);
-                if (!response.ok) continue;
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) continue;
-                const json = await response.json();
-                if (json.data?.children) this.processRedditResults(json.data.children, allResults);
-            } catch (err) { console.error(`Reddit global search error: ${err.message}`); }
-        }
+        // 1. Vortex Keyword Search (REMOVED: Too prone to false positives in non-business subs)
+        // We now stick to Laser Targeting within verified subreddits.
 
         // 2. Subreddit Deep Dive (Laser Targeting)
         for (const sub of this.targetSubreddits) {
@@ -164,10 +160,96 @@ class MarketVibeSentinel {
         return uniqueResults;
     }
 
+    async discoverTwitterLeads() {
+        console.log(`🔍 Sentinel Twitter-Search: Scanning X.com for high-intent signals...`);
+        const results = [];
+        let browser = null;
+
+        try {
+            const edgePort = process.env.EDGE_DEBUG_PORT || 9222;
+            const resp = await fetch(`http://127.0.0.1:${edgePort}/json/version`);
+            const data = await resp.json();
+
+            browser = await puppeteer.connect({
+                browserWSEndpoint: data.webSocketDebuggerUrl,
+                defaultViewport: null,
+                protocolTimeout: 0
+            });
+
+            const page = await browser.newPage();
+            const queries = this.keywords.sort(() => 0.5 - Math.random()).slice(0, 3); // 3 terms for safety
+
+            for (const query of queries) {
+                console.log(`🐦 Sentinel: Searching Twitter for "${query}"...`);
+                await page.goto(`https://x.com/search?q=${encodeURIComponent(query)}&f=live`, { waitUntil: 'domcontentloaded' });
+                await new Promise(r => setTimeout(r, 6000));
+
+                const tweets = await page.evaluate(async () => {
+                    const items = [];
+                    // Wait for either tweets or empty state
+                    for (let i = 0; i < 10; i++) {
+                        if (document.querySelector('[data-testid="tweet"]')) break;
+                        await new Promise(r => setTimeout(r, 1000));
+                    }
+
+                    const tweetElements = document.querySelectorAll('[data-testid="tweet"]');
+
+                    tweetElements.forEach(tweet => {
+                        const text = tweet.querySelector('[data-testid="tweetText"]')?.innerText || "";
+                        const tweetUrlEl = tweet.querySelector('a[href*="/status/"]');
+                        const tweetUrl = tweetUrlEl ? tweetUrlEl.href : "";
+                        const tweetId = tweetUrl ? tweetUrl.split('/').pop() : "";
+                        
+                        // Extract author directly from URL (e.g. x.com/username/status/...) to bypass DOM changes
+                        let author = "";
+                        if (tweetUrl) {
+                            try {
+                                author = new URL(tweetUrl).pathname.split('/')[1];
+                            } catch(e) {}
+                        }
+
+                        if (text && author && tweetId && !items.find(it => it.id === tweetId)) {
+                            items.push({ author, text, id: tweetId });
+                        }
+                    });
+                    return items.slice(0, 5);
+                });
+
+                console.log(`✅ Extracted ${tweets.length} usable tweets for query: ${query}`);
+
+                tweets.forEach(t => {
+                    results.push({
+                        platform: 'twitter',
+                        platform_id: `tw_${t.id}`,
+                        username: t.author,
+                        post_content: t.text,
+                        niche: this.detectNiche(t.text)
+                    });
+                });
+
+                await new Promise(r => setTimeout(r, 4000));
+            }
+
+            await page.close();
+        } catch (err) {
+            console.error(`❌ Sentinel Twitter Discovery Error: ${err.message}`);
+        } finally {
+            if (browser) browser.disconnect();
+        }
+
+        return results;
+    }
+
     processRedditResults(children, resultsArray) {
         children.forEach(post => {
             const data = post.data;
             if (data.author === 'AutoModerator' || data.over_18) return;
+
+            // Safety Guard: Block explicitly non-business subreddits
+            if (this.blacklistSubreddits.some(s => data.subreddit.toLowerCase() === s.toLowerCase())) {
+                console.log(`🛡️ Blacklist Void: Skipping post from r/${data.subreddit}`);
+                return;
+            }
 
             resultsArray.push({
                 platform: 'reddit',
@@ -228,7 +310,7 @@ class MarketVibeSentinel {
         // 🏥 Professional & Local Services (Medical/Legal/Agency)
         if (/\b(clinic|doctor|dentist|patient|receptionist|medical|surgeon|hospital)\b/i.test(textLower)) return 'Medical/Professional Service';
         if (/\b(lawyer|attorney|legal|consultant|advisor)\b/i.test(textLower)) return 'Consulting/Professional Service';
-        if (/\b(marketing|agency|smma|outreach|ad management|clients)\b/i.test(textLower)) return 'Marketing/Service Agency';
+        if (/\b(smma|ad management|lead lead gen|appointment setter|cold outreach agency|ppc agency)\b/i.test(textLower)) return 'Marketing/Service Agency';
 
         // 🛠️ Productivity & Utilities
         if (/\b(clipboard|workflow|productivity|task|calendar|notes|todo|organize|system tray|windows app|mac app|desktop app|utility)\b/i.test(textLower)) return 'Productivity Tool';
@@ -319,6 +401,16 @@ class MarketVibeSentinel {
                     "not converting is a grind. usually it's a data gap between the offer and the audience imo."
                 ],
                 supportOpener: "troubleshooting a live funnel is a high-stress move. rooting for you to find the leak honestly."
+            },
+            {
+                keywords: ['\broast my pitch\b', '\bpitch feedback\b', '\bcold dm roast\b', '\boutreach roast\b', '\bnot working\b', '\bignored\b'],
+                type: 'roasting',
+                openers: [
+                    "honestly, most cold outreach fails because it sounds like a bot. a brutal roast usually fixes the psychology behind it.",
+                    "saw you're looking for feedback on your outreach. the line between 'valuable' and 'spam' is thin - usually comes down to the subtext.",
+                    "getting ignored is a data point. usually means the offer-to-bandwidth ratio is off."
+                ],
+                supportOpener: "outreach is 90% psychology and 10% copy. roasting the pitch is the best way to see the blind spots."
             }
         ];
 
@@ -391,26 +483,32 @@ class MarketVibeSentinel {
     generateDraftReply(lead, report) {
         const intent = this.detectIntent(lead.post_content, 'reddit');
         const niche = this.detectNiche(lead.post_content);
-        // Force production domain for outreach
-        const SITE_URL = 'https://marketvibe1.com';
 
-        // 🛡️ HUMANIZED REDDIT STRATEGY: Link-less 80% of the time to build karma/trust
+        // --- DUAL-FUNNEL LOGIC ---
+        const MARKETVIBE_URL = 'https://marketvibe1.com';
+        const STUDIO_URL = 'https://marketvibe1.com'; // Standardized to primary domain
+
+        const needsScaling = lead.post_content.toLowerCase().match(/customer|sale|outreach|growth|revenue|closing|leads/i);
+        const PRIMARY_URL = needsScaling ? STUDIO_URL : MARKETVIBE_URL;
+
+        // 🛡️ HUMANIZED REDDIT STRATEGY: Link-less 50% of the time (up from 20%)
         const roll = Math.random();
 
-        if (roll < 0.8) {
+        if (roll < 0.5) {
             // "Conversation Starters" - Pure Value
             const valueTemplates = [
-                `hey @${lead.username}, ${intent.opener} i actually pulled some growth data for ${niche} concepts recently. the ${report.targetAudience.primarySegment} segment looks like the lowest hanging fruit. would you be interested in the full revenue forecast breakdown?`,
-                `hi @${lead.username}, ${intent.opener} the ${niche} trends are looking pretty bullish right now tbh. i mapped out a quick 30-day execution plan for a similar concept - lmk if you want me to send it over.`,
-                `tagging @${lead.username} because i love this idea. ${intent.opener} i'm seeing some interesting signals in the ${niche} market that most people miss. i have the TAM/SAM numbers if you want to see them?`,
-                `saw your post @${lead.username}. if you're navigating the ${niche} market, i've got a free toolkit for mapping out market limits. happy to share the link if it helps with your research.`
+                `hey u/${lead.username}, ${intent.opener} i actually pulled some growth data for ${niche} concepts recently. the ${report.targetAudience.primarySegment} segment looks like the lowest hanging fruit. would you be interested in the full revenue forecast breakdown?`,
+                `hi u/${lead.username}, ${intent.opener} the ${niche} trends are looking pretty bullish right now tbh. i mapped out a quick 30-day execution plan for a similar concept - lmk if you want me to send it over.`,
+                `tagging u/${lead.username} because i love this idea. ${intent.opener} i'm seeing some interesting signals in the ${niche} market that most people miss. i have the TAM/SAM numbers if you want to see them?`,
+                `saw your post u/${lead.username}. if you're navigating the ${niche} market, i've got a free toolkit for mapping out market limits. happy to share the link if it helps with your research.`
             ];
             return valueTemplates[Math.floor(Math.random() * valueTemplates.length)];
         } else {
             // "Soft CTA" - Link included but wrapped in context
             const softTemplates = [
-                `hey @${lead.username}, ${intent.opener} i was looking at ${niche} data earlier and the potential for ${report.targetAudience.primarySegment} is huge. i put the full revenue analysis in this research hub if you're interested: ${SITE_URL}/hub`,
-                `really solid play @${lead.username}. ${intent.opener} i actually built a free research tool for ${niche} founders to avoid the validation grind. you can run your concept through it here: ${SITE_URL}`
+                `hey u/${lead.username}, ${intent.opener} i was looking at ${niche} data earlier and the potential for ${report.targetAudience.primarySegment} is huge. i put the full analysis in our research hub if you're interested: ${PRIMARY_URL}`,
+                `really solid play u/${lead.username}. ${intent.opener} i actually built a free research tool for ${niche} founders to avoid the validation and growth grind. you can run your concept through it here: ${PRIMARY_URL}`,
+                `if you want a brutal AI reality check on your outreach message u/${lead.username}, i just launched a free pitch roaster that might help fix those response rates: ${STUDIO_URL}/roaster`
             ];
             return softTemplates[Math.floor(Math.random() * softTemplates.length)];
         }
@@ -427,6 +525,12 @@ class MarketVibeSentinel {
         if (hasQuestion && painSignals.some(s => textLower.includes(s))) {
             score += 5; // Massive boost for direct founder questions
             reasons.push("Direct Help Signal 🆘");
+        }
+
+        // 1b. ROASTING INTENT BOOST (+4)
+        if (textLower.match(/roast|pitch|feedback|ignored|improve/i)) {
+            score += 4;
+            reasons.push("Roasting Intent 🔥");
         }
 
         // 2. HIGH VALUE SIGNALS (+2)
@@ -489,25 +593,32 @@ class MarketVibeSentinel {
     generateTwitterReply(lead, report) {
         const intent = this.detectIntent(lead.post_content, 'twitter');
         const niche = this.detectNiche(lead.post_content);
-        const SITE_URL = 'https://marketvibe1.com';
+
+        // --- DUAL-FUNNEL LOGIC ---
+        const MARKETVIBE_URL = 'https://marketvibe1.com';
+        const STUDIO_URL = 'https://marketvibe1.com'; // Standardized to primary domain
+
+        const needsScaling = lead.post_content.toLowerCase().match(/customer|sale|outreach|growth|revenue|closing|leads/i);
+        const PRIMARY_URL = needsScaling ? STUDIO_URL : MARKETVIBE_URL;
 
         const twitterTemplates = [
-            `hey @${lead.username}, ${intent.opener} just saw some data for ${niche} and it looks like solid six-figure potential for ${report.targetAudience.primarySegment} tbh. data breakdown here: ${SITE_URL}`,
-            `@${lead.username} love the ${niche} play. i'm seeing huge yearly potential for ${report.targetAudience.primarySegment} right now imo. mapped it out here: ${SITE_URL}`,
-            `hey @${lead.username}, i noticed you're building in ${niche}. if you're looking for a name, i built an AI generator that just dropped some cool ones for this niche: ${SITE_URL}/tools/naming`,
-            `@${lead.username} if you're still mapping out the ${niche} market, i built a free TAM calculator that might save you some time: ${SITE_URL}/tools/market-size`,
-            `really interesting play @${lead.username}. tracking breakout momentum in the ${niche} space right now. check this out: ${SITE_URL}/newsroom`
+            `hey @${lead.username}, ${intent.opener} just saw some data for ${niche} and it looks like solid six-figure potential for ${report.targetAudience.primarySegment} tbh. data breakdown here: ${PRIMARY_URL}`,
+            `@${lead.username} love the ${niche} play. i'm seeing huge yearly potential for ${report.targetAudience.primarySegment} right now imo. mapped it out here: ${PRIMARY_URL}`,
+            `hey @${lead.username}, i noticed you're building in ${niche}. if you're looking for a name or growth plan, i built an AI toolkit for this niche: ${PRIMARY_URL}`,
+            `@${lead.username} if you're still mapping out the ${niche} market or looking for customers, i built a free tool that might save you some time: ${PRIMARY_URL}`,
+            `really interesting play @${lead.username}. tracking breakout momentum in the ${niche} space right now. check this out: ${PRIMARY_URL}`,
+            `@${lead.username} getting ignored? 🌶️ i built a free tool to ROAST your sales pitches and fix your response rates: ${STUDIO_URL}/roaster`
         ];
 
         // Contextual Tool Injection (Twitter) 🛠️
         if (lead.post_content.match(/name|naming|brand/i)) {
-            twitterTemplates.push(`@${lead.username} naming is tough. i built a free AI generator for ${niche} ventures if you want to try it: ${SITE_URL}/tools/naming`);
+            twitterTemplates.push(`@${lead.username} naming is tough. i built a free AI generator for ${niche} ventures if you want to try it: ${MARKETVIBE_URL}/tools/naming`);
         }
         if (lead.post_content.match(/market size|tam|investor|pitch/i)) {
-            twitterTemplates.push(`@${lead.username} if you're pitching this, i built a free TAM calculator that maps out the ${niche} market: ${SITE_URL}/tools/market-size`);
+            twitterTemplates.push(`@${lead.username} if you're pitching this, i built a free TAM calculator that maps out the ${niche} market: ${MARKETVIBE_URL}/tools/market-size`);
         }
         if (lead.post_content.match(/trend|demand|growing|popular/i)) {
-            twitterTemplates.push(`@${lead.username} tracking breakout momentum in ${niche} right now. check out these live signals: ${SITE_URL}/newsroom`);
+            twitterTemplates.push(`@${lead.username} tracking breakout momentum in ${niche} right now. check out these live signals: ${MARKETVIBE_URL}/newsroom`);
         }
 
         return twitterTemplates[Math.floor(Math.random() * twitterTemplates.length)];
@@ -526,14 +637,5 @@ if (isDirectRun) {
     const isOnce = process.argv.includes('--once');
     console.log(`🚀 Running Sentinel directly${isOnce ? ' (Once mode)' : ''}...`);
     const sentinel = new MarketVibeSentinel();
-    if (isOnce) {
-        sentinel.runCycle();
-    } else {
-        // Normal continuous mode (Loop every 5 minutes for higher volume)
-        console.log("🔄 Starting Continuous Sentinel Mode (5m Interval)...");
-        sentinel.runCycle(); // Run immediately first
-        setInterval(() => {
-            sentinel.runCycle();
-        }, 5 * 60 * 1000);
-    }
+    sentinel.runCycle();
 }

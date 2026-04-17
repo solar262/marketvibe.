@@ -32,11 +32,11 @@ async function processLeads(leads) {
         let newStatus = 'pending';
         let actionMsg = '';
 
-        if (score >= 8) {
+        if (score >= 7) {
             // 🔥 TIER 1: HIGH INTENT (Auto-pilot)
             newStatus = 'contacted';
             actionMsg = "💎 AUTO-DISPATCH: High-intent lead promoted to 'contacted'.";
-        } else if (score >= 6) {
+        } else if (score >= 5) {
             // 🚥 TIER 2: MID INTENT (HITL Review)
             newStatus = 'shadow_pending';
             actionMsg = "🚥 HITL: Mid-intent lead promoted to 'shadow_pending' for review.";

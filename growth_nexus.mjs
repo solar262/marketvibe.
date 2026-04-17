@@ -14,7 +14,7 @@ import { runTrendAudit } from './trend_agent.mjs';
 import { runSocialAutopilot } from './social_poster.mjs';
 import { selectScript } from './src/lib/dm_scripts.js';
 
-dotenv.config();
+dotenv.config({ path: new URL('./.env', import.meta.url) });
 
 const supabase = createClient(
     process.env.VITE_SUPABASE_URL,
@@ -73,7 +73,7 @@ async function runMasterCycle() {
             console.log(`🎯 Identified ${sweepLeads.length} high-intent targets.`);
 
             for (const lead of sweepLeads) {
-                const dmContent = selectScript(lead);
+                const dmContent = await selectScript(lead);
 
                 await supabase
                     .from('growth_leads')

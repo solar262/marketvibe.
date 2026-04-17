@@ -18,23 +18,24 @@ import fs from 'fs';
 
 // ── CONFIG ──────────────────────────────────────────────────────────────────
 const CONFIG = {
-    followsPerRun: 10,       // profiles to follow per run
-    repliesPerRun: 2,        // tweets to reply to per run (keep low)
-    minDelay: 3000,
-    maxDelay: 7000,
+    followsPerRun: 4,        // SAFE: keep low to avoid X lockouts
+    repliesPerRun: 2,        // ENABLED: limited for safety
+    minDelay: 8000,          // slower = safer
+    maxDelay: 18000,
 
     searchTerms: [
-        'angel investor deal flow',
-        'micro VC startup investing',
-        'angel investor SaaS',
-        'early stage investor startup',
-        'pre-seed investor founder',
+        'building a micro saas',
+        'just launched my saas',
+        'building in public saas',
+        'indie hacker saas validation',
+        'first customer micro saas',
     ],
 
     replyTemplates: [
-        `Interesting take on deal flow. We built a private feed of 500+ validated startups for angels — full market data included. marketvibe1.com/investors`,
-        `This is exactly why we built MarketVibe Investor Access — validated deal flow with revenue forecasts before public launch. marketvibe1.com/investors`,
-        `Great point. For angels looking for early validated deals — we just launched a private feed at marketvibe1.com/investors 🚀`,
+        `Love this! If you're navigating the Micro-SaaS market, validation is key. Pulled some signals on similar niches at marketvibe1.com 🚀`,
+        `This is exactly why validating early saves months. If you're ready to SCALE this and get customers autonomously, check out our new studio: outreach-dashboard-1.onrender.com`,
+        `Great stuff. Market validation is the hardest part, but closing leads is the goal. We just launched an autonomous outreach engine at outreach-dashboard-1.onrender.com if you want to skip the grind.`,
+        `🌶️ Most cold DMs suck. If you're getting ignored, try running your pitch through our free AI Roaster: outreach-dashboard-1.onrender.com/roaster`
     ],
 
     logFile: './public/twitter_bot_log.json',
@@ -58,10 +59,12 @@ function log(message, data = {}) {
     } catch { }
 }
 
+const edgeDebugPort = process.env.EDGE_DEBUG_PORT || 9222;
+
 // ── CONNECT TO EDGE ──────────────────────────────────────────────────────────
 async function connectToEdge() {
     try {
-        const resp = await fetch(`http://127.0.0.1:${CONFIG.edgeDebugPort}/json/version`);
+        const resp = await fetch(`http://127.0.0.1:${edgeDebugPort}/json/version`);
         const data = await resp.json();
         if (!data.webSocketDebuggerUrl) throw new Error('No debugger URL');
         const browser = await puppeteer.connect({
@@ -72,7 +75,7 @@ async function connectToEdge() {
         log('✅ Connected to Edge browser');
         return browser;
     } catch (e) {
-        log(`❌ Cannot connect to Edge on port ${CONFIG.edgeDebugPort}.`);
+        log(`❌ Cannot connect to Edge on port ${edgeDebugPort}.`);
         log('   Make sure Edge is running with: --remote-debugging-port=9222');
         log('   (Same setup as the Reddit bot)');
         return null; // Return null instead of exiting
@@ -80,16 +83,66 @@ async function connectToEdge() {
 }
 
 // ── REPLY TO LATEST TWEET ────────────────────────────────────────────────────
-// ── SEND NEW TWEET ──────────────────────────────────────────────────────────
-export async function sendTweet(text) {
+async function replyToLatestTweet(page, text) {
+    try {
+        log('👀 Looking for latest tweet to reply to...');
+
+        // Wait for tweets to load on the profile
+        await page.waitForSelector('[data-testid="tweet"]', { timeout: 15000 }).catch(() => null);
+
+        // Find the first reply button (which is usually on the latest tweet)
+        const replyClicked = await page.evaluate(() => {
+            const replyBtns = Array.from(document.querySelectorAll('[data-testid="reply"]'));
+            if (replyBtns.length > 0) {
+                // Click the first one
+                replyBtns[0].click();
+                return true;
+            }
+            return false;
+        });
+
+        if (!replyClicked) {
+            log('⚠️ No tweet found to reply to.');
+            return false;
+        }
+
+        // Wait for the modal composer to pop up
+        log('⌨️ Waiting for reply modal...');
+        const textBoxSelector = '[data-testid="tweetTextarea_0"]';
+        await page.waitForSelector(textBoxSelector, { timeout: 10000 });
+
+        log('📝 Typing reply...');
+        await page.click(textBoxSelector);
+        await sleep(500);
+        // Use execCommand so React doesn't double-fire on each keypress
+        await page.evaluate((t) => {
+            document.execCommand('insertText', false, t);
+        }, text);
+        await sleep(1000);
+
+        log('🔘 Clicking reply button...');
+        const tweetBtnSelector = '[data-testid="tweetButton"]';
+        await page.click(tweetBtnSelector);
+
+        log('⏳ Waiting for confirmation...');
+        await sleep(4000); // Wait for send
+        return true;
+    } catch (err) {
+        log(`❌ Reply failed: ${err.message}`);
+        return false;
+    }
+}
+
+// ── REPLY TO SPECIFIC TWEET ID ──────────────────────────────────────────────
+export async function replyToTweetById(tweetId, text) {
     let browser = null;
     try {
         browser = await connectToEdge();
         if (!browser) return false;
         const page = await browser.newPage();
 
-        log('🐦 Opening Twitter composer...');
-        await page.goto('https://x.com/compose/tweet', { waitUntil: 'domcontentloaded' });
+        log(`🐦 Opening Tweet ${tweetId} to reply...`);
+        await page.goto(`https://x.com/any/status/${tweetId}`, { waitUntil: 'domcontentloaded' });
         await sleep(6000);
 
         // Check for login
@@ -99,29 +152,47 @@ export async function sendTweet(text) {
             return false;
         }
 
-        log('⌨️ Waiting for text area...');
-        const textBoxSelector = '[data-testid="tweetTextarea_0"]';
-        await page.waitForSelector(textBoxSelector, { timeout: 15000 });
+        // Click reply button first to open composer
+        const replyClicked = await page.evaluate(() => {
+            const btn = document.querySelector('[data-testid="reply"]');
+            if (btn) { btn.click(); return true; }
+            return false;
+        });
 
-        log('📝 Typing tweet...');
-        await page.click(textBoxSelector);
-        await page.keyboard.type(text, { delay: 50 });
+        if (!replyClicked) {
+            log('⚠️ Reply button not found (Post may be deleted or locked)');
+            await page.close();
+            return false;
+        }
+
         await sleep(2000);
 
-        log('🔘 Clicking tweet button...');
+        log('⌨️ Waiting for text area...');
+        const textBoxSelector = '[data-testid="tweetTextarea_0"]';
+        await page.waitForSelector(textBoxSelector, { timeout: 10000 });
+
+        log('📝 Typing reply...');
+        await page.click(textBoxSelector);
+        await sleep(500);
+        await page.evaluate((t) => {
+            document.execCommand('insertText', false, t);
+        }, text);
+        await sleep(2000);
+
+        log('🔘 Clicking reply button...');
         const tweetBtnSelector = '[data-testid="tweetButton"]';
         await page.click(tweetBtnSelector);
 
         log('⏳ Waiting for confirmation...');
-        await sleep(6000); // Wait for send
+        await sleep(6000);
 
-        log(`✅ Tweet sent: "${text}"`);
+        log(`✅ Replied to Tweet ${tweetId}`);
         await page.close();
         browser.disconnect();
         return true;
 
     } catch (err) {
-        log(`❌ Tweet failed: ${err.message}`);
+        log(`❌ Direct reply failed: ${err.message}`);
         if (browser) browser.disconnect();
         return false;
     }
@@ -246,7 +317,7 @@ async function runTwitterGrowthBot() {
 
 // ── SCHEDULER ────────────────────────────────────────────────────────────────
 async function runScheduled() {
-    const INTERVAL_HOURS = 6;
+    const INTERVAL_HOURS = 12;  // 12h gap — much safer than 6h
     log(`📅 Scheduled mode — running every ${INTERVAL_HOURS} hours`);
     while (true) {
         await runTwitterGrowthBot();

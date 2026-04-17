@@ -55,20 +55,6 @@
     }
   </script>
 
-  <!-- Open Graph / Facebook -->
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://www.marketvibe1.com/">
-  <meta property="og:title" content="I just validated a 1.2M idea on MarketVibe 🚀">
-  <meta property="og:description" content="Get your free revenue forecast and 30-day execution blueprint in minutes.">
-  <meta property="og:image" content="https://www.marketvibe1.com/og-preview.png">
-
-  <!-- Twitter -->
-  <meta property="twitter:card" content="summary_large_image">
-  <meta property="twitter:url" content="https://www.marketvibe1.com/">
-  <meta property="twitter:title" content="I just validated a 1.2M idea on MarketVibe 🚀">
-  <meta property="twitter:description" content="Get your free revenue forecast and 30-day blueprint.">
-  <meta property="twitter:image" content="https://www.marketvibe1.com/og-preview.png">
-
   <!-- Google AdSense -->
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1690496065763879"
     crossorigin="anonymous"></script>
@@ -80,46 +66,80 @@
     #__next-vercel-toolbar,
     [data-vercel-toolbar],
     [data-vercel-edit-mode],
-    .vercel-toolbar-root-container {
+    .vercel-toolbar-root-container,
+    div[class*="vercel-toolbar"],
+    vercel-live-feedback,
+    #vercel-live-feedback,
+    [id*="vercel"],
+    [class*="VercelToolbar"] {
       display: none !important;
       visibility: hidden !important;
       opacity: 0 !important;
       pointer-events: none !important;
+      height: 0 !important;
+      width: 0 !important;
+      overflow: hidden !important;
+      position: absolute !important;
+      left: -9999px !important;
+      z-index: -9999 !important;
     }
   </style>
   <script>
-    // DEFENSIVE MANEUVER: Kill Vercel Toolbar on sight
+    // NUCLEAR MANEUVER: Kill Vercel Toolbar & Feedback Widgets
     (function() {
+      const selectors = [
+        '#vercel-speed-insights-widget',
+        '.vercel-toolbar-root',
+        '#__next-vercel-toolbar',
+        '[data-vercel-toolbar]',
+        '[data-vercel-edit-mode]',
+        '.vercel-toolbar-root-container',
+        'vercel-live-feedback',
+        '#vercel-live-feedback'
+      ];
+
       const kill = () => {
-        const selectors = [
-          '#vercel-speed-insights-widget',
-          '.vercel-toolbar-root',
-          '#__next-vercel-toolbar',
-          '[data-vercel-toolbar]',
-          '[data-vercel-edit-mode]',
-          '.vercel-toolbar-root-container'
-        ];
+        // 1. Selector-based kill
         selectors.forEach(s => {
           document.querySelectorAll(s).forEach(el => el.remove());
         });
+        
+        // 2. Attribute-based kill
+        document.querySelectorAll('[id*="vercel"], [class*="vercel"], [data-vercel-toolbar]').forEach(el => {
+          el.remove();
+        });
+
+        // 3. Shadow DOM Deep Scan
+        const allElements = document.querySelectorAll('*');
+        allElements.forEach(el => {
+          if (el.shadowRoot) {
+            const vercelInShadow = el.shadowRoot.querySelectorAll('[id*="vercel"], [class*="vercel"]');
+            if (vercelInShadow.length > 0) el.remove();
+          }
+        });
+
+        // 4. Global Variable Wipe
+        window.__VERCEL_TOOLBAR = undefined;
+        window.__VERCEL_LIVE_FEEDBACK = undefined;
       };
       
       // Run immediately
       kill();
       
-      // Watch for dynamic injection (Observer pattern)
-      const observer = new MutationObserver((mutations) => {
-        kill();
-      });
-      
+      // High-frequency Observer
+      const observer = new MutationObserver(kill);
       observer.observe(document.documentElement, {
         childList: true,
         subtree: true
       });
       
-      // Safety timeout
-      setTimeout(kill, 1000);
-      setTimeout(kill, 3000);
+      // Aggressive interval for the first 10 seconds
+      const fastInterval = setInterval(kill, 100);
+      setTimeout(() => {
+        clearInterval(fastInterval);
+        // Permanent fallback interval
+        setInterval(kill, 1000);
+      }, 10000);
     })();
   </script>
 </head>

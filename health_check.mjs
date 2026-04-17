@@ -7,7 +7,7 @@ import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import { Resend } from 'resend';
 
-dotenv.config();
+dotenv.config({ path: 'c:/Users/qwerty/Desktop/prototype/.env' });
 
 const supabase = createClient(
     process.env.VITE_SUPABASE_URL,

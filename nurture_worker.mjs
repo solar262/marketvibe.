@@ -36,6 +36,28 @@ You have the ${name} idea. You have the revenue forecast. Now you just need the 
 We've helped 100+ founders skip the guesswork. Grab your blueprint before the lifetime deal expires!
 
 ${SITE_URL}`
+    },
+    {
+        step: 3,
+        delayHours: 48,
+        subject: "From Validation to Closing (The missing link) 📲",
+        template: (name) => `Hey again! You validated ${name} on MarketVibe... but are you actually getting customers yet?
+
+Most founders get stuck here. That's why we launched the AI Outreach Studio.
+
+It's an autonomous sales engine that finds, analyzes, and closes leads for you while you sleep. Use the blueprint you got from MarketVibe and feed it into the Studio.
+
+Check out the new engine here: ${SITE_URL}`
+    },
+    {
+        step: 4,
+        delayHours: 72,
+        subject: 'The "Customer Problem" solved. 🤖',
+        template: (name) => `Still struggling to get your first 10 customers for ${name}?
+
+Stop manual outreach. Our autonomous studio is now live and handles the entire LinkedIn/Twitter/Reddit conversion funnel for you.
+
+See it in action: ${SITE_URL}`
     }
 ];
 

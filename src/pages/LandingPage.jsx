@@ -127,22 +127,56 @@ const LandingPage = () => {
                 {/* Main Content Area (70%) */}
                 <main className="mag-main">
                     <div style={{ marginBottom: '3rem' }}>
-                        <h1 style={{ 
-                            fontFamily: 'var(--font-display)',
-                            fontSize: 'clamp(2.5rem, 6vw, 4.2rem)', 
-                            fontWeight: '900', 
-                            color: 'var(--text)', 
-                            letterSpacing: '-0.04em', 
-                            lineHeight: '1.05', 
-                            marginBottom: '1.5rem' 
-                        }}>
-                           The Data-First <br/>
-                           <span style={{ color: 'var(--primary)' }}>Founder's Intelligence.</span>
-                        </h1>
-                        <p style={{ fontSize: '1.25rem', color: 'var(--text-dim)', marginBottom: '0', maxWidth: '650px', lineHeight: '1.6', fontWeight: '500' }}>
-                            Daily signal detection for high-velocity software markets. <br/>
-                            We validate the ideas so you can build the revenue.
-                        </p>
+                        {/* MAIN HERO SECTION */}
+                <div style={{ padding: '4rem 0', textAlign: 'center' }}>
+                    <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        background: 'rgba(99, 102, 241, 0.1)',
+                        padding: '0.5rem 1rem',
+                        borderRadius: '2rem',
+                        color: 'var(--primary)',
+                        fontSize: '0.85rem',
+                        fontWeight: '700',
+                        marginBottom: '1.5rem',
+                        border: '1px solid rgba(99, 102, 241, 0.2)'
+                    }}>
+                        <span style={{ fontSize: '1rem' }}>✨</span> THE ULTIMATE FOUNDER'S TOOLKIT
+                    </div>
+                    <h1 style={{
+                        fontSize: 'clamp(2.5rem, 8vw, 4.5rem)',
+                        lineHeight: '1.1',
+                        letterSpacing: '-0.02em',
+                        marginBottom: '1.5rem',
+                        fontWeight: '800'
+                    }}>
+                        Validate Your <br />
+                        <span style={{
+                            background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                        }}>Startup Idea With AI.</span>
+                    </h1>
+                    <p style={{
+                        fontSize: 'clamp(1.1rem, 2vw, 1.25rem)',
+                        color: 'var(--text-muted)',
+                        maxWidth: '700px',
+                        margin: '0 auto 3rem',
+                        lineHeight: '1.6'
+                    }}>
+                        Stop guessing and start building. MarketVibe provides data-driven revenue forecasts, competitor intelligence, and 30-day execution plans in seconds.
+                    </p>
+
+                    <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                        <a href="/validate" onClick={(e) => { e.preventDefault(); onNavigate('setup'); }} className="btn-primary" style={{ padding: '1rem 2rem', fontSize: '1.1rem' }}>
+                            Validate My Idea →
+                        </a>
+                        <a href="/blog" onClick={(e) => { e.preventDefault(); onNavigate('blog-index'); }} className="btn-secondary" style={{ padding: '1rem 2rem', fontSize: '1.1rem' }}>
+                            Explore Market Analysis
+                        </a>
+                    </div>
+                </div>
                     </div>
 
                     {/* Market Velocity Ticker */}
