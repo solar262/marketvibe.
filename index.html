@@ -5,7 +5,8 @@
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/vite.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="impact-site-verification" value="29b4920b-398c-43ef-83f2-5fb67c6166bb" content="29b4920b-398c-43ef-83f2-5fb67c6166bb">
+  <meta name="impact-site-verification" value="29b4920b-398c-43ef-83f2-5fb67c6166bb"
+    content="29b4920b-398c-43ef-83f2-5fb67c6166bb">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <title>MarketVibe | AI Startup Validation & Revenue Forecasting</title>
   <meta name="description"
@@ -72,7 +73,7 @@
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1690496065763879"
     crossorigin="anonymous"></script>
 
-  <!-- Hide Vercel Development Toolbar -->
+  <!-- Kill Vercel Development Toolbar -->
   <style>
     #vercel-speed-insights-widget,
     .vercel-toolbar-root,
@@ -86,6 +87,41 @@
       pointer-events: none !important;
     }
   </style>
+  <script>
+    // DEFENSIVE MANEUVER: Kill Vercel Toolbar on sight
+    (function() {
+      const kill = () => {
+        const selectors = [
+          '#vercel-speed-insights-widget',
+          '.vercel-toolbar-root',
+          '#__next-vercel-toolbar',
+          '[data-vercel-toolbar]',
+          '[data-vercel-edit-mode]',
+          '.vercel-toolbar-root-container'
+        ];
+        selectors.forEach(s => {
+          document.querySelectorAll(s).forEach(el => el.remove());
+        });
+      };
+      
+      // Run immediately
+      kill();
+      
+      // Watch for dynamic injection (Observer pattern)
+      const observer = new MutationObserver((mutations) => {
+        kill();
+      });
+      
+      observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true
+      });
+      
+      // Safety timeout
+      setTimeout(kill, 1000);
+      setTimeout(kill, 3000);
+    })();
+  </script>
 </head>
 
 <body>
