@@ -6,19 +6,18 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-import { sendTweet } from '../../twitter_growth_bot.mjs';
+import { replyToTweetById } from '../../twitter_growth_bot.mjs';
 
-export const postTwitterReply = async (content) => {
+export const postTwitterReply = async (content, tweetId = null) => {
     try {
-        console.log(`📡 Twitter Herald: Posting via Browser Automation...`);
-
-        const success = await sendTweet(content);
-
-        if (success) {
-            return { success: true };
-        } else {
-            return { success: false, error: 'BROWSER_AUTOMATION_FAILED' };
+        if (tweetId) {
+            console.log(`📡 Twitter Herald: Posting direct reply to ${tweetId}...`);
+            const success = await replyToTweetById(tweetId, content);
+            return success ? { success: true } : { success: false, error: 'DIRECT_REPLY_FAILED' };
         }
+
+        console.log(`📡 Twitter Herald: No tweetId provided. Skipping...`);
+        return { success: false, error: 'MISSING_TWEET_ID' };
 
     } catch (err) {
         console.error('❌ Twitter Herald Error:', err.message);

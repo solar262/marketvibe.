@@ -1,72 +1,16 @@
 [
   {
-    "niche": "AI/Automation Agent",
-    "volume": 134,
-    "velocity": 134,
-    "avgInterest": "6.5",
-    "heatScore": 408.53731343283584
-  },
-  {
-    "niche": "Indie Project",
-    "volume": 123,
-    "velocity": 123,
-    "avgInterest": "5.6",
-    "heatScore": 374.5772357723577
-  },
-  {
-    "niche": "AI Agent",
-    "volume": 116,
-    "velocity": 116,
-    "avgInterest": "5.0",
-    "heatScore": 353
-  },
-  {
-    "niche": "SaaS / Micro-SaaS",
-    "volume": 99,
-    "velocity": 99,
-    "avgInterest": "7.0",
-    "heatScore": 304.030303030303
-  },
-  {
-    "niche": "Streaming & Content Creation",
-    "volume": 94,
-    "velocity": 94,
-    "avgInterest": "6.3",
-    "heatScore": 288.3404255319149
-  },
-  {
-    "niche": "Home Improvement",
-    "volume": 87,
-    "velocity": 87,
-    "avgInterest": "6.1",
-    "heatScore": 267.11494252873564
-  },
-  {
-    "niche": "Fintech",
-    "volume": 57,
-    "velocity": 57,
-    "avgInterest": "6.6",
-    "heatScore": 177.59649122807016
-  },
-  {
-    "niche": "Marketing Agency",
-    "volume": 41,
-    "velocity": 41,
-    "avgInterest": "7.0",
-    "heatScore": 129.9512195121951
-  },
-  {
-    "niche": "Pet Tech",
-    "volume": 39,
-    "velocity": 39,
+    "niche": "High-Value Wellness (Cleaning)",
+    "volume": 12,
+    "velocity": 124,
     "avgInterest": "5.5",
-    "heatScore": 122.46153846153847
+    "heatScore": 91.9310344
   },
   {
-    "niche": "Service Business (Cleaning)",
-    "volume": 31,
-    "velocity": 31,
-    "avgInterest": "6.2",
-    "heatScore": 99.2258064516129
+    "niche": "Education/Training",
+    "volume": 8,
+    "velocity": 85,
+    "avgInterest": "4.2",
+    "heatScore": 72.5
   }
 ]

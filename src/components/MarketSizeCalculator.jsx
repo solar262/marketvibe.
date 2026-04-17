@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import AdSenseUnit from './AdSenseUnit';
 
 const MarketSizeCalculator = () => {
     const [tam, setTam] = useState(1000000);
@@ -77,6 +78,8 @@ const MarketSizeCalculator = () => {
                         <p style={{ fontSize: '0.7rem', color: '#475569', marginTop: '0.5rem' }}>The realistic users you'll capture in Year 1.</p>
                     </div>
                 </div>
+
+                <AdSenseUnit style={{ marginBottom: '2rem' }} />
 
                 <div style={{ padding: '2rem', background: 'rgba(16, 185, 129, 0.05)', borderRadius: '1rem', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
                     <h4 style={{ color: '#10b981' }}>💡 MarketVibe Analysis</h4>

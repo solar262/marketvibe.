@@ -3,7 +3,9 @@
 // However, to fix the "Blank Screen" (likely caused by Node.js library incompatibilities),
 // we are switching to a direct fetch call to the Resend API.
 
-const apiKey = import.meta.env.VITE_RESEND_API_KEY;
+const apiKey = (typeof process !== 'undefined' && process.env.VITE_RESEND_API_KEY) || 
+               (import.meta.env && import.meta.env.VITE_RESEND_API_KEY);
+
 
 export const sendWelcomeEmail = async (email) => {
     if (!apiKey) {

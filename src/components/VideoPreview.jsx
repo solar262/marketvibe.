@@ -183,25 +183,40 @@ const VideoPreview = () => {
                 else if (phase === 'conclusion') {
                     ctx.textAlign = 'center';
                     ctx.fillStyle = '#ffffff';
-                    ctx.font = 'bold 64px sans-serif';
-                    ctx.fillText('Build your empire.', 640, 280);
+                    ctx.font = 'bold 54px sans-serif';
+                    ctx.fillText('Go from Validation to Closing.', 640, 260);
 
                     ctx.fillStyle = '#94a3b8';
-                    ctx.font = '24px sans-serif';
-                    ctx.fillText('Get the full founder playbook at:', 640, 350);
+                    ctx.font = '22px sans-serif';
+                    ctx.fillText('Built with AI Outreach Studio & MarketVibe', 640, 320);
 
-                    // URL Box
+                    // URL Box 1: MarketVibe
                     ctx.fillStyle = 'rgba(99, 102, 241, 0.1)';
                     ctx.beginPath();
-                    ctx.roundRect(340, 400, 600, 110, 24);
+                    ctx.roundRect(140, 380, 480, 80, 16);
                     ctx.fill();
-                    ctx.lineWidth = 4;
                     ctx.strokeStyle = '#6366f1';
                     ctx.stroke();
-
                     ctx.fillStyle = '#ffffff';
-                    ctx.font = 'bold 55px sans-serif';
-                    ctx.fillText('marketvibe1.com', 640, 465);
+                    ctx.font = 'bold 35px sans-serif';
+                    ctx.fillText('marketvibe1.com', 380, 425);
+                    ctx.font = '16px sans-serif';
+                    ctx.fillStyle = '#94a3b8';
+                    ctx.fillText('VALIDATE IDEAS', 380, 450);
+
+                    // URL Box 2: Outreach Studio
+                    ctx.fillStyle = 'rgba(168, 85, 247, 0.1)';
+                    ctx.beginPath();
+                    ctx.roundRect(660, 380, 480, 80, 16);
+                    ctx.fill();
+                    ctx.strokeStyle = '#a855f7';
+                    ctx.stroke();
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 35px sans-serif';
+                    ctx.fillText('outreachstudio.ai', 900, 425);
+                    ctx.font = '16px sans-serif';
+                    ctx.fillStyle = '#94a3b8';
+                    ctx.fillText('GET CUSTOMERS', 900, 450);
                 }
 
                 framesCaptured++;

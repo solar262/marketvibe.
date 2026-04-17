@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Link } from 'react-router-dom';
+import AdSenseUnit from './AdSenseUnit';
 
 const CaseStudyHub = () => {
     const [cases, setCases] = useState([]);
@@ -51,6 +52,8 @@ const CaseStudyHub = () => {
                         Real ideas, real data. Explore how founders are using MarketVibe to validate their next move.
                     </p>
                 </div>
+
+                <AdSenseUnit style={{ marginBottom: '3rem' }} />
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '2rem' }}>
                     {cases.map((c, idx) => (

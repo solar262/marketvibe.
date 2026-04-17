@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { popularNiches } from '../lib/niches';
+import AdSenseUnit from './AdSenseUnit';
 
 const IntelligenceFeed = () => {
     const feeds = [
@@ -89,6 +90,8 @@ const Library = ({ onSelectNiche }) => {
                     Browse through hundreds of AI-generated market blueprints. Each industry is analyzed for entry barriers, revenue potential, and execution risk.
                 </p>
             </div>
+
+            <AdSenseUnit style={{ marginBottom: '2rem' }} />
 
             {/* Search & Filter Bar */}
             <div style={{

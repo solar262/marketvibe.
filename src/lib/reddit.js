@@ -49,6 +49,7 @@ async function connectToEdge() {
 export const postRedditReply = async (postId, content) => {
     let browser = null;
     let page = null;
+    let username = null;
 
     try {
         browser = await connectToEdge();
@@ -63,24 +64,60 @@ export const postRedditReply = async (postId, content) => {
 
         // Check login status
         console.log('Checking Reddit session...');
-        await page.goto('https://old.reddit.com/api/me.json', {
-            waitUntil: 'domcontentloaded',
-            timeout: 15000
-        });
-
-        const meText = await page.evaluate(() => document.body.innerText);
-        let username = null;
-
         try {
-            const me = JSON.parse(meText);
-            if (me?.data?.name) {
-                username = me.data.name;
-                console.log('Logged in as u/' + username);
-            }
-        } catch { }
+            await page.goto('https://old.reddit.com/', { waitUntil: 'domcontentloaded', timeout: 15000 });
 
-        if (!username) {
+            // Bypass cookie wall if present
+            await page.evaluate(() => {
+                const btn = document.querySelector('button.continue') || Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('CONTINUE'));
+                if (btn) btn.click();
+            }).catch(() => { });
+
+            await sleep(2000);
+
+            const loggedIn = await page.evaluate(() => {
+                const userLink = document.querySelector('.user a');
+                return userLink ? userLink.innerText.trim() : null;
+            });
+
+            if (loggedIn && !loggedIn.toLowerCase().includes('log in')) {
+                username = loggedIn;
+                console.log('Logged in as u/' + username);
+            } else {
+                // Secondary check via API
+                const resp = await page.goto('https://old.reddit.com/api/me.json', { timeout: 10000 });
+                const meText = await page.evaluate(() => document.body.innerText);
+                const me = JSON.parse(meText);
+                if (me?.data?.name) {
+                    username = me.data.name;
+                    console.log('Logged in as u/' + username + ' (via API)');
+                }
+            }
+        } catch (e) {
+            console.warn('Reddit session check failed:', e.message);
+        }
+
+        if (!username || username.toLowerCase().includes('log in')) {
+            console.log('🔄 Session missing or expired. Attempting automated login...');
+            const loginSuccess = await performRedditLogin(page);
+            if (loginSuccess) {
+                // Verify again on old.reddit.com
+                await page.goto('https://old.reddit.com/', { waitUntil: 'domcontentloaded', timeout: 15000 });
+                const verif = await page.evaluate(() => {
+                    const userLink = document.querySelector('.user a');
+                    return userLink ? userLink.innerText.trim() : null;
+                });
+                if (verif && !verif.toLowerCase().includes('log in')) {
+                    username = verif;
+                    console.log('✅ Automated login verified: u/' + username);
+                }
+            }
+        }
+
+        if (!username || username.toLowerCase().includes('log in')) {
             console.error('Not logged into Reddit in Edge.');
+            // Capture screenshot for debugging if possible
+            await page.screenshot({ path: 'reddit_login_error.png' }).catch(() => { });
             await page.close();
             browser.disconnect();
             return { success: false, error: 'MISSING_API_KEYS' };
@@ -109,6 +146,7 @@ export const postRedditReply = async (postId, content) => {
 
         await humanDelay(2000, 5000);
 
+        const hasCommentBox = await page.evaluate(() => { return !!document.querySelector('.usertext-edit textarea, textarea[name="text"]'); });
         if (!hasCommentBox) {
             console.error('No comment box found. Thread may be locked or deleted.');
             await page.close();
@@ -137,6 +175,28 @@ export const postRedditReply = async (postId, content) => {
         }
 
         await humanDelay(3000, 5000);
+
+        // Aggressively handle "are you sure? yes / no" confirmation prompt if it appears
+        const clickedYes = await page.evaluate(() => {
+            let found = false;
+            // Scan literally every A, BUTTON, or element with class .yes
+            const elements = document.querySelectorAll('a, button, .yes');
+            for (const el of elements) {
+                if (el.innerText && el.innerText.trim().toLowerCase() === 'yes') {
+                    el.click();
+                    found = true;
+                }
+            }
+            return found;
+        });
+
+        if (clickedYes) {
+            console.log('🔥 Found and clicked a hidden "Yes" confirmation. Waiting for processing...');
+            await new Promise(r => setTimeout(r, 3000));
+        } else {
+            // Backup wait just in case
+            await new Promise(r => setTimeout(r, 1000));
+        }
 
         // Check for rate limit errors or submission failures
         const errors = await page.evaluate(() => {
@@ -173,3 +233,36 @@ export const postRedditReply = async (postId, content) => {
         return { success: false, error: errorCode, details: err.message };
     }
 };
+/**
+ * Perform automated login to Reddit
+ */
+async function performRedditLogin(page) {
+    const user = process.env.REDDIT_USERNAME;
+    const pass = process.env.REDDIT_PASSWORD;
+
+    if (!user || !pass) {
+        console.warn('⚠️ REDDIT_USERNAME or REDDIT_PASSWORD missing from .env');
+        return false;
+    }
+
+    try {
+        console.log('🔑 Navigating to Reddit login...');
+        await page.goto('https://old.reddit.com/login', { waitUntil: 'networkidle2', timeout: 30000 });
+
+        console.log('⌨️ Entering credentials...');
+        await page.type('#user_login', user, { delay: 100 });
+        await page.type('#passwd_login', pass, { delay: 100 });
+
+        await sleep(1000);
+
+        console.log('🔘 Submitting...');
+        await page.click('#login-form button[type="submit"]');
+
+        await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }).catch(() => { });
+
+        return true;
+    } catch (err) {
+        console.error('❌ Reddit Login Failed:', err.message);
+        return false;
+    }
+}

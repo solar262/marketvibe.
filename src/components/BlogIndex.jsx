@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import AdSenseUnit from './AdSenseUnit';
 
 const BlogIndex = () => {
     const [posts, setPosts] = useState([]);
@@ -39,6 +40,8 @@ const BlogIndex = () => {
                     Data-driven insights on the fastest growing niches in 2026.
                 </p>
             </div>
+
+            <AdSenseUnit style={{ marginBottom: '2rem' }} />
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
                 {posts.map((post, index) => {

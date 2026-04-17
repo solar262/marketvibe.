@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import AdSenseUnit from './AdSenseUnit';
 
 const NameGenerator = ({ onSelectName }) => {
     const [keywords, setKeywords] = useState('');
@@ -120,6 +121,8 @@ const NameGenerator = ({ onSelectName }) => {
                     {loading ? 'Thinking...' : 'Generate Names'}
                 </button>
             </form>
+
+            <AdSenseUnit style={{ marginBottom: '2rem' }} />
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 {names.map((name, index) => (

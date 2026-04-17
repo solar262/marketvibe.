@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-
+import AdSenseUnit from './AdSenseUnit';
 
 const BlogPost = () => {
     // Manual slug extraction since we are not using React Router's <Route>
@@ -170,9 +170,13 @@ const BlogPost = () => {
                 </div>
             </div>
 
+            <AdSenseUnit style={{ marginBottom: '2rem' }} />
+
             <div className="blog-content">
                 {renderContent(post.content)}
             </div>
+
+            <AdSenseUnit style={{ marginTop: '2rem' }} />
 
             {/* Permanent CTA Footer */}
             <div style={{ marginTop: '4rem', padding: '3rem', background: 'rgba(99, 102, 241, 0.1)', borderRadius: '1rem', border: '1px solid rgba(99, 102, 241, 0.3)', textAlign: 'center' }}>
