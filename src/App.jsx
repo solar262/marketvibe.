@@ -259,6 +259,44 @@ function App() {
     }
   }, [activePath])
 
+  // --- SEO: Dynamic Breadcrumb Schema ---
+  useEffect(() => {
+    const crumbs = [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.marketvibe1.com" }];
+    if (step !== 'landing') {
+        const labels = {
+            'blog-index': 'Intelligence Blog',
+            'blog-post': 'Analysis',
+            'newsroom': 'Newsroom',
+            'hub': 'Launchpad',
+            'launchpad': 'Launchpad',
+            'market-size': 'Market Size Calculator',
+            'tools-naming': 'Naming Engine',
+            'fulfillment': 'Business Report'
+        };
+        crumbs.push({ 
+            "@type": "ListItem", 
+            "position": 2, 
+            "name": labels[step] || step.charAt(0).toUpperCase() + step.slice(1), 
+            "item": `https://www.marketvibe1.com${window.location.pathname}`
+        });
+    }
+
+    const breadcrumbSchema = {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": crumbs
+    };
+
+    let script = document.getElementById('breadcrumb-schema');
+    if (!script) {
+        script = document.createElement('script');
+        script.id = 'breadcrumb-schema';
+        script.type = 'application/ld+json';
+        document.head.appendChild(script);
+    }
+    script.text = JSON.stringify(breadcrumbSchema);
+  }, [step]);
+
   const handleUnlock = async (plan = 'founder') => {
     if (!email) {
       window.dispatchEvent(new CustomEvent('mv_trigger_capture'));

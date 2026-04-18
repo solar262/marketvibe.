@@ -28,6 +28,32 @@ const NewsArticle = () => {
                 if (data) {
                     setStory(data);
                     document.title = `${data.title} | MarketVibe Tech News`;
+                    
+                    // --- SEO: JSON-LD NewsArticle Schema ---
+                    const schema = {
+                        "@context": "https://schema.org",
+                        "@type": "NewsArticle",
+                        "headline": data.title,
+                        "datePublished": new Date(data.time * 1000).toISOString(),
+                        "author": {
+                            "@type": "Person",
+                            "name": data.by || "MarketVibe Intelligence"
+                        },
+                        "publisher": {
+                            "@type": "Organization",
+                            "name": "MarketVibe",
+                            "logo": "https://www.marketvibe1.com/logo.svg"
+                        }
+                    };
+
+                    let script = document.getElementById('news-schema');
+                    if (!script) {
+                        script = document.createElement('script');
+                        script.id = 'news-schema';
+                        script.type = 'application/ld+json';
+                        document.head.appendChild(script);
+                    }
+                    script.text = JSON.stringify(schema);
                 }
                 setLoading(false);
             } catch (err) {
@@ -80,9 +106,20 @@ const NewsArticle = () => {
                         <AdSenseUnit />
                     </div>
 
+                    {/* google_ad_section_start */}
                     <p style={{ fontSize: '1.1rem', color: 'var(--text)', lineHeight: '1.7', marginBottom: '3rem' }}>
-                        MarketVibe scanners detected high activity related to <strong>{story.title}</strong>. This signal has reached a velocity score of {story.score}, making it a critical trend in the tech ecosystem. Read the full technical breakdown, comments, and details on the original source below.
+                        MarketVibe scanners detected high activity related to <strong>{story.title}</strong>. This signal has reached a velocity score of {story.score}, making it a critical trend in the tech ecosystem. 
                     </p>
+
+                    <div style={{ margin: '2rem 0', textAlign: 'center' }}>
+                        <div style={{ fontSize: '0.65rem', color: '#94a3b8', textTransform: 'uppercase', marginBottom: '1rem' }}>Trend Analysis Unit</div>
+                        <AdSenseUnit />
+                    </div>
+
+                    <p style={{ fontSize: '1.1rem', color: 'var(--text)', lineHeight: '1.7', marginBottom: '3rem' }}>
+                        Read the full technical breakdown, comments, and details on the original source below.
+                    </p>
+                    {/* google_ad_section_end */}
 
                     <div style={{ display: 'flex', justifyContent: 'center', marginTop: '2rem' }}>
                         <a 

@@ -1,0 +1,17 @@
+node_modules
+.bot_profile
+.social_profile
+.agent
+.vercel
+dist
+build_error.log
+*.png
+!public/*.png
+*.csv
+*.txt
+*.sql
+*.bat
+api/
+scripts/
+supabase/
+.env

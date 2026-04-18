@@ -16,8 +16,8 @@ const AdSenseUnit = ({ slot, style }) => {
     <ins className="adsbygoogle"
          style={{ display: 'block', ...style }}
          data-ad-client="ca-pub-1690496065763879"
-         data-ad-slot={slot || "YOUR_AD_SLOT"}
-         data-ad-format="auto"
+         data-ad-slot={slot || "3331191790"}
+         data-ad-format={format || "auto"}
          data-full-width-responsive="true"></ins>
   );
 };

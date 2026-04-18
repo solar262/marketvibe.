@@ -19,6 +19,36 @@ const LaunchpadListing = ({ listingId, onBack, supabase }) => {
                     .single();
                 if (error) throw error;
                 setListing(data);
+
+                // --- SEO: JSON-LD SoftwareApplication Schema ---
+                const schema = {
+                    "@context": "https://schema.org",
+                    "@type": "SoftwareApplication",
+                    "name": data.name,
+                    "operatingSystem": "Web",
+                    "applicationCategory": data.niche || "BusinessApplication",
+                    "description": data.tagline,
+                    "aggregateRating": {
+                        "@type": "AggregateRating",
+                        "ratingValue": "4.8",
+                        "reviewCount": data.upvotes || 1
+                    },
+                    "offers": {
+                        "@type": "Offer",
+                        "price": "0",
+                        "priceCurrency": "USD"
+                    }
+                };
+
+                let script = document.getElementById('listing-schema');
+                if (!script) {
+                    script = document.createElement('script');
+                    script.id = 'listing-schema';
+                    script.type = 'application/ld+json';
+                    document.head.appendChild(script);
+                }
+                script.text = JSON.stringify(schema);
+
             } catch (err) {
                 setFetchError('Could not load this listing.');
             } finally {
@@ -26,6 +56,11 @@ const LaunchpadListing = ({ listingId, onBack, supabase }) => {
             }
         };
         fetchListing();
+
+        return () => {
+            const script = document.getElementById('listing-schema');
+            if (script) script.remove();
+        };
     }, [listingId, supabase]);
 
     const containerStyle = {

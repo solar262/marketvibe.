@@ -29,6 +29,32 @@ const LaunchpadDirectory = ({ supabase }) => {
 
             if (!error && data) {
                 setListings(data);
+
+                // --- SEO: Dynamic Title & Meta ---
+                const count = data.length;
+                document.title = `${count}+ Verified Startup Ideas | Founder Launchpad`;
+                
+                const metaDesc = `Browse ${count} vetted startup ideas, SaaS prototypes, and validated niches. The definitive directory for the modern founder.`;
+                const metaEl = document.querySelector('meta[name="description"]');
+                if (metaEl) metaEl.setAttribute('content', metaDesc);
+
+                // --- SEO: CollectionPage Schema ---
+                const schema = {
+                    "@context": "https://schema.org",
+                    "@type": "CollectionPage",
+                    "name": "Founder Launchpad Directory",
+                    "description": metaDesc,
+                    "numberOfItems": count
+                };
+
+                let script = document.getElementById('launchpad-schema');
+                if (!script) {
+                    script = document.createElement('script');
+                    script.id = 'launchpad-schema';
+                    script.type = 'application/ld+json';
+                    document.head.appendChild(script);
+                }
+                script.text = JSON.stringify(schema);
             }
         } catch (err) {
             console.error('Error fetching listings:', err);
@@ -36,6 +62,14 @@ const LaunchpadDirectory = ({ supabase }) => {
             setLoading(false);
         }
     };
+
+    // Cleanup schema on unmount
+    useEffect(() => {
+        return () => {
+            const script = document.getElementById('launchpad-schema');
+            if (script) script.remove();
+        };
+    }, []);
 
     const handleUpvote = async (listingId) => {
         // Optimistic update
@@ -359,15 +393,37 @@ const LaunchpadDirectory = ({ supabase }) => {
                             </span>
                         </div>
 
-                        {displayed.map(listing => (
-                            <LaunchpadCard
-                                key={listing.id}
-                                listing={listing}
-                                onUpvote={handleUpvote}
-                            />
+                        {displayed.map((listing, index) => (
+                            <React.Fragment key={listing.id}>
+                                <LaunchpadCard
+                                    listing={listing}
+                                    onUpvote={handleUpvote}
+                                />
+                                
+                                {/* Ad Injection: Every 4 items */}
+                                {(index + 1) % 4 === 0 && (
+                                    <div style={{
+                                        margin: '0.5rem 0 1rem',
+                                        padding: '1.5rem',
+                                        background: 'rgba(255,255,255,0.02)',
+                                        borderRadius: '16px',
+                                        border: '1px dashed rgba(255,255,255,0.1)',
+                                        textAlign: 'center'
+                                    }}>
+                                        <div style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase', marginBottom: '1rem', fontWeight: 800, letterSpacing: '0.05em' }}>Recommended Insight</div>
+                                        <AdSenseUnit style={{ minHeight: '120px' }} />
+                                    </div>
+                                )}
+                            </React.Fragment>
                         ))}
                     </div>
                 )}
+
+                {/* Multiplex Recommendations */}
+                <div style={{ marginTop: '5rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '3rem' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase', marginBottom: '1.5rem', textAlign: 'center', letterSpacing: '0.1em' }}>Recommended Platforms & Services</div>
+                    <AdSenseUnit slot="2948048414" format="autorelaxed" />
+                </div>
             </div>
 
             {/* Bottom CTA */}

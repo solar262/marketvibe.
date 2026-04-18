@@ -18,6 +18,35 @@ const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = '
     const [downloading, setDownloading] = useState(false);
     const [completedTasks, setCompletedTasks] = useState({});
 
+    React.useEffect(() => {
+        if (results) {
+            const h = landingPage.headline || "Business Validation Report";
+            document.title = `${h} | MarketVibe Intelligence`;
+
+            const schema = {
+                "@context": "https://schema.org",
+                "@type": "Article",
+                "headline": h,
+                "description": results.expertNarrative?.substring(0, 160) || "Comprehensive market validation and execution roadmap.",
+                "author": { "@type": "Organization", "name": "MarketVibe Intelligence Unit" },
+                "publisher": { "@type": "Organization", "name": "MarketVibe" }
+            };
+
+            let script = document.getElementById('report-schema');
+            if (!script) {
+                script = document.createElement('script');
+                script.id = 'report-schema';
+                script.type = 'application/ld+json';
+                document.head.appendChild(script);
+            }
+            script.text = JSON.stringify(schema);
+        }
+        return () => {
+            const script = document.getElementById('report-schema');
+            if (script) script.remove();
+        };
+    }, [results]);
+
     const toggleTask = (weekIndex, taskIndex) => {
         const key = `${weekIndex}-${taskIndex}`;
         setCompletedTasks(prev => ({
@@ -727,6 +756,12 @@ const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = '
                 >
                     {unlocked ? (planType === 'expert' ? '📄 Whitelabel PDF Export' : 'Download PDF Playbook') : 'Pay to Download PDF'}
                 </button>
+            </div>
+
+            {/* Multiplex Content Recommendations */}
+            <div style={{ marginTop: '5rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '3rem' }}>
+                <div style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase', marginBottom: '1.5rem', textAlign: 'center', letterSpacing: '0.1em' }}>Recommended for Entrepreneurs</div>
+                <AdSenseUnit slot="2948048414" format="autorelaxed" />
             </div>
         </div>
     );
