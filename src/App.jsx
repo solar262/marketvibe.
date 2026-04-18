@@ -233,7 +233,18 @@ function App() {
     } else if (activePath.startsWith('/validate/')) {
       const slug = activePath.split('/').pop()
       const foundNiche = popularNiches.find(n => n.slug === slug)
-      if (foundNiche) { setStep('p-seo'); setActiveNiche(foundNiche); }
+      setStep('p-seo')
+      if (foundNiche) {
+        setActiveNiche(foundNiche)
+      } else {
+        // Dynamic Fallback: Treat the slug as the niche name
+        const dynamicNiche = { 
+          slug, 
+          name: slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+          description: "Intelligence scanning active for this territory." 
+        }
+        setActiveNiche(dynamicNiche)
+      }
     } else if (activePath === '/library') {
       setStep('library')
     } else if (activePath === '/newsroom') {

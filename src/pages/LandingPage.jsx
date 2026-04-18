@@ -278,7 +278,7 @@ const LandingPage = () => {
                             category="AI Agents" 
                             title="Autonomous Sales Bots" 
                             excerpt="Why agents that perform actions are replacing conversational LLMs in Enterprise revenue operations." 
-                            url="/validate/ai-agents" 
+                            url="/validate/ai-agent" 
                         />
                     </div>
                 </main>
