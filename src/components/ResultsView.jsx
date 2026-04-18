@@ -78,7 +78,14 @@ const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = '
     };
 
     return (
-        <div className={`results-view ${planType === 'expert' ? 'expert-mode' : ''}`} style={{ position: 'relative', textAlign: 'left', color: 'white', maxWidth: '800px', margin: '0 auto' }}>
+        <div className={`results-view ${planType === 'expert' ? 'expert-mode' : ''}`} style={{ 
+            position: 'relative', 
+            textAlign: 'left', 
+            color: 'var(--text)', 
+            maxWidth: '1000px', 
+            margin: '0 auto',
+            padding: '2rem 0'
+        }}>
             <style>
                 {`
                 @media print {
@@ -90,58 +97,80 @@ const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = '
                 `}
             </style>
 
+            {/* Dossier Header */}
+            <div style={{
+                background: 'rgba(17, 24, 39, 0.4)',
+                border: '1px solid var(--glass-border)',
+                borderRadius: '24px',
+                padding: '3rem',
+                marginBottom: '3rem',
+                position: 'relative',
+                overflow: 'hidden'
+            }}>
+                <div style={{ position: 'absolute', top: 0, right: 0, padding: '1rem', background: 'rgba(236, 72, 153, 0.1)', color: 'var(--accent)', fontSize: '0.7rem', fontWeight: 900, borderBottomLeftRadius: '12px' }}>
+                    CLASSIFICATION: CONFIDENTIAL
+                </div>
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+                    <div style={{ padding: '0.4rem 0.8rem', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.2)', borderRadius: '8px', color: 'var(--primary)', fontSize: '0.75rem', fontWeight: 800 }}>
+                        INTEL REPORT #{Math.floor(Math.random() * 90000) + 10000}
+                    </div>
+                </div>
+
+                <h1 style={{ fontSize: 'clamp(1.8rem, 4vw, 3rem)', fontWeight: 900, marginBottom: '1rem', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+                    {results.projectName || landingPage.headline || "Market Analysis"}
+                </h1>
+                <p style={{ fontSize: '1.1rem', color: 'var(--text-dim)', lineHeight: 1.6 }}>
+                    Strategic intelligence teardown for the identified business territory.
+                </p>
+            </div>
+
             {!unlocked && (
                 <div style={{
-                    background: 'rgba(99, 102, 241, 0.05)',
-                    border: '1px solid rgba(99, 102, 241, 0.2)',
-                    padding: '2rem',
+                    background: 'rgba(15, 23, 42, 0.4)',
+                    border: '1px solid rgba(236, 72, 153, 0.2)',
+                    padding: '2.5rem',
                     borderRadius: '24px',
                     marginBottom: '3rem',
-                    textAlign: 'left',
                     position: 'relative',
-                    overflow: 'hidden'
+                    overflow: 'hidden',
+                    boxShadow: '0 0 30px rgba(236, 72, 153, 0.1)'
                 }}>
-                    <div style={{ position: 'absolute', top: 0, right: 0, padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', fontWeight: 'bold', borderBottomLeftRadius: '24px', fontSize: '0.75rem' }}>
-                        ⭐ SPECIAL FOUNDER OFFER
+                    <div style={{ position: 'absolute', top: 0, right: 0, padding: '0.75rem 1.25rem', background: 'var(--accent)', color: '#fff', fontWeight: '900', borderBottomLeftRadius: '16px', fontSize: '0.7rem', letterSpacing: '0.1em' }}>
+                        SECURITY CLEARANCE REQUIRED
                     </div>
-                    <h3 style={{ color: '#fff', marginBottom: '1rem', fontSize: '1.5rem' }}>Your Idea is Validated. Now Build It. 🛠️</h3>
-                    <p style={{ color: '#94a3b8', marginBottom: '2rem', fontSize: '0.9rem' }}>
-                        You've unlocked the surface level data. To actually launch, you need the **Execution Engine**.
+                    <h3 style={{ color: '#fff', marginBottom: '1rem', fontSize: '1.4rem', fontWeight: 800 }}>Actionable Beta Locked. ⚡</h3>
+                    <p style={{ color: 'var(--text-dim)', marginBottom: '2rem', fontSize: '0.95rem' }}>
+                        Surface signals are verified. To extract the **GTM Playbook** and **Execution Roadmap**, upgrade to Founder level.
                     </p>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.5rem', fontSize: '0.85rem' }}>
-                        <div style={{ color: '#64748b', fontWeight: 'bold' }}>Feature</div>
-                        <div style={{ color: '#64748b', textAlign: 'center' }}>Free</div>
-                        <div style={{ color: '#6366f1', textAlign: 'center', fontWeight: 'bold' }}>Founder</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem', fontSize: '0.8rem' }}>
+                        <div style={{ color: '#475569', fontWeight: 'bold' }}>SYSTEM MODULE</div>
+                        <div style={{ color: '#475569', textAlign: 'center' }}>BASIC</div>
+                        <div style={{ color: 'var(--primary)', textAlign: 'center', fontWeight: 'bold' }}>FOUNDER</div>
 
-                        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '0.5rem 0' }}>Revenue Forecast</div>
-                        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'center', color: '#10b981' }}>✅</div>
-                        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'center', color: '#10b981' }}>✅ High Precision</div>
-
-                        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '0.5rem 0' }}>30-Day Execution Roadmap</div>
-                        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'center' }}>❌ Locked</div>
-                        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'center', color: '#10b981' }}>✅ Full Playbook</div>
-
-                        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '0.5rem 0' }}>Copy-Paste Outreach Scripts</div>
-                        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'center' }}>❌ Locked</div>
-                        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'center', color: '#10b981' }}>✅ Reddit & X Scripts</div>
-
-                        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '0.5rem 0' }}>React MVP Boilerplate (Code)</div>
-                        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'center' }}>❌ Locked</div>
-                        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'center', color: '#10b981' }}>✅ Export Project</div>
+                        {[
+                            ["Market Momentum", "✅", "✅ High-Res"],
+                            ["30-Day Execution", "❌ LOCKED", "✅ COMPLETE"],
+                            ["Outreach Scripts", "❌ LOCKED", "✅ FULL SET"],
+                            ["React MVP Code", "❌ LOCKED", "✅ SOURCE"]
+                        ].map(([title, free, paid], i) => (
+                            <React.Fragment key={i}>
+                                <div style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', padding: '0.6rem 0', color: 'var(--text)' }}>{title}</div>
+                                <div style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', textAlign: 'center', color: free.includes('✅') ? '#10b981' : '#ef4444' }}>{free}</div>
+                                <div style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', textAlign: 'center', color: '#10b981', fontWeight: 600 }}>{paid}</div>
+                            </React.Fragment>
+                        ))}
                     </div>
 
-                    <div style={{ marginTop: '2rem', textAlign: 'center' }}>
-                        <button className="btn-primary" onClick={() => onUnlock('founder')} style={{ width: '100%', padding: '1.25rem', fontSize: '1.1rem' }}>
-                            Unlock Full Execution Playbook — $49
+                    <div style={{ marginTop: '2rem' }}>
+                        <button className="btn-glow" onClick={() => onUnlock('founder')} style={{ width: '100%', padding: '1.25rem', fontSize: '1.1rem' }}>
+                            UPGRADE TO FOUNDER — $49
                         </button>
-                        <p style={{ marginTop: '0.75rem', fontSize: '0.7rem', color: '#475569' }}>
-                            Prices are rising. Secure your lifetime access now.
-                        </p>
                     </div>
                 </div>
             )}
-            <div style={{ marginBottom: '3rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '2rem' }}>
+            <div style={{ marginBottom: '3rem', borderBottom: '1px solid var(--glass-border)', paddingBottom: '2rem' }}>
                 <h2 style={{ color: '#6366f1', marginBottom: '1rem' }}>🚀 Your Lead Magnet Strategy</h2>
                 <div style={{ background: 'rgba(99, 102, 241, 0.05)', padding: '2rem', borderRadius: '16px', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
                     <h3 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>{landingPage.headline}</h3>

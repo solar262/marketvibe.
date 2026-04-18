@@ -358,11 +358,25 @@ function App() {
     <ErrorBoundary>
       <div className={(isInvestorRoute || isInvestorDashboard) ? "full-width" : "container"}>
         {!isInvestorRoute && !isInvestorDashboard && (
-          <header style={{ padding: '1.5rem 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div onClick={() => setStep('landing')} style={{ fontSize: '1.8rem', fontWeight: 900, color: '#6366f1', cursor: 'pointer' }}>MarketVibe</div>
+          <header style={{ 
+            padding: '1.5rem 0', 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            borderBottom: '1px solid var(--glass-border)',
+            marginBottom: '2rem'
+          }}>
+            <div onClick={() => setStep('landing')} style={{ 
+              fontSize: '1.8rem', 
+              fontWeight: 900, 
+              background: 'linear-gradient(135deg, #6366f1, #ec4899)', 
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              cursor: 'pointer' 
+            }}>MarketVibe</div>
             <div style={{ display: 'flex', gap: '2rem' }}>
-              <a href="/newsroom" onClick={(e) => { e.preventDefault(); setStep('newsroom'); }} style={{ color: '#94a3b8', textDecoration: 'none' }}>Newsroom</a>
-              <a href="/hub" onClick={(e) => { e.preventDefault(); setStep('hub'); }} style={{ color: '#94a3b8', textDecoration: 'none' }}>Launchpad</a>
+              <a href="/newsroom" onClick={(e) => { e.preventDefault(); setStep('newsroom'); }} style={{ color: 'var(--text-dim)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 600 }}>Newsroom</a>
+              <a href="/hub" onClick={(e) => { e.preventDefault(); setStep('hub'); }} style={{ color: 'var(--text-dim)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 600 }}>Launchpad</a>
             </div>
           </header>
         )}
@@ -395,31 +409,37 @@ function App() {
         <EmailCapturePopup supabase={supabase} onEmailCaptured={setEmail} />
         
         {!isInvestorRoute && !isInvestorDashboard && (
-          <footer style={{ marginTop: '5rem', padding: '4rem 0', borderTop: '1px solid #e2e8f0', background: '#fff' }}>
+          <footer style={{ 
+            marginTop: '5rem', 
+            padding: '4rem 0', 
+            borderTop: '1px solid var(--glass-border)', 
+            background: 'var(--bg)',
+            color: 'var(--text)'
+          }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3rem', justifyContent: 'space-between' }}>
               <div>
                 <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#6366f1', marginBottom: '1rem' }}>MarketVibe</div>
-                <div style={{ color: '#94a3b8', fontSize: '0.9rem', maxWidth: '300px' }}>
+                <div style={{ color: 'var(--text-dim)', fontSize: '0.9rem', maxWidth: '300px' }}>
                   Autonomous startup validation and revenue intelligence. Built for the 2026 founder.
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '4rem' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   <div style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Platform</div>
-                  <a href="/hub" onClick={(e) => { e.preventDefault(); setStep('hub'); }} style={{ color: '#64748b', textDecoration: 'none', fontSize: '0.9rem' }}>Launchpad</a>
-                  <a href="/tools/naming" onClick={(e) => { e.preventDefault(); setStep('tools-naming'); }} style={{ color: '#64748b', textDecoration: 'none', fontSize: '0.9rem' }}>Naming Tool</a>
-                  <a href="/blog" onClick={(e) => { e.preventDefault(); setStep('blog-index'); }} style={{ color: '#64748b', textDecoration: 'none', fontSize: '0.9rem' }}>Intelligence Blog</a>
+                  <a href="/hub" onClick={(e) => { e.preventDefault(); setStep('hub'); }} style={{ color: 'var(--text-dim)', textDecoration: 'none', fontSize: '0.9rem' }}>Launchpad</a>
+                  <a href="/tools/naming" onClick={(e) => { e.preventDefault(); setStep('tools-naming'); }} style={{ color: 'var(--text-dim)', textDecoration: 'none', fontSize: '0.9rem' }}>Naming Tool</a>
+                  <a href="/blog" onClick={(e) => { e.preventDefault(); setStep('blog-index'); }} style={{ color: 'var(--text-dim)', textDecoration: 'none', fontSize: '0.9rem' }}>Intelligence Blog</a>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   <div style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Company</div>
-                  <a href="/about" onClick={(e) => { e.preventDefault(); setStep('about'); }} style={{ color: '#64748b', textDecoration: 'none', fontSize: '0.9rem' }}>About Us</a>
-                  <a href="/contact" onClick={(e) => { e.preventDefault(); setStep('contact'); }} style={{ color: '#64748b', textDecoration: 'none', fontSize: '0.9rem' }}>Contact</a>
-                  <a href="/privacy" onClick={(e) => { e.preventDefault(); setStep('privacy'); }} style={{ color: '#64748b', textDecoration: 'none', fontSize: '0.9rem' }}>Privacy Policy</a>
-                  <a href="/terms" onClick={(e) => { e.preventDefault(); setStep('terms'); }} style={{ color: '#64748b', textDecoration: 'none', fontSize: '0.9rem' }}>Terms</a>
+                  <a href="/about" onClick={(e) => { e.preventDefault(); setStep('about'); }} style={{ color: 'var(--text-dim)', textDecoration: 'none', fontSize: '0.9rem' }}>About Us</a>
+                  <a href="/contact" onClick={(e) => { e.preventDefault(); setStep('contact'); }} style={{ color: 'var(--text-dim)', textDecoration: 'none', fontSize: '0.9rem' }}>Contact</a>
+                  <a href="/privacy" onClick={(e) => { e.preventDefault(); setStep('privacy'); }} style={{ color: 'var(--text-dim)', textDecoration: 'none', fontSize: '0.9rem' }}>Privacy Policy</a>
+                  <a href="/terms" onClick={(e) => { e.preventDefault(); setStep('terms'); }} style={{ color: 'var(--text-dim)', textDecoration: 'none', fontSize: '0.9rem' }}>Terms</a>
                 </div>
               </div>
             </div>
-            <div style={{ marginTop: '4rem', paddingOver: '2rem', borderTop: '1px solid #f1f5f9', paddingTop: '2rem', textAlign: 'center', color: '#cbd5e1', fontSize: '0.8rem' }}>
+            <div style={{ marginTop: '4rem', paddingOver: '2rem', borderTop: '1px solid var(--glass-border)', paddingTop: '2rem', textAlign: 'center', color: '#334155', fontSize: '0.8rem' }}>
               &copy; 2026 MarketVibe Intelligence Unit. All rights reserved.
             </div>
           </footer>
