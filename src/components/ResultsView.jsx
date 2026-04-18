@@ -3,6 +3,7 @@ import { generateScorecard } from '../lib/scorecard';
 import VerificationBadge from './VerificationBadge';
 import NewsletterSignup from './NewsletterSignup';
 import { generateMVPCode } from '../lib/mvp_templates';
+import AdSenseUnit from './AdSenseUnit';
 
 const ResultsView = ({ results, unlocked, onUnlock, spots, loading, planType = 'founder', leads = [], usageCount = 0, leadId = null, fomoTimer }) => {
     // Add safe defaults for old data migration
