@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 
-const AdSenseUnit = ({ slot, style }) => {
+const AdSenseUnit = ({ slot, style, format }) => {
   useEffect(() => {
     try {
       // Check if adsbygoogle is available as an object or array
