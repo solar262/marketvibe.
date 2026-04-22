@@ -412,6 +412,11 @@ function App() {
               case 'terms': return <TermsOfService />;
               case 'about': return <About />;
               case 'contact': return <Contact />;
+              case 'ads.txt': return (
+                <pre style={{ margin: 0, padding: '1rem', background: 'white', color: 'black', fontStyle: 'normal' }}>
+                  google.com, pub-1690496065763879, DIRECT, f08c47fec0942fa0
+                </pre>
+              );
               case 'landing':
               default: return <LandingPage />;
             }
