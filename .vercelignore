@@ -8,7 +8,9 @@ build_error.log
 *.png
 !public/*.png
 *.csv
-*.txt
+# *.txt (Whitelisted to allow AdSense and SEO verification)
+!ads.txt
+!robots.txt
 *.sql
 *.bat
 api/
