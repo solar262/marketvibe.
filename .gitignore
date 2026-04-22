@@ -29,6 +29,8 @@ public/twitter_bot_log.json
 
 # Diagnostics & Scripts
 *.txt
+!public/ads.txt
+!public/robots.txt
 *.mjs
 !scheduler.mjs
 *.js
