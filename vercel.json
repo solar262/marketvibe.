@@ -1,11 +1,20 @@
 {
+    "cleanUrls": true,
     "rewrites": [
         {
             "source": "/api/(.*)",
             "destination": "/api/$1"
         },
         {
-            "source": "/((?!api|ads\\.txt|robots\\.txt|sitemap\\.xml|favicon\\.ico|logo.*\\.png).*)",
+            "source": "/ads.txt",
+            "destination": "/ads.txt"
+        },
+        {
+            "source": "/robots.txt",
+            "destination": "/robots.txt"
+        },
+        {
+            "source": "/(.*)",
             "destination": "/index.html"
         }
     ]
