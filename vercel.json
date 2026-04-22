@@ -1,10 +1,16 @@
 {
     "cleanUrls": true,
-    "rewrites": [
-        { "source": "/api/(.*)", "destination": "/api/$1" },
-        { "source": "/ads.txt", "destination": "/ads.txt" },
-        { "source": "/robots.txt", "destination": "/robots.txt" },
-        { "source": "/sitemap.xml", "destination": "/sitemap.xml" },
-        { "source": "/(.*)", "destination": "/index.html" }
+    "routes": [
+        {
+            "src": "/api/(.*)",
+            "dest": "/api/$1"
+        },
+        {
+            "handle": "filesystem"
+        },
+        {
+            "src": "/(.*)",
+            "dest": "/index.html"
+        }
     ]
 }
