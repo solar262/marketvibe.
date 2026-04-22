@@ -5,7 +5,7 @@
             "destination": "/api/$1"
         },
         {
-            "source": "/((?!api|ads\\.txt|robots\\.txt|sitemap\\.xml).*)",
+            "source": "/((?!api|ads\\.txt|robots\\.txt|sitemap\\.xml|favicon\\.ico|logo.*\\.png).*)",
             "destination": "/index.html"
         }
     ]
