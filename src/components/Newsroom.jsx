@@ -65,14 +65,17 @@ const Newsroom = () => {
             <div style={{ background: '#fff', borderBottom: '1px solid var(--glass-border)', padding: '3rem 1.5rem', marginBottom: '2rem' }}>
                 <div className="container" style={{ maxWidth: '800px', margin: '0 auto' }}>
                     <div style={{ display: 'inline-block', background: '#fee2e2', color: '#ef4444', padding: '4px 12px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        Live Feed Active
+                        Intelligence Unit: Live Market Signals
                     </div>
                     <h1 style={{ fontSize: 'clamp(2.5rem, 5vw, 3.5rem)', fontWeight: '900', color: 'var(--text)', marginBottom: '1rem', letterSpacing: '-0.03em' }}>
-                        Top Tech News
+                        Startup Trends & Tech News
                     </h1>
-                    <p style={{ color: 'var(--text-dim)', fontSize: '1.2rem', lineHeight: '1.6' }}>
-                        Real-time breaking tech news, startups, and product launches to help you spot emerging market trends before anyone else.
+                    <p style={{ color: 'var(--text-dim)', fontSize: '1.2rem', lineHeight: '1.6', marginBottom: '1.5rem' }}>
+                        Real-time breaking tech news, curated market signals, and product launches to help you spot emerging niches before they become mainstream.
                     </p>
+                    <div style={{ padding: '1rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.85rem', color: '#64748b' }}>
+                        <b>Disclaimer:</b> This newsroom is a curated feed of global technology signals powered by autonomous agents. Our mission is to provide founders with a high-fidelity window into market movements. Use these signals to inform your next validation project.
+                    </div>
                 </div>
             </div>
 

@@ -99,10 +99,66 @@ class MarketVibeNurturer {
         // 1. WARM NURTURE (Email)
         await this.runEmailNurture();
 
-        // 2. COLD NURTURE (Social Nudge)
+        // 2. ENRICHED OUTREACH (New Social -> Email Bridge)
+        await this.runEnrichedOutreach();
+
+        // 3. COLD NURTURE (Social Nudge)
         await this.runSocialNurture();
 
         console.log("🏁 Nurture Cycle Complete.");
+    }
+
+    async runEnrichedOutreach() {
+        console.log("🌉 Evaluating Enriched Bridge Leads...");
+        const { data: leads, error } = await supabase
+            .from('growth_leads')
+            .select('*')
+            .eq('enrichment_status', 'found')
+            .eq('status', 'pending');
+
+        if (error) {
+            console.error("❌ Error fetching enriched leads:", error);
+            return;
+        }
+
+        for (const lead of leads) {
+            console.log(`📧 Sending Initial Bridge Email to @${lead.username} (${lead.email})...`);
+
+            const subject = `MarketVibe discovery: Researching the ${lead.niche} space 📡`;
+            const body = `Hey @${lead.username}!
+            
+I saw your recent activity on ${lead.platform} regarding ${lead.niche}. I actually run MarketVibe, and our discovery engine flagged your profile as a high-intent mover in this space.
+
+I've put together a quick "Founder Briefing" for you based on the signals we're seeing in ${lead.niche}:
+${SITE_URL}/blog/${lead.niche.toLowerCase().replace(/[^a-z0-9]/g, '-')}
+
+If you have a minute, I'd love to hear if this matches what you're seeing on the ground.
+
+Best,
+The MarketVibe Team`;
+
+            try {
+                const { error: sendError } = await resend.emails.send({
+                    from: 'founder@marketvibe1.com',
+                    to: lead.email,
+                    subject: subject,
+                    text: body,
+                });
+
+                if (!sendError) {
+                    await supabase
+                        .from('growth_leads')
+                        .update({ status: 'contacted' })
+                        .eq('id', lead.id);
+                    console.log(`✅ Bridge email sent to ${lead.email}`);
+                } else {
+                    console.error(`❌ Failed to send to ${lead.email}:`, sendError);
+                }
+            } catch (err) {
+                console.error(`🔥 Resend Error for ${lead.email}:`, err.message);
+            }
+            await new Promise(resolve => setTimeout(resolve, 2000));
+        }
     }
 
     async runEmailNurture() {

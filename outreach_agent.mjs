@@ -15,6 +15,7 @@ const supabase = createClient(
     process.env.VITE_SUPABASE_URL,
     process.env.VITE_SUPABASE_ANON_KEY
 );
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 class MarketVibeSentinel {
     constructor() {
@@ -26,6 +27,8 @@ class MarketVibeSentinel {
             "how to get beta testers", "product market fit help", "competitor research", "niche validation",
             "market research tools", "customer discovery tips", "low landing page conversion", "Facebook ads help",
             "Google ads failing", "marketing strategy for saas", "growth hacking for startups", "b2b outreach strategy",
+            "fintech marketing strategy", "cybersecurity startup growth", "best cyber tools for startups",
+            "security compliance for saas", "fintech customer acquisition cost",
 
             // New Scaling Keywords (50+)
             "how to get first customers", "SaaS marketing feedback", "landing page roast",
@@ -49,10 +52,11 @@ class MarketVibeSentinel {
             "why am i getting ignored on linkedin", "cold email not working", "outreach roast"
         ];
         this.targetSubreddits = [
-            'saas', 'Entrepreneur', 'indiehackers', 'startups', 'SideProject', 'MicroSaaS',
+            'Saas', 'Entrepreneur', 'indiehackers', 'startups', 'SideProject', 'MicroSaaS',
             'digitalmarketing', 'growthhacking', 'GrowthHackingSub', 'ecommerce', 'EmailMarketing',
             'SaaSMarketing', 'smallbusiness', 'ProductManagement', 'marketing', 'Business_Ideas',
             'startups_help', 'indiemakers', 'SoloDevelopers', 'NoCode', 'buildinginpublic',
+            'fintech', 'cybersecurity', 'netsec', 'InformationSecurity', 'banking', 'paymentgateways',
             // New Scaled Subreddits
             'Sales', 'GrowthHacking', 'Agency', 'Business', 'Solopreneurs', 'WebDev',
             'AppDevelopment', 'StartupIdeas', 'builders', 'foundermindset', 'leanstartup'
@@ -69,7 +73,8 @@ class MarketVibeSentinel {
         // 1. Discovery (Live Reddit & Twitter Search)
         const redditLeads = await this.discoverLeads();
         const twitterLeads = await this.discoverTwitterLeads();
-        const rawLeads = [...redditLeads, ...twitterLeads];
+        const linkedinLeads = await this.discoverLinkedInLeads();
+        const rawLeads = [...redditLeads, ...twitterLeads, ...linkedinLeads];
 
         for (const rawLead of rawLeads) {
             try {
@@ -167,8 +172,22 @@ class MarketVibeSentinel {
 
         try {
             const edgePort = process.env.EDGE_DEBUG_PORT || 9222;
-            const resp = await fetch(`http://127.0.0.1:${edgePort}/json/version`);
-            const data = await resp.json();
+            let data;
+            try {
+                const resp = await fetch(`http://127.0.0.1:${edgePort}/json/version`);
+                if (!resp.ok) throw new Error(`Status ${resp.status}`);
+                const contentType = resp.headers.get('content-type') || '';
+                if (!contentType.includes('application/json')) throw new Error(`Non-JSON content: ${contentType}`);
+                data = await resp.json();
+            } catch (fetchErr) {
+                console.error(`⚠️ Sentinel Twitter Discovery: Edge connection failed (${fetchErr.message}). Skipping X-scan.`);
+                return results;
+            }
+
+            if (!data || !data.webSocketDebuggerUrl) {
+                console.error("❌ Sentinel Twitter Discovery: No debugger URL available.");
+                return results;
+            }
 
             browser = await puppeteer.connect({
                 browserWSEndpoint: data.webSocketDebuggerUrl,
@@ -233,6 +252,84 @@ class MarketVibeSentinel {
             await page.close();
         } catch (err) {
             console.error(`❌ Sentinel Twitter Discovery Error: ${err.message}`);
+        } finally {
+            if (browser) browser.disconnect();
+        }
+
+        return results;
+    }
+
+    async discoverLinkedInLeads() {
+        console.log(`🔍 Sentinel LinkedIn-Search: Scanning for professional signals via Google Dorks...`);
+        const results = [];
+        let browser = null;
+
+        try {
+            const edgePort = process.env.EDGE_DEBUG_PORT || 9222;
+            let data;
+            try {
+                const resp = await fetch(`http://127.0.0.1:${edgePort}/json/version`);
+                if (!resp.ok) throw new Error(`Status ${resp.status}`);
+                const contentType = resp.headers.get('content-type') || '';
+                if (!contentType.includes('application/json')) throw new Error(`Non-JSON content: ${contentType}`);
+                data = await resp.json();
+            } catch (fetchErr) {
+                console.error(`⚠️ Sentinel LinkedIn Discovery: Edge connection failed (${fetchErr.message}). Skipping LI-scan.`);
+                return results;
+            }
+
+            if (!data || !data.webSocketDebuggerUrl) {
+                console.error("❌ Sentinel LinkedIn Discovery: No debugger URL available.");
+                return results;
+            }
+
+            browser = await puppeteer.connect({
+                browserWSEndpoint: data.webSocketDebuggerUrl,
+                defaultViewport: null
+            });
+
+            const page = await browser.newPage();
+            const queries = [
+                'site:linkedin.com/posts "fintech" "roast my"',
+                'site:linkedin.com/posts "saas" "feedback wanted"',
+                'site:linkedin.com/posts "cybersecurity" "startup advice"',
+                'site:linkedin.com/posts "looking for" "b2b outreach"'
+            ];
+
+            for (const query of queries) {
+                console.log(`🔎 Dorking LinkedIn for: "${query}"...`);
+                await page.goto(`https://www.google.com/search?q=${encodeURIComponent(query)}`, { waitUntil: 'domcontentloaded' });
+                await sleep(3000);
+
+                const profileLinks = await page.evaluate(() => {
+                    const links = Array.from(document.querySelectorAll('a[href*="linkedin.com/posts/"]'));
+                    return links.map(a => {
+                        const href = a.href;
+                        // Extract username from /in/username or the post url usually contains unique IDs
+                        // For simplicity, we just grab the post URL as the ID
+                        return { url: href, text: a.innerText };
+                    }).slice(0, 5);
+                });
+
+                for (const link of profileLinks) {
+                    // Very crude username extraction from LinkedIn Post URL
+                    // Example: linkedin.com/posts/username_activity-123...
+                    const parts = link.url.split('/posts/')[1]?.split('_')[0];
+                    if (parts) {
+                        results.push({
+                            platform: 'linkedin',
+                            platform_id: `li_${parts}_${Math.random().toString(36).substring(7)}`,
+                            username: parts,
+                            post_content: link.text || "LinkedIn Post Signal",
+                            niche: this.detectNiche(link.text)
+                        });
+                    }
+                }
+            }
+
+            await page.close();
+        } catch (err) {
+            console.error(`❌ Sentinel LinkedIn Discovery Error: ${err.message}`);
         } finally {
             if (browser) browser.disconnect();
         }
@@ -337,6 +434,12 @@ class MarketVibeSentinel {
 
         // 🎓 Edtech & Academic
         if (/\b(learn|school|course|teaching|tutor|university|admissions|harvard|phd|student|institute|institute|training)\b/i.test(textLower)) return 'Education/Training';
+
+        // 💳 FinTech & Finance
+        if (/\b(bank|payment|fintech|finance|stripe|square|ledger|wallet|trading|broker|equity)\b/i.test(textLower)) return 'FinTech';
+
+        // 🛡️ CyberSecurity
+        if (/\b(security|cyber|defense|attack|pentest|encryption|protection|firewall|malware|soc|compliance)\b/i.test(textLower)) return 'CyberSecurity';
 
         return 'High-Value Venture'; // Replaces "Indie Project" for better tone
     }

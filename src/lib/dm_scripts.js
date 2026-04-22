@@ -1,44 +1,45 @@
 const SITE_URL = (import.meta.env && import.meta.env.VITE_SITE_URL) || (typeof process !== 'undefined' && process.env ? process.env.VITE_SITE_URL : undefined) || 'https://marketvibe1.com';
 
 const GROQ_API_KEY = (typeof process !== 'undefined' && process.env ? process.env.GROQ_API_KEY : undefined);
+const XAI_API_KEY = (typeof process !== 'undefined' && process.env ? process.env.XAI_API_KEY : undefined);
+const USE_SUPERGROK = (typeof process !== 'undefined' && process.env ? process.env.USE_SUPERGROK_BROWSER : undefined) === 'true';
+
+import { generateGrokResponse as generateBrowserResponse } from './browser_ai.js';
 
 export const dmScripts = {
-    // Fallback static scripts
-    high_intent: [
-        (name, niche) => `yo ${name}, saw your post about the ${niche} grind. if you're struggling with response rates, i actually built a free AI roaster that critiques your pitches. might help: ${SITE_URL}/roaster`,
-        (name, niche) => `stumbled onto your ${niche} project. genuinely solid idea. if you want a brutal AI reality check on your outreach message, try this free pitch roaster: ${SITE_URL}/roaster`
-    ],
-    curiosity: [
-        (name, niche) => `hey, was just reading about ${niche} and remembered i built a tiny tool that estimates the TAM in like 30 seconds. might be useful for your deck: ${SITE_URL}/tools/market-size`,
-    ]
+// ...
+// ... lines 5-15 ...
+// ...
 };
 
 async function generateGroqResponse(lead) {
-    if (!GROQ_API_KEY) return null;
-
-    const systemPrompt = `You are a casual, helpful startup founder surfing Reddit. You are replying to a post by a prospect to organically recommend your tool, MarketVibe. 
-Rules:
-1. Be extremely casual. Use lowercase mostly, like a text message. NO hashtags. Don't be robotic.
-2. Directly reference specific details from their post to prove you actually read it (e.g. if they mention 'Wordpress' or 'late fees', talk about that).
-3. Seamlessly hook your tool: MarketVibe (${SITE_URL}), which is an autonomous AI agent for finding B2B leads and growth. 
-4. If they seem to need pitch help, hook MarketVibe's Pitch Roaster (${SITE_URL}/roaster).
-5. Keep it to 2-3 short sentences. Be authentic. Do not sound like a marketer.`;
-
+    const isNode = typeof window === 'undefined';
+    
     const userPrompt = `Prospect Name: ${lead.username || 'there'}
 Prospect Niche/Interest: ${lead.niche || 'startups'}
 Prospect Post Content: "${lead.post_content || ''}"
 
-Write the short, casual comment reply. Just the reply, nothing else.`;
+Write a short, casual 2-sentence comment reply to organically recommend a solution. Keep it lowercase.`;
+
+    if (isNode && USE_SUPERGROK) {
+        console.log(`🤖 [MV-AI] Channeling SuperGrok (Browser)...`);
+        const result = await generateBrowserResponse(userPrompt);
+        if (result) return result;
+        console.warn(`⚠️ [MV-AI] Browser generation failed, falling back to API.`);
+    }
+
+    const apiKey = XAI_API_KEY || GROQ_API_KEY;
+    if (!apiKey) return null;
 
     try {
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${GROQ_API_KEY}`,
+                'Authorization': `Bearer ${apiKey}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                model: 'llama-3.3-70b-versatile',
+                model: model,
                 messages: [
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: userPrompt }
@@ -49,7 +50,7 @@ Write the short, casual comment reply. Just the reply, nothing else.`;
         });
 
         if (!response.ok) {
-            console.error('Groq API Error:', response.statusText);
+            console.error('AI API Error:', response.statusText);
             return null;
         }
 
@@ -59,7 +60,7 @@ Write the short, casual comment reply. Just the reply, nothing else.`;
         reply = reply.replace(/^["']|["']$/g, '');
         return reply;
     } catch (e) {
-        console.error('Groq generation failed:', e.message);
+        console.error('AI generation failed:', e.message);
         return null;
     }
 }

@@ -35,6 +35,7 @@ import LandingPage from './pages/LandingPage';
 import AdminDashboard from './pages/AdminDashboard';
 import About from './components/About';
 import Contact from './components/Contact';
+import CookieConsent from './components/CookieConsent';
 
 import NewsletterSignup from './components/NewsletterSignup';
 import { popularNiches } from './lib/niches'
@@ -418,6 +419,7 @@ function App() {
         </main>
 
         <EmailCapturePopup supabase={supabase} onEmailCaptured={setEmail} />
+        <CookieConsent />
         
         {!isInvestorRoute && !isInvestorDashboard && (
           <footer style={{ 

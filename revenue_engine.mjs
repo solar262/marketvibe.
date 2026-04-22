@@ -8,14 +8,16 @@ import path from 'path';
  */
 
 const SCRIPTS = [
-    { name: 'SENTINEL (Lead Finder)', path: 'outreach_agent.mjs', interval: 15 * 60 * 1000 }, // Every 15 mins
-    { name: 'THE CLOSER (High Ticket Sales)', path: 'closer_autopilot.mjs', interval: 15 * 60 * 1000 }, // Every 15 mins
-    { name: 'THE HERALD (Engagement)', path: 'herald_worker.mjs', interval: 5 * 60 * 1000 }, // Every 5 mins
-    { name: 'THE BLOGGER (Content)', path: 'blog_worker.mjs', interval: 1 * 60 * 1000 }, // Every 1 min
-    { name: 'THE NURTURER (Email Drip)', path: 'nurture_worker.mjs', interval: 60 * 60 * 1000 }, // Every 1 hour
-    { name: 'THE PRODUCER (YouTube)', path: 'youtube_worker.mjs', interval: 24 * 60 * 60 * 1000 }, // Every 24 hours
-    { name: 'RECOVERY AGENT (Checkout)', path: 'recovery_worker.mjs', interval: 30 * 60 * 1000 }, // Every 30 mins
-    { name: 'FB DISCOVERY (Facebook)', path: 'facebook_worker.mjs', interval: 20 * 60 * 1000 } // Every 20 mins
+    { name: 'SENTINEL (Lead Finder)', path: 'outreach_agent.mjs', interval: 15 * 60 * 1000 }, 
+    { name: 'THE CLOSER (High Ticket Sales)', path: 'closer_autopilot.mjs', interval: 15 * 60 * 1000 },
+    { name: 'THE ENRICHER (Email Waterfall)', path: 'email_enricher.mjs', interval: 30 * 60 * 1000 }, // New: Bridge Social -> Email
+    { name: 'THE HERALD (Engagement)', path: 'herald_worker.mjs', interval: 5 * 60 * 1000 }, 
+    { name: 'THE BLOGGER (Content)', path: 'blog_worker.mjs', interval: 1 * 60 * 1000 }, 
+    { name: 'THE NURTURER (Email Drip)', path: 'nurture_worker.mjs', interval: 60 * 60 * 1000 }, 
+    { name: 'THE PRODUCER (YouTube)', path: 'youtube_worker.mjs', interval: 24 * 60 * 60 * 1000 }, 
+    { name: 'THE PRODUCER (TikTok)', path: 'tiktok_worker.mjs', interval: 24 * 60 * 60 * 1000 }, // New: TikTok Vertical Engine
+    { name: 'RECOVERY AGENT (Checkout)', path: 'recovery_worker.mjs', interval: 30 * 60 * 1000 }, 
+    { name: 'FB DISCOVERY (Facebook)', path: 'facebook_worker.mjs', interval: 20 * 60 * 1000 } 
 ];
 
 function runScript(script) {

@@ -108,8 +108,8 @@ async function replyToLatestTweet(page, text) {
 
         // Wait for the modal composer to pop up
         log('⌨️ Waiting for reply modal...');
-        const textBoxSelector = '[data-testid="tweetTextarea_0"]';
-        await page.waitForSelector(textBoxSelector, { timeout: 10000 });
+        const textBoxSelector = '[data-testid^="tweetTextarea_"], [role="textbox"], div[contenteditable="true"]';
+        await page.waitForSelector(textBoxSelector, { timeout: 12000 });
 
         log('📝 Typing reply...');
         await page.click(textBoxSelector);
@@ -168,8 +168,8 @@ export async function replyToTweetById(tweetId, text) {
         await sleep(2000);
 
         log('⌨️ Waiting for text area...');
-        const textBoxSelector = '[data-testid="tweetTextarea_0"]';
-        await page.waitForSelector(textBoxSelector, { timeout: 10000 });
+        const textBoxSelector = '[data-testid^="tweetTextarea_"], [role="textbox"], div[contenteditable="true"]';
+        await page.waitForSelector(textBoxSelector, { timeout: 12000 });
 
         log('📝 Typing reply...');
         await page.click(textBoxSelector);

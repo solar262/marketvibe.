@@ -1,16 +1,72 @@
 [
   {
-    "niche": "High-Value Wellness (Cleaning)",
-    "volume": 12,
-    "velocity": 124,
-    "avgInterest": "5.5",
-    "heatScore": 91.9310344
+    "niche": "High-Value Venture",
+    "volume": 436,
+    "velocity": 436,
+    "avgInterest": "5.4",
+    "heatScore": 1313.3623853211009
+  },
+  {
+    "niche": "SaaS / Micro-SaaS",
+    "volume": 145,
+    "velocity": 145,
+    "avgInterest": "4.3",
+    "heatScore": 439.2689655172414
+  },
+  {
+    "niche": "AI/Automation Agent",
+    "volume": 120,
+    "velocity": 120,
+    "avgInterest": "3.6",
+    "heatScore": 363.55833333333334
+  },
+  {
+    "niche": "Productivity Tool",
+    "volume": 103,
+    "velocity": 103,
+    "avgInterest": "3.5",
+    "heatScore": 312.49514563106794
+  },
+  {
+    "niche": "Streaming & Content Creation",
+    "volume": 43,
+    "velocity": 43,
+    "avgInterest": "3.9",
+    "heatScore": 132.93023255813952
+  },
+  {
+    "niche": "FinTech",
+    "volume": 27,
+    "velocity": 27,
+    "avgInterest": "3.9",
+    "heatScore": 84.85185185185185
+  },
+  {
+    "niche": "Consulting/Professional Service",
+    "volume": 23,
+    "velocity": 23,
+    "avgInterest": "3.0",
+    "heatScore": 71.95652173913044
   },
   {
     "niche": "Education/Training",
-    "volume": 8,
-    "velocity": 85,
-    "avgInterest": "4.2",
-    "heatScore": 72.5
+    "volume": 21,
+    "velocity": 21,
+    "avgInterest": "3.2",
+    "heatScore": 66.19047619047619
+  },
+  {
+    "niche": "Medical/Professional Service",
+    "volume": 21,
+    "velocity": 21,
+    "avgInterest": "2.7",
+    "heatScore": 65.71428571428571
+  },
+  {
+    "niche": "Retail Arbitrage",
+    "volume": 13,
+    "velocity": 13,
+    "avgInterest": "2.5",
+    "heatScore": 41.53846153846154
   }
 ]
