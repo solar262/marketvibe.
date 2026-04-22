@@ -6,15 +6,8 @@
             "dest": "/api/$1"
         },
         {
-            "src": "/ads.txt",
-            "dest": "/ads.txt"
-        },
-        {
-            "src": "/robots.txt",
-            "dest": "/robots.txt"
-        },
-        {
-            "handle": "filesystem"
+            "src": "/(ads\\.txt|robots\\.txt|sitemap\\.xml)",
+            "continue": true
         },
         {
             "src": "/(.*)",
