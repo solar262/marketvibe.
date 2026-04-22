@@ -100,6 +100,7 @@ function App() {
       if (p.includes('twitter-bot')) return 'twitter-bot';
       return 'admin';
     }
+    if (p === '/ads.txt') return 'ads.txt';
     return 'landing';
   });
 
