@@ -152,7 +152,6 @@ const LandingPage = () => {
                                 letterSpacing: '-0.04em',
                                 marginBottom: '1.5rem',
                                 fontWeight: '900',
-                                fontWeight: 'black'
                             }}>
                                 Autonomous <br />
                                 <span style={{

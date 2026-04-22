@@ -4,7 +4,9 @@ const GROQ_API_KEY = (typeof process !== 'undefined' && process.env ? process.en
 const XAI_API_KEY = (typeof process !== 'undefined' && process.env ? process.env.XAI_API_KEY : undefined);
 const USE_SUPERGROK = (typeof process !== 'undefined' && process.env ? process.env.USE_SUPERGROK_BROWSER : undefined) === 'true';
 
-import { generateGrokResponse as generateBrowserResponse } from './browser_ai.js';
+
+// import { generateGrokResponse as generateBrowserResponse } from './browser_ai.js';
+
 
 export const dmScripts = {
 // ...
@@ -23,8 +25,8 @@ Write a short, casual 2-sentence comment reply to organically recommend a soluti
 
     if (isNode && USE_SUPERGROK) {
         console.log(`🤖 [MV-AI] Channeling SuperGrok (Browser)...`);
-        const result = await generateBrowserResponse(userPrompt);
-        if (result) return result;
+        // const result = await generateBrowserResponse(userPrompt);
+        // if (result) return result;
         console.warn(`⚠️ [MV-AI] Browser generation failed, falling back to API.`);
     }
 
