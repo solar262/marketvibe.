@@ -253,7 +253,7 @@ function App() {
   useEffect(() => {
     if (activePath === '/investors' || activePath === '/investor') {
       setStep('investors')
-      updateMetaTags('Investor Access | MarketVibe', 'Private access to vetted startup opportunities.');
+      updateMetaTags('Investor Access | MarketVibe', 'Private access to vetted Web3 security reports.');
     } else if (activePath.startsWith('/og-preview/')) {
       const id = activePath.split('/').pop()
       setPreviewId(parseInt(id, 10))
@@ -315,14 +315,14 @@ function App() {
     const crumbs = [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.marketvibe1.com" }];
     if (step !== 'landing') {
         const labels = {
-            'blog-index': 'Intelligence Blog',
-            'blog-post': 'Analysis',
-            'newsroom': 'Newsroom',
-            'hub': 'Launchpad',
-            'launchpad': 'Launchpad',
-            'market-size': 'Market Size Calculator',
-            'tools-naming': 'Naming Engine',
-            'fulfillment': 'Business Report'
+            'blog-index': 'Security Blog',
+            'blog-post': 'Threat Analysis',
+            'newsroom': 'Live Exploits',
+            'hub': 'Threat Scanner',
+            'launchpad': 'Audit Pipeline',
+            'market-size': 'Gas Estimator',
+            'tools-naming': 'Risk Analyzer',
+            'fulfillment': 'Audit Report'
         };
         crumbs.push({ 
             "@type": "ListItem", 
@@ -432,9 +432,9 @@ function App() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
               <div style={{ display: 'flex', gap: '2rem' }}>
-                <a href="/scan" onClick={(e) => { e.preventDefault(); setStep('scan'); }} style={{ color: step === 'scan' ? 'var(--primary)' : 'var(--text-dim)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 600 }}>Market Intel</a>
-                <a href="/blog" onClick={(e) => { e.preventDefault(); setStep('blog'); }} style={{ color: step === 'blog' ? 'var(--primary)' : 'var(--text-dim)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 600 }}>Trends</a>
-                <a href="/audit" onClick={(e) => { e.preventDefault(); setStep('audit'); }} style={{ color: step === 'audit' ? 'var(--primary)' : 'var(--text-dim)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 600 }}>VC Audit</a>
+                <a href="/scan" onClick={(e) => { e.preventDefault(); setStep('scan'); }} style={{ color: step === 'scan' ? 'var(--primary)' : 'var(--text-dim)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 600 }}>Threat Scanner</a>
+                <a href="/blog" onClick={(e) => { e.preventDefault(); setStep('blog'); }} style={{ color: step === 'blog' ? 'var(--primary)' : 'var(--text-dim)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 600 }}>Live Exploits</a>
+                <a href="/audit" onClick={(e) => { e.preventDefault(); setStep('audit'); }} style={{ color: step === 'audit' ? 'var(--primary)' : 'var(--text-dim)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 600 }}>Full Audit</a>
               </div>
               <div style={{ width: '1px', height: '24px', background: 'var(--glass-border)' }}></div>
               <button 
@@ -503,15 +503,15 @@ function App() {
               <div>
                 <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#6366f1', marginBottom: '1rem' }}>MarketVibe</div>
                 <div style={{ color: 'var(--text-dim)', fontSize: '0.9rem', maxWidth: '300px' }}>
-                  Autonomous startup validation and revenue intelligence. Built for the 2026 founder.
+                  Autonomous smart contract auditing and on-chain threat intelligence. Built for the decentralized future.
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '4rem' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   <div style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Platform</div>
-                  <a href="/hub" onClick={(e) => { e.preventDefault(); setStep('hub'); }} style={{ color: 'var(--text-dim)', textDecoration: 'none', fontSize: '0.9rem' }}>Launchpad</a>
-                  <a href="/tools/naming" onClick={(e) => { e.preventDefault(); setStep('tools-naming'); }} style={{ color: 'var(--text-dim)', textDecoration: 'none', fontSize: '0.9rem' }}>Naming Tool</a>
-                  <a href="/blog" onClick={(e) => { e.preventDefault(); setStep('blog-index'); }} style={{ color: 'var(--text-dim)', textDecoration: 'none', fontSize: '0.9rem' }}>Intelligence Blog</a>
+                  <a href="/hub" onClick={(e) => { e.preventDefault(); setStep('hub'); }} style={{ color: 'var(--text-dim)', textDecoration: 'none', fontSize: '0.9rem' }}>Threat Scanner</a>
+                  <a href="/tools/naming" onClick={(e) => { e.preventDefault(); setStep('tools-naming'); }} style={{ color: 'var(--text-dim)', textDecoration: 'none', fontSize: '0.9rem' }}>Risk Analyzer</a>
+                  <a href="/blog" onClick={(e) => { e.preventDefault(); setStep('blog-index'); }} style={{ color: 'var(--text-dim)', textDecoration: 'none', fontSize: '0.9rem' }}>Security Blog</a>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   <div style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Company</div>
@@ -523,7 +523,7 @@ function App() {
               </div>
             </div>
             <div style={{ marginTop: '4rem', paddingOver: '2rem', borderTop: '1px solid var(--glass-border)', paddingTop: '2rem', textAlign: 'center', color: '#334155', fontSize: '0.8rem' }}>
-              &copy; 2026 MarketVibe Intelligence Unit. All rights reserved.
+              &copy; 2026 MarketVibe Security Unit. All rights reserved.
             </div>
           </footer>
         )}
