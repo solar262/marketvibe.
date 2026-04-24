@@ -37,6 +37,11 @@ import About from './components/About';
 import Contact from './components/Contact';
 import CookieConsent from './components/CookieConsent';
 
+// Web3 Security Components
+import SecurityScanner from './components/SecurityScanner';
+import AuditService from './pages/AuditService';
+import LeadMagnet from './pages/LeadMagnet';
+
 import NewsletterSignup from './components/NewsletterSignup';
 import { popularNiches } from './lib/niches'
 
@@ -74,35 +79,54 @@ function App() {
     const rawPath = window.location.pathname.toLowerCase();
     const p = rawPath.replace(/\/$/, '') || '/';
     console.log('[Router] Initializing path:', p);
-
-    if (p.includes('/investor')) return 'investors';
-    if (rawPath.startsWith('/og-preview/')) return 'og-preview';
-    if (p === '/tools/naming') return 'tools-naming';
-    if (p.includes('/admin/leads')) return 'admin-leads';
-    if (p.includes('/privacy')) return 'privacy';
-    if (p.includes('/terms')) return 'terms';
-    if (p.includes('/about')) return 'about';
-    if (p.includes('/contact')) return 'contact';
-    if (p === '/hub') return 'hub';
-    if (p === '/tools/market-size') return 'market-size';
-    if (p === '/insights') return 'insights';
-    if (rawPath.startsWith('/validate/')) return 'p-seo';
-    if (p === '/newsroom') return 'newsroom';
-    if (rawPath.startsWith('/news/')) return 'news-article';
-    if (p === '/blog') return 'blog-index';
-    if (rawPath.startsWith('/blog/')) return 'blog-post';
-    if (p === '/launchpad') return 'launchpad';
-    if (p === '/launchpad/submit') return 'launchpad-submit';
-    if (rawPath.startsWith('/launchpad/listing/')) return 'launchpad-listing';
-    if (p === '/admin/video-preview') return 'video-preview';
-    if (p.startsWith('/admin')) {
-      if (p.includes('social')) return 'social-command';
-      if (p.includes('twitter-bot')) return 'twitter-bot';
-      return 'admin';
-    }
-    if (p === '/ads.txt') return 'ads.txt';
-    return 'landing';
+    return getStepFromPath(p);
   });
+
+  function getStepFromPath(p) {
+    if (p.includes('/investor')) return 'investors';
+    if (p.startsWith('/og-preview/')) return 'og-preview';
+    if (p === '/tools/naming') return 'tools-naming';
+    if (p === '/scan') return 'scan';
+    if (p === '/audit') return 'audit';
+    if (p === '/free-checklist') return 'checklist';
+    if (p === '/blog') return 'blog';
+    if (p.startsWith('/blog/')) return 'blog-post';
+    if (p === '/hub') return 'hub';
+    if (p.startsWith('/validate/')) return 'p-seo';
+    if (p.startsWith('/news/')) return 'news-article';
+    if (p === '/ads.txt') return 'ads.txt';
+    if (p === '/studio') return 'studio';
+    if (p.startsWith('/admin')) return 'admin';
+    return 'landing';
+  }
+
+  // GLOBAL ROUTER LISTENER
+  useEffect(() => {
+    const handleLocationChange = () => {
+      const p = window.location.pathname.toLowerCase();
+      console.log('[Router] Navigating to:', p);
+      setStep(getStepFromPath(p));
+    };
+
+    const handleLinkClick = (e) => {
+      const link = e.target.closest('a');
+      if (link && link.href && link.href.startsWith(window.location.origin)) {
+        const path = new URL(link.href).pathname;
+        if (!path.includes('.') && !link.getAttribute('download')) { 
+          e.preventDefault();
+          window.history.pushState({}, '', path);
+          handleLocationChange();
+        }
+      }
+    };
+
+    window.addEventListener('popstate', handleLocationChange);
+    document.addEventListener('click', handleLinkClick);
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange);
+      document.removeEventListener('click', handleLinkClick);
+    };
+  }, []);
 
   const [email, setEmail] = useState('')
   const [spots, setSpots] = useState(20)
@@ -123,6 +147,20 @@ function App() {
   const [pendingPlan, setPendingPlan] = useState(null)
   const [selectedProjectName, setSelectedProjectName] = useState('')
   const [fomoTimer, setFomoTimer] = useState(900)
+  const [account, setAccount] = useState(null)
+
+  const connectWallet = async () => {
+    if (window.ethereum) {
+      try {
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        setAccount(accounts[0]);
+      } catch (err) {
+        console.error("Wallet connection failed", err);
+      }
+    } else {
+      alert("Please install a Web3 wallet (like MetaMask) to use this feature.");
+    }
+  };
   const [notification, setNotification] = useState(null)
 
   useEffect(() => {
@@ -351,7 +389,7 @@ function App() {
   const handleProjectSubmit = async (projectData) => {
     setSubmitting(true)
     try {
-      const report = generateValidationReport(projectData)
+      const report = await generateValidationReport(projectData)
       setResults(report)
       setStep('fulfillment')
     } finally { setSubmitting(false) }
@@ -362,7 +400,7 @@ function App() {
     if (selected) { setResults(selected.results); setStep('fulfillment'); }
   };
 
-  if (!supabase) return <div>⚠️ Database offline</div>
+  // Note: supabase may be null if env vars are missing; individual components handle this gracefully
 
   const isInvestorRoute = window.location.pathname.toLowerCase().includes('/investor');
   const isInvestorDashboard = isInvestorRoute && window.location.pathname.toLowerCase().includes('/dashboard');
@@ -382,14 +420,42 @@ function App() {
             <div onClick={() => setStep('landing')} style={{ 
               fontSize: '1.8rem', 
               fontWeight: 900, 
-              background: 'linear-gradient(135deg, #6366f1, #ec4899)', 
+              background: 'linear-gradient(135deg, #10b981, #3b82f6)', 
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
-              cursor: 'pointer' 
-            }}>MarketVibe</div>
-            <div style={{ display: 'flex', gap: '2rem' }}>
-              <a href="/newsroom" onClick={(e) => { e.preventDefault(); setStep('newsroom'); }} style={{ color: 'var(--text-dim)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 600 }}>Newsroom</a>
-              <a href="/hub" onClick={(e) => { e.preventDefault(); setStep('hub'); }} style={{ color: 'var(--text-dim)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 600 }}>Launchpad</a>
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px' 
+            }}>
+              MarketVibe <span style={{ fontSize: '0.6rem', padding: '2px 6px', background: 'rgba(59,130,246,0.1)', color: '#3b82f6', border: '1px solid #3b82f6', borderRadius: '4px', verticalAlign: 'middle' }}>WEB3</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+              <div style={{ display: 'flex', gap: '2rem' }}>
+                <a href="/scan" onClick={(e) => { e.preventDefault(); setStep('scan'); }} style={{ color: step === 'scan' ? 'var(--primary)' : 'var(--text-dim)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 600 }}>Market Intel</a>
+                <a href="/blog" onClick={(e) => { e.preventDefault(); setStep('blog'); }} style={{ color: step === 'blog' ? 'var(--primary)' : 'var(--text-dim)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 600 }}>Trends</a>
+                <a href="/audit" onClick={(e) => { e.preventDefault(); setStep('audit'); }} style={{ color: step === 'audit' ? 'var(--primary)' : 'var(--text-dim)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 600 }}>VC Audit</a>
+              </div>
+              <div style={{ width: '1px', height: '24px', background: 'var(--glass-border)' }}></div>
+              <button 
+                onClick={connectWallet}
+                style={{
+                  background: 'rgba(16,185,129,0.1)',
+                  border: '1px solid var(--primary)',
+                  color: 'var(--primary)',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  fontSize: '0.8rem',
+                  fontWeight: 900,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: account ? '#10b981' : '#64748b', boxShadow: account ? '0 0 10px #10b981' : 'none' }}></div>
+                {account ? `${account.substring(0, 6)}...${account.slice(-4)}` : "CONNECT WALLET"}
+              </button>
             </div>
           </header>
         )}
@@ -402,13 +468,11 @@ function App() {
               case 'setup': return <ProjectForm onSubmit={handleProjectSubmit} submitting={submitting} />;
               case 'fulfillment': return <ResultsView results={results} email={email} unlocked={paid} onUnlock={handleUnlock} spots={spots} loading={loading} fomoTimer={fomoTimer} />;
               case 'admin': return <AdminDashboard />;
-              case 'launchpad':
-              case 'hub': return <LaunchpadDirectory supabase={supabase} />;
-              case 'launchpad-submit': return <LaunchpadSubmit supabase={supabase} />;
-              case 'newsroom': return <Newsroom />;
-              case 'news-article': return <NewsArticle />;
-              case 'p-seo': return <ResultsView results={generateValidationReport(activeNiche)} email={email} unlocked={true} onUnlock={handleUnlock} />;
-              case 'video-preview': return <VideoPreview />;
+              case 'scan': return <SecurityScanner />;
+              case 'audit': return <AuditService />;
+              case 'checklist': return <LeadMagnet />;
+              case 'blog': return <BlogIndex />;
+              case 'blog-post': return <BlogPost />;
               case 'privacy': return <PrivacyPolicy />;
               case 'terms': return <TermsOfService />;
               case 'about': return <About />;
@@ -424,7 +488,7 @@ function App() {
           })()}
         </main>
 
-        <EmailCapturePopup supabase={supabase} onEmailCaptured={setEmail} />
+        {supabase && <EmailCapturePopup supabase={supabase} onEmailCaptured={setEmail} />}
         <CookieConsent />
         
         {!isInvestorRoute && !isInvestorDashboard && (
