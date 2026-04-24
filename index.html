@@ -62,11 +62,9 @@
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1690496065763879"
     crossorigin="anonymous"></script>
 
-  <!-- Kill Vercel Development Toolbar -->
+  <!-- Clandestine Mode: Production Hardening -->
   <style>
-  <!-- Clandestine Mode: Strict Production Hardening -->
-  <style>
-    /* Absolute suppression of development artifacts */
+    /* Absolute suppression of Vercel injected artifacts */
     #vercel-speed-insights-widget,
     .vercel-toolbar-root,
     #__next-vercel-toolbar,
@@ -75,9 +73,7 @@
     .vercel-toolbar-root-container,
     div[class*="vercel-toolbar"],
     vercel-live-feedback,
-    #vercel-live-feedback,
-    [id*="vercel"],
-    [class*="VercelToolbar"] {
+    #vercel-live-feedback {
       display: none !important;
       visibility: hidden !important;
       opacity: 0 !important;
@@ -88,62 +84,9 @@
       position: absolute !important;
       left: -9999px !important;
       z-index: -9999 !important;
-      transform: scale(0) !important;
     }
   </style>
-  <script>
-    (function() {
-      const selectors = [
-        '#vercel-speed-insights-widget',
-        '.vercel-toolbar-root',
-        '#__next-vercel-toolbar',
-        '[data-vercel-toolbar]',
-        '[data-vercel-edit-mode]',
-        '.vercel-toolbar-root-container',
-        'vercel-live-feedback',
-        '#vercel-live-feedback'
-      ];
 
-      const nuclearPurge = () => {
-        // 1. Tag & Attribute Kill
-        selectors.forEach(s => document.querySelectorAll(s).forEach(el => el.remove()));
-        document.querySelectorAll('[id*="vercel"], [class*="vercel"], [data-vercel-toolbar]').forEach(el => el.remove());
-
-        // 2. Text-based Scan (Kill tooltips)
-        document.querySelectorAll('div').forEach(el => {
-          if (el.textContent && el.textContent.includes('Vercel Toolbar')) {
-            el.remove();
-          }
-        });
-
-        // 3. Shadow DOM Deep Clean
-        document.querySelectorAll('*').forEach(el => {
-          if (el.shadowRoot) {
-            const hits = el.shadowRoot.querySelectorAll('[id*="vercel"], [class*="vercel"], button, div');
-            hits.forEach(h => {
-              if (h.id?.includes('vercel') || h.className?.includes('vercel') || h.textContent?.includes('Vercel')) {
-                el.remove();
-              }
-            });
-          }
-        });
-
-        // 4. Global State Wipe
-        window.__VERCEL_TOOLBAR = undefined;
-        window.__VERCEL_LIVE_FEEDBACK = undefined;
-      };
-
-      // Periodic High-Frequency Purge
-      nuclearPurge();
-      const observer = new MutationObserver(nuclearPurge);
-      observer.observe(document.documentElement, { childList: true, subtree: true });
-      setInterval(nuclearPurge, 1000);
-      
-      // Cleanup window after initial load bursts
-      setTimeout(nuclearPurge, 3000);
-      setTimeout(nuclearPurge, 6000);
-    })();
-  </script>
 </head>
 
 <body>
