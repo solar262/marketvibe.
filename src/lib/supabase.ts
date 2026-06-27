@@ -1,7 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+function cleanEnv(value: string | undefined) {
+  return value?.trim() || undefined;
+}
+
+const supabaseUrl = cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_URL);
+const supabaseAnonKey = cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+const supabaseServiceRoleKey = cleanEnv(process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 function safeSupabaseHost() {
   if (!supabaseUrl) return "missing";
@@ -26,7 +31,6 @@ export function requireSupabase() {
 }
 
 export function getSupabaseAdmin() {
-  const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !supabaseServiceRoleKey) return null;
 
   return createClient(supabaseUrl, supabaseServiceRoleKey, {
@@ -41,8 +45,8 @@ export function supabaseConnectionStatus() {
   return {
     hasUrl: Boolean(supabaseUrl),
     hasAnonKey: Boolean(supabaseAnonKey),
-    hasServiceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
-    serverWritesEnabled: Boolean(supabaseUrl && process.env.SUPABASE_SERVICE_ROLE_KEY),
+    hasServiceRoleKey: Boolean(supabaseServiceRoleKey),
+    serverWritesEnabled: Boolean(supabaseUrl && supabaseServiceRoleKey),
     host: safeSupabaseHost(),
     urlLooksValid: Boolean(supabaseUrl?.startsWith("https://") && supabaseUrl.endsWith(".supabase.co")),
   };
