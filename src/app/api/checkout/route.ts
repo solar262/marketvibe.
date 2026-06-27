@@ -2,13 +2,72 @@ import Stripe from "stripe";
 import { NextResponse } from "next/server";
 import { hydrateCart, orderNumber } from "@/lib/checkout";
 import { stripePaymentLinks } from "@/lib/checkout-links";
+import type { MarketVibeProduct } from "@/lib/buyer-delivery";
+
+const productConfig: Record<MarketVibeProduct, { name: string; amount: number; mode: "payment" | "subscription"; description: string }> = {
+  audit: {
+    name: "MarketVibe Full Audit Report",
+    amount: 1900,
+    mode: "payment",
+    description: "Full lead details, scanner findings, outreach message, fix checklist, and report access.",
+  },
+  starter: {
+    name: "MarketVibe Starter",
+    amount: 1900,
+    mode: "subscription",
+    description: "50 lead opportunities per month for freelancers and service sellers.",
+  },
+  pro: {
+    name: "MarketVibe Pro",
+    amount: 4900,
+    mode: "subscription",
+    description: "250 lead opportunities per month for agencies and regular prospecting.",
+  },
+};
+
+function isProduct(value: unknown): value is MarketVibeProduct {
+  return value === "audit" || value === "starter" || value === "pro";
+}
 
 export async function POST(request: Request) {
-  const { cart, customer, product = "audit" } = await request.json();
-  const origin = request.headers.get("origin") || "http://localhost:3000";
+  const { cart, customer, product = "audit", leadSlug = "" } = await request.json();
+  const origin = request.headers.get("origin") || process.env.NEXT_PUBLIC_APP_URL || "https://marketvibe.vercel.app";
 
-  if (product in stripePaymentLinks && !cart) {
-    return NextResponse.json({ url: stripePaymentLinks[product as keyof typeof stripePaymentLinks] });
+  if (isProduct(product)) {
+    const config = productConfig[product];
+
+    if (process.env.STRIPE_SECRET_KEY) {
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+      const session = await stripe.checkout.sessions.create({
+        mode: config.mode,
+        customer_email: customer?.email,
+        client_reference_id: leadSlug || product,
+        line_items: [
+          {
+            quantity: 1,
+            price_data: {
+              currency: "eur",
+              unit_amount: config.amount,
+              recurring: config.mode === "subscription" ? { interval: "month" } : undefined,
+              product_data: {
+                name: config.name,
+                description: config.description,
+              },
+            },
+          },
+        ],
+        metadata: {
+          product,
+          leadSlug,
+        },
+        success_url: `${origin}/payment-success?product=${product}&lead=${encodeURIComponent(leadSlug)}&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: leadSlug ? `${origin}/audit/${leadSlug}` : `${origin}/pricing`,
+      });
+
+      return NextResponse.json({ url: session.url });
+    }
+
+    return NextResponse.json({ url: stripePaymentLinks[product] });
   }
 
   const items = hydrateCart(cart || []);
