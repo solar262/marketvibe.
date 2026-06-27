@@ -3,6 +3,12 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 
+const paymentLinks: Record<"audit" | "starter" | "pro", string> = {
+  audit: "https://buy.stripe.com/bJebJ11CTeBIdmafmW3ks0h",
+  starter: "https://buy.stripe.com/6oUaEX2GX1OWfui6Qq3ks0i",
+  pro: "https://buy.stripe.com/fZucN5ftJdxEbe2caK3ks0g",
+};
+
 export function CheckoutButton({
   product,
   leadSlug,
@@ -18,6 +24,13 @@ export function CheckoutButton({
 
   async function checkout() {
     setLoading(true);
+
+    const directLink = paymentLinks[product];
+    if (directLink) {
+      window.location.href = directLink;
+      return;
+    }
+
     const response = await fetch("/api/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
