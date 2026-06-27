@@ -27,9 +27,10 @@ export default function Home() {
                 View Sample Audit
               </Link>
             </div>
-            <div className="mt-8 grid gap-3 text-sm font-medium text-slate-700 sm:grid-cols-2">
+            <div className="mt-8 grid gap-3 text-sm font-medium text-slate-700 sm:grid-cols-3">
               <span className="inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-emerald-700" /> Public data only</span>
               <span className="inline-flex items-center gap-2"><MailCheck className="h-4 w-4 text-emerald-700" /> Compliance controls</span>
+              <span className="inline-flex items-center gap-2"><LockKeyhole className="h-4 w-4 text-emerald-700" /> Secure checkout</span>
             </div>
           </div>
 
@@ -64,7 +65,7 @@ export default function Home() {
           {[
             ["Find", "Choose country, city, business type, and the service you sell. MarketVibe returns public business profiles and contact routes."],
             ["Scan", "Each website is checked for SEO basics, speed signals, mobile readiness, contact visibility, booking links, reviews, social links, and outdated signals."],
-            ["Sell", "Generate a plain-English audit, outreach message, pitch angle, and public preview page for each business."],
+            ["Sell", "Generate a plain-English audit, outreach message, pitch angle, public preview page, and secure checkout for each business."],
           ].map(([title, body], index) => (
             <div key={title} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <span className="grid h-10 w-10 place-items-center rounded-md bg-slate-950 text-sm font-semibold text-white">{index + 1}</span>
