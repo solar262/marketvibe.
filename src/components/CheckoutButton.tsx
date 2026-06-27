@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { track } from "@vercel/analytics";
 import { Loader2 } from "lucide-react";
 
 const paymentLinks: Record<"audit" | "starter" | "pro", string> = {
@@ -24,6 +25,7 @@ export function CheckoutButton({
 
   async function checkout() {
     setLoading(true);
+    track("checkout_clicked", { product, lead_slug: leadSlug || "" });
 
     const directLink = paymentLinks[product];
     if (directLink) {
