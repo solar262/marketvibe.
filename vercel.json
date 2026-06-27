@@ -1,7 +1,7 @@
 {
   "crons": [
     {
-      "path": "/api/cron/lead-hunt?markets=2&leads=3",
+      "path": "/api/cron/lead-hunt",
       "schedule": "0 7 * * *"
     }
   ]
