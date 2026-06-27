@@ -3,9 +3,19 @@ import { NextResponse } from "next/server";
 import { hydrateCart, orderNumber } from "@/lib/checkout";
 import { leadSettings } from "@/lib/lead-engine";
 
+function getStripeSecretKey() {
+  return (process.env.STRIPE_SECRET_KEY || process.env.VITE_STRIPE_SECRET_KEY || "").trim();
+}
+
+function withSessionId(origin: string, path: string) {
+  const separator = path.includes("?") ? "&" : "?";
+  return `${origin}${path}${separator}session_id={CHECKOUT_SESSION_ID}`;
+}
+
 export async function POST(request: Request) {
   const { cart, customer, product = "audit", leadSlug } = await request.json();
   const origin = request.headers.get("origin") || "http://localhost:3000";
+  const stripeSecretKey = getStripeSecretKey();
 
   const leadProducts = {
     audit: {
@@ -30,11 +40,14 @@ export async function POST(request: Request) {
 
   if (product in leadProducts && !cart) {
     const selected = leadProducts[product as keyof typeof leadProducts];
-    if (!process.env.STRIPE_SECRET_KEY) {
-      return NextResponse.json({ url: `${origin}${selected.successPath}` });
+    if (!stripeSecretKey) {
+      return NextResponse.json(
+        { error: "Stripe checkout is not configured. Add STRIPE_SECRET_KEY in Vercel." },
+        { status: 503 },
+      );
     }
 
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+    const stripe = new Stripe(stripeSecretKey);
     const session = await stripe.checkout.sessions.create({
       mode: selected.mode,
       customer_email: customer?.email,
@@ -48,7 +61,7 @@ export async function POST(request: Request) {
         },
       }],
       metadata: { product, lead_slug: leadSlug || "" },
-      success_url: `${origin}${selected.successPath}&session_id={CHECKOUT_SESSION_ID}`,
+      success_url: withSessionId(origin, selected.successPath),
       cancel_url: `${origin}/pricing`,
     });
 
@@ -70,11 +83,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ url: url.toString(), order: number });
   }
 
-  if (!process.env.STRIPE_SECRET_KEY) {
-    return NextResponse.json({ url: `${origin}/success?order=${number}` });
+  if (!stripeSecretKey) {
+    return NextResponse.json(
+      { error: "Stripe checkout is not configured. Add STRIPE_SECRET_KEY in Vercel." },
+      { status: 503 },
+    );
   }
 
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  const stripe = new Stripe(stripeSecretKey);
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     customer_email: customer?.email,
@@ -87,7 +103,7 @@ export async function POST(request: Request) {
       },
     })),
     metadata: { order_number: number, customer_name: customer?.name || "" },
-    success_url: `${origin}/success?order=${number}&session_id={CHECKOUT_SESSION_ID}`,
+    success_url: withSessionId(origin, `/success?order=${number}`),
     cancel_url: `${origin}/cart`,
   });
 
