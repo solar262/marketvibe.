@@ -24,13 +24,13 @@ export async function POST(request: Request) {
       input,
       leads: demoLeads,
       sourceStatus: "demo",
-      sourceNote: "DEMO: No live public businesses with listed websites and public contact details were returned for this search.",
+      sourceNote: "No qualified live public opportunities were returned for this search. Sample previews are shown instead.",
     });
 
     return NextResponse.json({
       leads: demoLeads,
       sourceStatus: "demo",
-      sourceNote: "DEMO: No live public businesses with listed websites and public contact details were returned for this search. These sample leads are not real businesses.",
+      sourceNote: "No qualified live public opportunities were returned for this search. Sample previews are shown instead.",
       persistence,
     });
   } catch (error) {
@@ -40,14 +40,14 @@ export async function POST(request: Request) {
       input,
       leads: demoLeads,
       sourceStatus: "demo",
-      sourceNote: "DEMO: Live public API search failed, so these are sample leads only.",
+      sourceNote: "Live public search is temporarily unavailable. Sample previews are shown instead.",
       errorMessage,
     });
 
     return NextResponse.json({
       leads: demoLeads,
       sourceStatus: "demo",
-      sourceNote: `DEMO: Live public API search failed, so these are sample leads only. ${errorMessage}`,
+      sourceNote: "Live public search is temporarily unavailable. Sample previews are shown instead.",
       persistence,
     });
   }

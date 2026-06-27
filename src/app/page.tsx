@@ -37,7 +37,7 @@ export default function Home() {
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-5 shadow-sm">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold text-amber-700">DEMO sample opportunity</p>
+                <p className="text-sm font-semibold text-emerald-700">Sample preview</p>
                 <h2 className="mt-1 text-2xl font-semibold text-slate-950">{lead.businessName}</h2>
                 <p className="mt-1 text-sm text-slate-600">{lead.city}, {lead.country} · {lead.businessCategory}</p>
               </div>

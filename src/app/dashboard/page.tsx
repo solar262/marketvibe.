@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Gauge, MailWarning, Search, Settings, type LucideIcon } from "lucide-react";
+import { ArrowRight, Gauge, PackageOpen, Search, Settings, type LucideIcon } from "lucide-react";
 import { leadSettings, sampleLeads } from "@/lib/lead-engine";
 
 export default function DashboardPage() {
@@ -7,7 +7,7 @@ export default function DashboardPage() {
   const workflowCards: Array<[LucideIcon, string, string, string]> = [
     [Search, "Search setup", "Country, city, business type, and service category selectors are ready.", "/lead-search"],
     [Gauge, "Audit scoring", "Scores use the requested CTA, booking, speed, SEO, review, social, mobile, and outdated-signal weights.", "/lead-results"],
-    [MailWarning, "Outreach guardrails", "Automated sending is off by default, with opt-out, suppression, and rate-limit controls.", "/compliance"],
+    [PackageOpen, "Lead packs", "Compare Free, Starter, and Pro access for ranked monthly opportunities.", "/lead-packs"],
     [Settings, "Admin controls", "Daily send limit, prices, free limits, allowed countries, and categories are configurable.", "/admin/settings"],
   ];
 
@@ -19,16 +19,21 @@ export default function DashboardPage() {
           <h1 className="mt-2 text-3xl font-semibold text-slate-950">Lead Engine Workspace</h1>
           <p className="mt-2 max-w-2xl text-slate-600">Search markets, review audit scores, open public audit pages, and control outreach compliance before sending anything.</p>
         </div>
-        <Link href="/lead-search" className="inline-flex items-center justify-center gap-2 rounded-md bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">
-          Find Leads <ArrowRight className="h-4 w-4" />
-        </Link>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Link href="/lead-packs" className="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800">
+            Lead Packs <ArrowRight className="h-4 w-4" />
+          </Link>
+          <Link href="/lead-search" className="inline-flex items-center justify-center gap-2 rounded-md bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">
+            Lead Search <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
       </div>
 
       <section className="mt-8 grid gap-4 md:grid-cols-4">
         {[
-          ["Free leads", `${leadSettings.freeLeadLimit}`, "Included sample leads"],
-          ["Starter", "50", "Leads per month"],
-          ["Pro", "250", "Leads per month"],
+          ["Free", `${leadSettings.freeLeadLimit}`, "Sample previews"],
+          ["Starter", "50", "Leads/month"],
+          ["Pro", "250", "Leads/month"],
           ["High priority", `${highPriority}`, "Current sample matches"],
         ].map(([label, value, body]) => (
           <div key={label} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -49,12 +54,6 @@ export default function DashboardPage() {
         ))}
       </section>
 
-      <section className="mt-8 rounded-lg border border-amber-200 bg-amber-50 p-5">
-        <h2 className="font-semibold text-amber-950">Compliance warning before automated sending</h2>
-        <p className="mt-2 text-sm leading-6 text-amber-900">
-          Do not send deceptive emails, hide sender identity, scrape private data, or repeatedly contact the same business. Use generic business emails where legally allowed and maintain a suppression list.
-        </p>
-      </section>
     </main>
   );
 }

@@ -23,7 +23,7 @@ export default async function AuditPage({
         <div className="grid gap-6 md:grid-cols-[1fr_auto]">
           <div>
             <p className={`text-sm font-semibold ${lead.sourceStatus === "live" ? "text-emerald-700" : "text-amber-700"}`}>
-              {lead.sourceStatus === "live" ? "LIVE public audit preview" : "DEMO sample audit preview"}
+              {lead.sourceStatus === "live" ? "LIVE public audit preview" : "Sample audit preview"}
             </p>
             <h1 className="mt-2 text-3xl font-semibold text-slate-950">{lead.businessName}</h1>
             <p className="mt-2 text-slate-600">{lead.city}, {lead.country} · {lead.businessCategory}</p>
@@ -36,7 +36,7 @@ export default async function AuditPage({
         <section className="mt-8">
           {lead.sourceStatus !== "live" && (
             <div className="mb-5 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-900">
-              DEMO: This sample audit is not a real business. Run Lead Search to create live public-data audit results.
+              Sample preview. Run Lead Search to create live public-data audit results.
             </div>
           )}
           <h2 className="text-xl font-semibold text-slate-950">Visible Issues</h2>

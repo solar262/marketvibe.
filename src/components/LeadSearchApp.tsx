@@ -17,9 +17,8 @@ export function LeadSearchApp({ initialLeads = [] }: { initialLeads?: BusinessLe
   const [input, setInput] = useState(defaultInput);
   const [leads, setLeads] = useState<BusinessLead[]>(initialLeads);
   const [loading, setLoading] = useState(false);
-  const [sourceNote, setSourceNote] = useState(initialLeads.length ? "DEMO: These initial sample leads are not real businesses. Click Find Leads to search live public business data." : "");
+  const [sourceNote, setSourceNote] = useState(initialLeads.length ? "Sample previews are shown until you run a live public data search." : "");
   const [sourceStatus, setSourceStatus] = useState<"live" | "demo" | "idle">(initialLeads.length ? "demo" : "idle");
-  const [persistenceNote, setPersistenceNote] = useState("");
 
   async function runSearch() {
     setLoading(true);
@@ -32,7 +31,6 @@ export function LeadSearchApp({ initialLeads = [] }: { initialLeads?: BusinessLe
     setLeads(data.leads || []);
     setSourceNote(data.sourceNote || "");
     setSourceStatus(data.sourceStatus || "idle");
-    setPersistenceNote(data.persistence?.saved ? `Saved to Supabase search run ${data.persistence.searchRunId}.` : data.persistence?.error ? `Not saved to Supabase: ${data.persistence.error}` : "");
     setLoading(false);
   }
 
@@ -72,11 +70,10 @@ export function LeadSearchApp({ initialLeads = [] }: { initialLeads?: BusinessLe
           Find Leads
         </button>
         {sourceNote && (
-          <div className={`mt-4 rounded-md p-3 text-xs font-semibold leading-5 ${sourceStatus === "live" ? "bg-emerald-50 text-emerald-900" : "bg-amber-50 text-amber-900"}`}>
+          <div className={`mt-4 rounded-md p-3 text-xs font-semibold leading-5 ${sourceStatus === "live" ? "bg-emerald-50 text-emerald-900" : "bg-slate-50 text-slate-700"}`}>
             {sourceNote}
           </div>
         )}
-        {persistenceNote && <p className="mt-3 text-xs leading-5 text-slate-500">{persistenceNote}</p>}
       </section>
 
       <section className="min-w-0">
@@ -87,7 +84,7 @@ export function LeadSearchApp({ initialLeads = [] }: { initialLeads?: BusinessLe
           </div>
           {sourceStatus !== "idle" && (
             <span className={`rounded-md px-3 py-1 text-xs font-semibold ${sourceStatus === "live" ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900"}`}>
-              {sourceStatus === "live" ? "LIVE PUBLIC DATA" : "DEMO SAMPLE DATA"}
+              {sourceStatus === "live" ? "LIVE PUBLIC DATA" : "SAMPLE PREVIEW"}
             </span>
           )}
           <Link href="/pricing" className="hidden text-sm font-semibold text-slate-950 hover:underline sm:block">Upgrade limits</Link>
@@ -102,7 +99,7 @@ export function LeadSearchApp({ initialLeads = [] }: { initialLeads?: BusinessLe
                     <h3 className="text-lg font-semibold text-slate-950">{lead.businessName}</h3>
                     <span className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-800">{lead.audit.priority} priority</span>
                     <span className={`rounded-md px-2 py-1 text-xs font-semibold ${lead.sourceStatus === "live" ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900"}`}>
-                      {lead.sourceStatus === "live" ? "LIVE" : "DEMO"}
+                      {lead.sourceStatus === "live" ? "LIVE" : "SAMPLE"}
                     </span>
                   </div>
                   <p className="mt-1 text-sm text-slate-600">{lead.city}, {lead.country} · {lead.businessCategory}</p>

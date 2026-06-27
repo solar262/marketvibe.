@@ -1,64 +1,83 @@
 import Link from "next/link";
-import { PlayCircle, ShieldCheck, TimerReset } from "lucide-react";
-import { autopilotMarkets } from "@/lib/autopilot";
+import { AlertTriangle, Bot, Database, Play, Route } from "lucide-react";
+import { autopilotStatus } from "@/lib/autopilot";
+import { getPersistenceStats } from "@/lib/lead-persistence";
 
-export default function AutopilotAdminPage() {
+export default async function AdminAutopilotPage() {
+  const status = autopilotStatus();
+  const persistence = await getPersistenceStats();
+
   return (
     <main className="p-4 sm:p-6 lg:p-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-sm font-semibold text-emerald-700">Autopilot</p>
-          <h1 className="mt-2 text-3xl font-semibold text-slate-950">Scheduled Lead Hunt</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-            This is the no-human-in-the-loop engine: it checks configured markets, scans websites, scores opportunities, and saves results when Supabase is connected.
-          </p>
+          <p className="text-sm font-semibold text-emerald-700">Admin</p>
+          <h1 className="mt-2 text-3xl font-semibold text-slate-950">Autopilot</h1>
+          <p className="mt-2 max-w-2xl text-slate-600">Run scheduled lead hunts, save ranked opportunities to Supabase, and keep outreach manual until sending controls are ready.</p>
         </div>
-        <a href="/api/cron/lead-hunt?markets=1&leads=2" target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-md bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">
-          <PlayCircle className="h-4 w-4" /> Test one run
-        </a>
+        <Link href="/api/cron/lead-hunt?markets=1&leads=2" className="inline-flex items-center justify-center gap-2 rounded-md bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">
+          <Play className="h-4 w-4" /> Run test hunt
+        </Link>
       </div>
 
-      <section className="mt-6 grid gap-4 md:grid-cols-3">
+      <section className="mt-6 grid gap-4 md:grid-cols-4">
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <TimerReset className="h-5 w-5 text-emerald-700" />
-          <h2 className="mt-4 font-semibold text-slate-950">Schedule</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">Daily at 06:00 UTC from Vercel Cron. The route can also be triggered by an external scheduler for more frequent runs.</p>
+          <Bot className="h-5 w-5 text-emerald-700" />
+          <p className="mt-4 text-sm text-slate-500">Autopilot status</p>
+          <p className="mt-1 text-2xl font-semibold text-slate-950">{status.enabled ? "Ready" : "Off"}</p>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <ShieldCheck className="h-5 w-5 text-emerald-700" />
-          <h2 className="mt-4 font-semibold text-slate-950">Safe by default</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">It does not send spam. It finds, scores, and stores opportunities. Email sending remains off until compliance is reviewed.</p>
+          <Route className="h-5 w-5 text-emerald-700" />
+          <p className="mt-4 text-sm text-slate-500">Markets in rotation</p>
+          <p className="mt-1 text-2xl font-semibold text-slate-950">{status.marketsInRotation.length}</p>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <PlayCircle className="h-5 w-5 text-emerald-700" />
-          <h2 className="mt-4 font-semibold text-slate-950">Endpoint</h2>
-          <code className="mt-2 block rounded-md bg-slate-50 p-3 text-xs text-slate-700">/api/cron/lead-hunt</code>
+          <Database className="h-5 w-5 text-emerald-700" />
+          <p className="mt-4 text-sm text-slate-500">Saved leads</p>
+          <p className="mt-1 text-2xl font-semibold text-slate-950">{persistence.savedLeadsCount}</p>
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <Database className="h-5 w-5 text-emerald-700" />
+          <p className="mt-4 text-sm text-slate-500">Saved audits</p>
+          <p className="mt-1 text-2xl font-semibold text-slate-950">{persistence.savedAuditsCount}</p>
         </div>
       </section>
 
+      {!persistence.connected && (
+        <section className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-900">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+            <div>
+              <p className="font-semibold">Supabase is not saving lead hunts.</p>
+              <p className="mt-1">{persistence.error || "Check Supabase URL, anon key, service role key, and migrations."}</p>
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="font-semibold text-slate-950">Markets in rotation</h2>
-        <div className="mt-4 grid gap-3">
-          {autopilotMarkets.map((market) => (
-            <div key={market.label} className="rounded-md border border-slate-200 bg-slate-50 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h3 className="font-semibold text-slate-950">{market.label}</h3>
-                <span className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-800">{market.serviceCategory}</span>
-              </div>
-              <p className="mt-1 text-sm text-slate-600">{market.city}, {market.country} · {market.businessType}</p>
-              <p className="mt-2 text-sm leading-6 text-slate-700">{market.buyerAngle}</p>
+        <h2 className="text-xl font-semibold text-slate-950">Cron endpoint</h2>
+        <p className="mt-2 rounded-md bg-slate-50 p-3 font-mono text-sm text-slate-700">{status.cronEndpoint}</p>
+        <p className="mt-2 text-sm text-slate-600">Vercel cron is configured to call `/api/cron/lead-hunt?markets=2&leads=3` daily at 07:00 UTC.</p>
+      </section>
+
+      <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="text-xl font-semibold text-slate-950">Markets currently in rotation</h2>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {status.marketsInRotation.map((market) => (
+            <div key={`${market.country}-${market.city}-${market.businessType}`} className="rounded-md border border-slate-200 bg-slate-50 p-4">
+              <p className="font-semibold text-slate-950">{market.city}, {market.country}</p>
+              <p className="mt-1 text-sm text-slate-600">{market.businessType} · {market.serviceCategory}</p>
             </div>
           ))}
         </div>
       </section>
 
-      <section className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-5">
-        <h2 className="font-semibold text-amber-950">Important</h2>
-        <p className="mt-2 text-sm leading-6 text-amber-900">
-          For true saved history, Supabase must stay connected. If Supabase is unavailable, the engine still produces fallback preview packs but cannot keep permanent saved lead inventory.
-        </p>
-        <Link href="/admin/persistence" className="mt-4 inline-flex text-sm font-semibold text-amber-950 underline">Check persistence</Link>
+      <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="text-xl font-semibold text-slate-950">Outreach status</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-600">Automatic cold email sending is not enabled. MarketVibe generates outreach copy for buyers to review and send manually.</p>
       </section>
     </main>
   );
 }
+
