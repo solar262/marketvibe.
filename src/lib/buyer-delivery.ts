@@ -10,7 +10,7 @@ type DeliveryInput = {
   sessionId?: string;
 };
 
-const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://marketvibe.vercel.app";
+const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://marketvibe1.com";
 
 function productLabel(product: MarketVibeProduct) {
   if (product === "starter") return "MarketVibe Starter";
