@@ -1,12 +1,7 @@
 "use client";
 
+import { track } from "@vercel/analytics";
 import { stripePaymentLinks } from "@/lib/checkout-links";
-
-declare global {
-  interface Window {
-    va?: (event: string, properties?: Record<string, string>) => void;
-  }
-}
 
 export function CheckoutButton({
   product,
@@ -20,7 +15,7 @@ export function CheckoutButton({
   className: string;
 }) {
   function checkout() {
-    window.va?.("checkout_click", { product, leadSlug: leadSlug || "" });
+    track("checkout_click", { product, leadSlug: leadSlug || "" });
     window.location.href = stripePaymentLinks[product];
   }
 
