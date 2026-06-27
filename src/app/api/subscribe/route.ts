@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { addContactToMarketVibeList, addOrUpdateContact, sendTransactionalEmail } from "@/lib/brevo";
 
-const leadPacksUrl = "https://marketvibe.vercel.app/lead-packs";
-const pricingUrl = "https://marketvibe.vercel.app/pricing";
+const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://marketvibe1.com";
+const leadPacksUrl = `${baseUrl}/lead-packs`;
+const pricingUrl = `${baseUrl}/pricing`;
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
@@ -56,4 +57,3 @@ ${pricingUrl}`,
     }, { status: 500 });
   }
 }
-
