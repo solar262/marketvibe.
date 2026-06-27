@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { addContactToMarketVibeList, addOrUpdateContact, sendTransactionalEmail } from "@/lib/brevo";
 
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://marketvibe1.com";
-const leadPacksUrl = `${baseUrl}/lead-packs`;
+const leadSearchUrl = `${baseUrl}/lead-search`;
 const pricingUrl = `${baseUrl}/pricing`;
 
 export async function POST(request: Request) {
@@ -28,22 +28,22 @@ export async function POST(request: Request) {
     await addContactToMarketVibeList(email, attributes);
     await sendTransactionalEmail({
       to: email,
-      subject: "Your 3 free MarketVibe lead previews are ready",
+      subject: "Your MarketVibe lead search is ready",
       htmlContent: `
         <p>Hi${firstName ? ` ${firstName}` : ""},</p>
         <p>Thanks for joining MarketVibe.</p>
-        <p>MarketVibe helps freelancers and agencies find businesses with website, SEO, booking, review, and conversion opportunities.</p>
-        <p><a href="${leadPacksUrl}">Open your lead previews</a></p>
+        <p>Use MarketVibe to find businesses with website, SEO, booking, review, and conversion opportunities.</p>
+        <p><a href="${leadSearchUrl}">Run your lead search</a></p>
         <p><a href="${pricingUrl}">View pricing</a></p>
       `,
       textContent: `Hi${firstName ? ` ${firstName}` : ""},
 
 Thanks for joining MarketVibe.
 
-MarketVibe helps freelancers and agencies find businesses with website, SEO, booking, review, and conversion opportunities.
+Use MarketVibe to find businesses with website, SEO, booking, review, and conversion opportunities.
 
-Open your lead previews:
-${leadPacksUrl}
+Run your lead search:
+${leadSearchUrl}
 
 View pricing:
 ${pricingUrl}`,
