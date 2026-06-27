@@ -3,6 +3,16 @@ import { createClient } from "@supabase/supabase-js";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+function safeSupabaseHost() {
+  if (!supabaseUrl) return "missing";
+  try {
+    const url = new URL(supabaseUrl);
+    return url.host;
+  } catch {
+    return "invalid url";
+  }
+}
+
 export const supabase =
   supabaseUrl && supabaseAnonKey
     ? createClient(supabaseUrl, supabaseAnonKey)
@@ -33,5 +43,7 @@ export function supabaseConnectionStatus() {
     hasAnonKey: Boolean(supabaseAnonKey),
     hasServiceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
     serverWritesEnabled: Boolean(supabaseUrl && process.env.SUPABASE_SERVICE_ROLE_KEY),
+    host: safeSupabaseHost(),
+    urlLooksValid: Boolean(supabaseUrl?.startsWith("https://") && supabaseUrl.endsWith(".supabase.co")),
   };
 }
