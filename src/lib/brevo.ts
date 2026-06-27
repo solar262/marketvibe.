@@ -45,7 +45,7 @@ async function brevoFetch(path: string, init: RequestInit) {
 export function getBrevoStatus() {
   const config = brevoConfig();
   return {
-    configured: Boolean(config.apiKey && config.senderEmail && config.listId),
+    configured: Boolean(config.apiKey && config.senderEmail),
     hasApiKey: Boolean(config.apiKey),
     hasSenderEmail: Boolean(config.senderEmail),
     hasSenderName: Boolean(config.senderName),
@@ -74,9 +74,12 @@ export async function addOrUpdateContact(email: string, attributes: BrevoAttribu
 
 export async function addContactToMarketVibeList(email: string, attributes: BrevoAttributes = {}) {
   const config = brevoConfig();
-  if (!config.listId) throw new Error("Brevo MarketVibe list ID is not configured.");
-
   await addOrUpdateContact(email, attributes);
+
+  if (!config.listId) {
+    return { skipped: true, reason: "BREVO_MARKETVIBE_LIST_ID is not configured." };
+  }
+
   return brevoFetch(`/contacts/lists/${config.listId}/contacts/add`, {
     method: "POST",
     body: JSON.stringify({ emails: [email.trim().toLowerCase()] }),
@@ -98,4 +101,3 @@ export async function sendTransactionalEmail({ to, subject, htmlContent, textCon
     }),
   });
 }
-
