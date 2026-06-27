@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import { addContactToMarketVibeList, addOrUpdateContact, sendTransactionalEmail } from "./brevo";
+import { addContactToMarketVibeList, addOrUpdateContact, scheduleBuyerSequence, sendTransactionalEmail } from "./brevo";
 
 export type MarketVibeProduct = "audit" | "starter" | "pro";
 
@@ -50,11 +50,14 @@ export async function sendBuyerDeliveryEmail({ email, product, leadSlug, session
     PLAN: product,
     LEAD_SLUG: leadSlug || "",
     STRIPE_SESSION_ID: sessionId || "",
+    FUNNEL_STAGE: "buyer",
   });
   await addContactToMarketVibeList(normalizedEmail, {
     SOURCE: "stripe_buyer",
     PRODUCT: product,
     PLAN: product,
+    STRIPE_SESSION_ID: sessionId || "",
+    FUNNEL_STAGE: "buyer",
   });
 
   const htmlContent = `
@@ -91,6 +94,7 @@ MarketVibe`;
     htmlContent,
     textContent,
   });
+  await scheduleBuyerSequence(normalizedEmail);
 }
 
 export async function deliverStripeSession(session: Stripe.Checkout.Session) {

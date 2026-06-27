@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
-import { addContactToMarketVibeList, addOrUpdateContact, sendTransactionalEmail } from "@/lib/brevo";
-
-const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.marketvibe1.com";
-const leadSearchUrl = `${baseUrl}/lead-search`;
-const pricingUrl = `${baseUrl}/pricing`;
+import { track } from "@vercel/analytics/server";
+import {
+  addContactToMarketVibeList,
+  addOrUpdateContact,
+  leadSearchUrl,
+  pricingUrl,
+  scheduleFreeLeadSequence,
+  sendTransactionalEmail,
+} from "@/lib/brevo";
 
 function emailHtml(firstName: string) {
   const greeting = firstName ? `Hi ${firstName},` : "Hi,";
@@ -62,6 +66,7 @@ export async function POST(request: Request) {
       SERVICE_TYPE: serviceType,
       CITY: city,
       SOURCE: "free_leads_form",
+      FUNNEL_STAGE: "free_lead",
     };
 
     await addOrUpdateContact(email, attributes);
@@ -72,6 +77,8 @@ export async function POST(request: Request) {
       htmlContent: emailHtml(firstName),
       textContent: emailText(firstName),
     });
+    await scheduleFreeLeadSequence(email, firstName);
+    await track("free_leads_success", { source: "free_leads_form" }).catch(() => undefined);
 
     return NextResponse.json({ ok: true });
   } catch (error) {

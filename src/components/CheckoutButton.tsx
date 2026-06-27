@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { track } from "@vercel/analytics";
-import { stripePaymentLinks } from "@/lib/checkout-links";
 
 export function CheckoutButton({
   product,
@@ -22,22 +21,22 @@ export function CheckoutButton({
     setLoading(true);
     track("checkout_click", { product, leadSlug: leadSlug || "" });
 
-    try {
-      const response = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ product, leadSlug: leadSlug || "" }),
-      });
-      const data = await response.json();
-      window.location.href = data.url || stripePaymentLinks[product];
-    } catch {
-      window.location.href = stripePaymentLinks[product];
+    const response = await fetch("/api/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ product, leadSlug: leadSlug || "" }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (data.url) {
+      window.location.href = data.url;
+      return;
     }
+    setLoading(false);
   }
 
   return (
     <button onClick={checkout} disabled={loading} className={className}>
-      {loading ? "Opening checkout..." : children}
+      {loading ? "Opening Stripe..." : children}
     </button>
   );
 }
