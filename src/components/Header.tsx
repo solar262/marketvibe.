@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LayoutDashboard, Menu, Search, X } from "lucide-react";
+import { Menu, Search, X } from "lucide-react";
 import { useState } from "react";
 
 const links = [
@@ -33,9 +33,6 @@ export function Header() {
           ))}
         </nav>
         <div className="hidden items-center gap-2 lg:flex">
-          <Link aria-label="Admin dashboard" title="Admin dashboard" href="/admin" className="rounded-md border border-slate-200 p-2 hover:bg-slate-50">
-            <LayoutDashboard className="h-5 w-5" />
-          </Link>
           <Link href="/lead-search" className="inline-flex items-center gap-2 rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
             <Search className="h-4 w-4" /> Find Leads
           </Link>
@@ -52,7 +49,6 @@ export function Header() {
                 {label}
               </Link>
             ))}
-            <Link href="/admin" onClick={() => setOpen(false)}>Admin</Link>
           </div>
         </div>
       )}
