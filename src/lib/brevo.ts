@@ -10,7 +10,7 @@ type TransactionalEmailInput = {
 function brevoConfig() {
   return {
     apiKey: process.env.BREVO_API_KEY || "",
-    senderEmail: process.env.BREVO_SENDER_EMAIL || process.env.OUTREACH_FROM_EMAIL || "",
+    senderEmail: process.env.BREVO_SENDER_EMAIL || process.env.OUTREACH_FROM_EMAIL || "hello@marketvibe1.com",
     senderName: process.env.BREVO_SENDER_NAME || process.env.OUTREACH_FROM_NAME || "MarketVibe",
     listId: process.env.BREVO_MARKETVIBE_LIST_ID || "",
   };
