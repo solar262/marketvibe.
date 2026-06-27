@@ -24,7 +24,6 @@ export function Footer() {
             <Link href="/compliance">Compliance</Link>
             <Link href="/privacy">Privacy</Link>
             <Link href="/terms">Terms</Link>
-            <Link href="/admin/settings">Admin Settings</Link>
           </div>
         </div>
       </div>
