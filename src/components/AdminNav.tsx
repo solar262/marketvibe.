@@ -1,0 +1,29 @@
+import Link from "next/link";
+import { BarChart3, Database, Search, Settings, ShieldCheck } from "lucide-react";
+
+const links = [
+  ["Dashboard", "/admin", BarChart3],
+  ["Lead Search", "/lead-search", Search],
+  ["Compliance", "/compliance", ShieldCheck],
+  ["Persistence", "/admin/persistence", Database],
+  ["Settings", "/admin/settings", Settings],
+];
+
+export function AdminNav() {
+  return (
+    <aside className="border-b border-slate-200 bg-white lg:min-h-screen lg:w-64 lg:border-b-0 lg:border-r">
+      <div className="px-4 py-5">
+        <p className="text-sm font-semibold text-slate-950">MarketVibe Admin</p>
+        <p className="text-xs text-slate-500">Lead engine console</p>
+      </div>
+      <nav className="flex gap-1 overflow-x-auto px-3 pb-3 lg:grid lg:overflow-visible">
+        {links.map(([label, href, Icon]) => (
+          <Link key={href as string} href={href as string} className="inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-950">
+            <Icon className="h-4 w-4" />
+            {label as string}
+          </Link>
+        ))}
+      </nav>
+    </aside>
+  );
+}
