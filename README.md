@@ -1,16 +1,16 @@
-# MarketVibe Pro
+# MarketVibe Lead Engine
 
-An original full-stack dropshipping marketplace inspired by the referenced public app concept. It does not copy private code, branding, or protected assets.
+MarketVibe Lead Engine helps opted-in visitors and customers find public business opportunities, preview audits, purchase access through Stripe Checkout, and receive Brevo transactional follow-up emails.
 
 ## What is included
 
 - Next.js App Router, TypeScript, Tailwind CSS
-- Public storefront: home, products, product detail, categories, cart, checkout, success, contact, policies
-- Admin area: dashboard, products, product form, CSV import preview, orders, fulfillment, settings
-- Stripe Checkout API route with demo fallback when keys are absent
-- Stripe webhook route ready to mark orders paid
+- Public funnel: home, free leads, lead search, audit previews, pricing, payment success, contact, policies
+- Protected admin area for internal settings and fulfillment
+- Stripe Checkout API route for audit, Starter, Pro, and cart sessions
+- Stripe webhook route for buyer delivery and buyer follow-up email scheduling
+- Brevo contact sync and transactional email sequences for opted-in subscribers and buyers
 - Supabase client wiring, SQL schema, seed SQL, and sample CSV
-- Demo admin login: `admin@marketvibepro.test` / `marketvibe123`
 
 ## Local setup
 
@@ -24,26 +24,17 @@ Open `http://localhost:3000`.
 
 ## Stripe setup
 
-### Option A: Stripe Payment Link
-
-Create a Payment Link in Stripe, then add it to `.env.local`:
-
-```bash
-STRIPE_PAYMENT_LINK_URL=https://buy.stripe.com/...
-```
-
-When this is set, checkout redirects customers to your real Stripe-hosted payment page. MarketVibe Pro appends `prefilled_email` and `client_reference_id` to the URL, so the order number is available in Stripe webhooks for reconciliation.
-
-Important: a Stripe Payment Link charges the product/price configured inside Stripe. Use this option when you want one fixed payment link, donation/tip flow, or a Stripe-managed product bundle.
-
-### Option B: Dynamic Stripe Checkout
-
-For cart-specific totals, add these values to `.env.local` instead:
+Add these values to `.env.local`:
 
 ```bash
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_AUDIT_PRICE_ID=price_...
+STRIPE_STARTER_PRICE_ID=price_...
+STRIPE_PRO_PRICE_ID=price_...
 ```
+
+The price IDs are recommended for production. If they are not present, the checkout route creates Stripe price data for the built-in audit, Starter, and Pro offers.
 
 Then forward webhooks during local development:
 
@@ -51,7 +42,7 @@ Then forward webhooks during local development:
 stripe listen --forward-to localhost:3000/api/webhooks/stripe
 ```
 
-The webhook handler listens for `checkout.session.completed`. In this demo it logs the order number; connect it to Supabase updates after enabling real persistence.
+The webhook handler listens for `checkout.session.completed`, verifies the Stripe signature, updates the buyer contact in Brevo, sends the access email, and schedules buyer follow-up emails.
 
 ## Supabase setup
 
