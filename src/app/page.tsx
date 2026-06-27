@@ -28,8 +28,8 @@ export default function Home() {
               </Link>
             </div>
             <div className="mt-8 grid gap-3 text-sm font-medium text-slate-700 sm:grid-cols-3">
-              <span className="inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-emerald-700" /> Public data only</span>
-              <span className="inline-flex items-center gap-2"><MailCheck className="h-4 w-4 text-emerald-700" /> Compliance controls</span>
+              <span className="inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-emerald-700" /> Opportunity scoring</span>
+              <span className="inline-flex items-center gap-2"><MailCheck className="h-4 w-4 text-emerald-700" /> Audit generator</span>
               <span className="inline-flex items-center gap-2"><LockKeyhole className="h-4 w-4 text-emerald-700" /> Secure checkout</span>
             </div>
           </div>
