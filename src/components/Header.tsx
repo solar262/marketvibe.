@@ -6,10 +6,10 @@ import { useState } from "react";
 
 const links = [
   ["Home", "/"],
+  ["Free Leads", "/free-leads"],
   ["Dashboard", "/dashboard"],
   ["Lead Packs", "/lead-packs"],
   ["Lead Search", "/lead-search"],
-  ["Lead Packs", "/lead-packs"],
   ["Pricing", "/pricing"],
   ["Compliance", "/compliance"],
   ["Contact", "/contact"],

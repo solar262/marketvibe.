@@ -5,6 +5,7 @@ const links = [
   ["Dashboard", "/admin", BarChart3],
   ["Lead Search", "/lead-search", Search],
   ["Autopilot", "/admin/autopilot", Bot],
+  ["Email", "/admin/email", Mail],
   ["Outreach", "/admin/outreach", Mail],
   ["Compliance", "/compliance", ShieldCheck],
   ["Persistence", "/admin/persistence", Database],
