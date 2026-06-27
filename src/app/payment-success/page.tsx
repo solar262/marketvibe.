@@ -2,6 +2,7 @@ import Link from "next/link";
 import Stripe from "stripe";
 import { CheckCircle2, FileSearch, Search } from "lucide-react";
 import { deliverStripeSession } from "@/lib/buyer-delivery";
+import { TrackEvent } from "@/components/TrackEvent";
 
 async function verifyAndDeliver(sessionId?: string) {
   if (!sessionId || !process.env.STRIPE_SECRET_KEY) return { status: "unknown", message: "Payment received. Delivery will also run through Stripe webhook if configured." };
@@ -30,6 +31,7 @@ export default async function PaymentSuccessPage({
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
+      <TrackEvent name="payment_success" />
       <div className="rounded-lg border border-emerald-200 bg-white p-8 text-center shadow-sm">
         <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-700" />
         <h1 className="mt-5 text-3xl font-semibold text-slate-950">Payment complete</h1>

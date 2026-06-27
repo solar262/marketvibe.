@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
+import { track } from "@vercel/analytics";
 
 const serviceTypes = ["Web Design", "SEO", "Social Media", "Booking Systems", "Reviews"];
 
@@ -14,6 +15,7 @@ export default function FreeLeadsPage() {
     setError("");
     setLoading(true);
     const form = new FormData(event.currentTarget);
+    track("free_leads_submit", { source: "free_leads_form" });
     const response = await fetch("/api/subscribe", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -25,6 +27,7 @@ export default function FreeLeadsPage() {
       setError(data.error || "Unable to subscribe right now.");
       return;
     }
+    track("free_leads_success", { source: "free_leads_form" });
     window.location.href = "/lead-packs";
   }
 

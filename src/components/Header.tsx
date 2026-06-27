@@ -7,7 +7,6 @@ import { useState } from "react";
 const links = [
   ["Home", "/"],
   ["Free Leads", "/free-leads"],
-  ["Dashboard", "/dashboard"],
   ["Lead Packs", "/lead-packs"],
   ["Lead Search", "/lead-search"],
   ["Pricing", "/pricing"],
@@ -32,8 +31,8 @@ export function Header() {
           ))}
         </nav>
         <div className="hidden items-center gap-2 lg:flex">
-          <Link href="/lead-search" className="inline-flex items-center gap-2 rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
-            <Search className="h-4 w-4" /> Find Leads
+          <Link href="/free-leads" className="inline-flex items-center gap-2 rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
+            <Search className="h-4 w-4" /> Get Free Leads
           </Link>
         </div>
         <button aria-label="Menu" className="rounded-md border border-slate-200 p-2 lg:hidden" onClick={() => setOpen((value) => !value)}>

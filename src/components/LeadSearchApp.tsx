@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { ArrowRight, Loader2, Search } from "lucide-react";
+import { track } from "@vercel/analytics";
 import { businessTypes, countries, serviceCategories } from "@/lib/lead-engine";
 import type { BusinessLead, LeadSearchInput } from "@/lib/types";
 
@@ -22,6 +23,7 @@ export function LeadSearchApp({ initialLeads = [] }: { initialLeads?: BusinessLe
 
   async function runSearch() {
     setLoading(true);
+    track("lead_search_submit", input);
     const response = await fetch("/api/leads", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -116,7 +118,7 @@ export function LeadSearchApp({ initialLeads = [] }: { initialLeads?: BusinessLe
                 </div>
               </div>
               <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                <Link href={`/audit/${lead.slug}`} className="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800">
+                <Link href={`/audit/${lead.slug}`} onClick={() => track("view_audit_click", { leadSlug: lead.slug, sourceStatus: lead.sourceStatus })} className="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800">
                   View Audit <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link href={lead.googleProfileUrl || "#"} className="inline-flex items-center justify-center rounded-md border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-950 hover:bg-slate-50">

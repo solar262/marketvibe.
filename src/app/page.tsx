@@ -20,11 +20,11 @@ export default function Home() {
               MarketVibe scans local businesses and finds websites with missing calls-to-action, weak SEO, slow speed, poor mobile experience, missing booking links, weak reviews, and other signs they may need help.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link href="/lead-search" className="inline-flex items-center justify-center gap-2 rounded-md bg-slate-950 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800">
-                Find Leads <ArrowRight className="h-4 w-4" />
+              <Link href="/free-leads" className="inline-flex items-center justify-center gap-2 rounded-md bg-slate-950 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800">
+                Get Free Leads <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link href={`/audit/${lead.slug}`} className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-slate-50">
-                View Sample Audit
+              <Link href="/lead-search" className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-slate-50">
+                Find Leads
               </Link>
             </div>
             <div className="mt-8 grid gap-3 text-sm font-medium text-slate-700 sm:grid-cols-3">
@@ -101,8 +101,8 @@ export default function Home() {
               <h2 className="mt-4 text-2xl font-semibold">Free plan includes 3 sample leads.</h2>
               <p className="mt-2 max-w-2xl text-slate-300">Upgrade to Starter for 50 leads/month, Pro for 250 leads/month, or sell a one-off full audit report for each business.</p>
             </div>
-            <Link href="/pricing" className="inline-flex items-center justify-center rounded-md bg-white px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-slate-100">
-              View Pricing
+            <Link href="/free-leads" className="inline-flex items-center justify-center rounded-md bg-white px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-slate-100">
+              Get Free Leads
             </Link>
           </div>
         </div>
