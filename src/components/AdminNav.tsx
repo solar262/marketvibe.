@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { BarChart3, Bot, Database, Search, Settings, ShieldCheck } from "lucide-react";
+import { BarChart3, Bot, Database, Mail, Search, Settings, ShieldCheck } from "lucide-react";
 
 const links = [
   ["Dashboard", "/admin", BarChart3],
   ["Lead Search", "/lead-search", Search],
   ["Autopilot", "/admin/autopilot", Bot],
+  ["Outreach", "/admin/outreach", Mail],
   ["Compliance", "/compliance", ShieldCheck],
   ["Persistence", "/admin/persistence", Database],
   ["Settings", "/admin/settings", Settings],
