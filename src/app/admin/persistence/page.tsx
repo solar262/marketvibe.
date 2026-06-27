@@ -34,6 +34,17 @@ export default async function AdminPersistencePage() {
         </div>
       </section>
 
+      <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 text-sm shadow-sm">
+        <h2 className="text-lg font-semibold text-slate-950">Connection details</h2>
+        <div className="mt-3 grid gap-2 text-slate-700 sm:grid-cols-2">
+          <p>Supabase host: <span className="font-mono">{stats.status.host}</span></p>
+          <p>URL format: <span className="font-semibold">{stats.status.urlLooksValid ? "Valid" : "Invalid"}</span></p>
+          <p>Public URL env: <span className="font-semibold">{stats.status.hasUrl ? "Present" : "Missing"}</span></p>
+          <p>Anon key env: <span className="font-semibold">{stats.status.hasAnonKey ? "Present" : "Missing"}</span></p>
+          <p>Service role env: <span className="font-semibold">{stats.status.hasServiceRoleKey ? "Present" : "Missing"}</span></p>
+        </div>
+      </section>
+
       {stats.error && (
         <section className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-900">
           <div className="flex items-start gap-3">
@@ -41,7 +52,7 @@ export default async function AdminPersistencePage() {
             <div>
               <p className="font-semibold">Supabase persistence is not ready.</p>
               <p className="mt-1">{stats.error}</p>
-              <p className="mt-1">Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`, then run `supabase/migrations/0002_lead_engine_schema.sql`.</p>
+              <p className="mt-1">The app needs the MarketVibe Supabase URL, anon key, and service role key from the same Supabase project.</p>
             </div>
           </div>
         </section>
