@@ -11,7 +11,6 @@ const links = [
   ["Lead Packs", "/lead-packs"],
   ["Lead Search", "/lead-search"],
   ["Pricing", "/pricing"],
-  ["Compliance", "/compliance"],
   ["Contact", "/contact"],
 ];
 
