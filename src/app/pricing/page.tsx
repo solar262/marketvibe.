@@ -1,4 +1,5 @@
 import { CheckoutButton } from "@/components/CheckoutButton";
+import { TrackEvent } from "@/components/TrackEvent";
 
 export default function PricingPage() {
   const plans = [
@@ -9,6 +10,7 @@ export default function PricingPage() {
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+      <TrackEvent name="pricing_viewed" />
       <h1 className="text-3xl font-semibold text-slate-950">Pricing</h1>
       <p className="mt-2 max-w-2xl text-slate-600">Pay for ranked business opportunities and audit reports that save prospecting time. No guaranteed sales claims, no hidden sender identity, and no private-data scraping.</p>
       <section className="mt-8 grid gap-4 md:grid-cols-3">
