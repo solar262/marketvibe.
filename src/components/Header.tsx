@@ -8,6 +8,7 @@ const links = [
   ["Home", "/"],
   ["Dashboard", "/dashboard"],
   ["Lead Search", "/lead-search"],
+  ["Lead Packs", "/lead-packs"],
   ["Pricing", "/pricing"],
   ["Compliance", "/compliance"],
   ["Contact", "/contact"],
