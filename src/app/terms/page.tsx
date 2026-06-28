@@ -47,18 +47,20 @@ const sections = [
 
 export default function TermsPage() {
   return (
-    <main className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
-      <p className="text-sm font-semibold text-emerald-700">MarketVibe Lead Engine</p>
-      <h1 className="mt-2 text-3xl font-semibold text-slate-950">Terms of Service</h1>
-      <p className="mt-3 text-sm text-slate-500">Last updated: June 2026</p>
-      <p className="mt-6 leading-7 text-slate-700">
-        These terms explain how MarketVibe may be used. By using the website, lead-search tools, audit previews,
-        paid reports, or subscription access, you agree to use the service responsibly and lawfully.
-      </p>
+    <main className="bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_45%,#f8fafc_100%)] px-4 py-12 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-3xl rounded-[2rem] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-950/5 sm:p-8">
+        <p className="text-sm font-semibold text-emerald-700">MarketVibe Lead Engine</p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">Terms of Service</h1>
+        <p className="mt-3 text-sm text-slate-500">Last updated: June 2026</p>
+        <p className="mt-6 leading-7 text-slate-700">
+          These terms explain how MarketVibe may be used. By using the website, lead-search tools, audit previews,
+          paid reports, or subscription access, you agree to use the service responsibly and lawfully.
+        </p>
+      </div>
 
-      <section className="mt-8 grid gap-5">
+      <section className="mx-auto mt-6 grid max-w-3xl gap-4">
         {sections.map((section) => (
-          <div key={section.title} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div key={section.title} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-lg shadow-slate-950/5">
             <h2 className="text-lg font-semibold text-slate-950">{section.title}</h2>
             <p className="mt-2 leading-7 text-slate-700">{section.body}</p>
           </div>
