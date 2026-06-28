@@ -13,6 +13,7 @@ export function Footer() {
           <div className="mt-3 grid gap-2 text-slate-300">
             <Link href="/lead-search">Find Leads</Link>
             <Link href="/pricing">Pricing</Link>
+            <Link href="/faq">Buyer Q&amp;A</Link>
           </div>
         </div>
         <div>
