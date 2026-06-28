@@ -101,8 +101,11 @@ export default function PricingPage() {
                 <Link href="/faq" className="inline-flex items-center justify-center rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-white hover:bg-white/10">
                   Read Buyer Q&amp;A
                 </Link>
+                <Link href="/terms" className="inline-flex items-center justify-center rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-white hover:bg-white/10">
+                  Terms
+                </Link>
               </div>
-              <p className="mt-3 text-sm text-slate-400">Payment happens on the selected business audit page after the buyer understands what the report includes.</p>
+              <p className="mt-3 text-sm text-slate-400">Payment happens on the selected business audit page after the buyer understands what the report includes and agrees to the Terms.</p>
             </div>
             <div className="min-w-0 rounded-3xl border border-white/10 bg-white/5 p-5">
               <p className="text-sm font-semibold text-emerald-300">What the €19 audit includes</p>
@@ -137,9 +140,14 @@ export default function PricingPage() {
           <div className="max-w-3xl">
             <p className="text-sm font-semibold text-emerald-700">FAQ</p>
             <h2 className="mt-2 text-2xl font-semibold text-slate-950">Common questions before checkout.</h2>
-            <Link href="/faq" className="mt-4 inline-flex rounded-full border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-950 hover:bg-white">
-              Open full buyer Q&amp;A page
-            </Link>
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+              <Link href="/faq" className="inline-flex rounded-full border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-950 hover:bg-white">
+                Open full buyer Q&amp;A page
+              </Link>
+              <Link href="/terms" className="inline-flex rounded-full border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-950 hover:bg-white">
+                Read Terms of Service
+              </Link>
+            </div>
           </div>
           <div className="mt-6 grid gap-4 md:grid-cols-2">
             {faqs.map(([question, answer]) => (
