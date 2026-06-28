@@ -33,6 +33,8 @@ const auditIncludes = [
 
 const faqs = [
   ["What does MarketVibe do?", "MarketVibe helps service sellers find public business opportunities, review visible website gaps, and turn those signals into practical audit reports and service offer ideas."],
+  ["What is the €19 audit?", "The €19 Full Audit Report unlocks one selected business report. Choose a business first, open its audit preview, then pay to unlock that exact report."],
+  ["Can I use the audit to pitch the business owner?", "Yes. You can use the findings to prepare a professional pitch, proposal, consultation, or service offer. MarketVibe gives research and pitch support, not guaranteed sales."],
   ["Where do the leads come from?", "Leads are based on public business information and visible website signals such as contact visibility, booking routes, SEO basics, review/trust signals, and conversion gaps."],
   ["Is this guaranteed to get me clients?", "No. MarketVibe helps with research, prioritization, and audit preparation, but it does not guarantee clients, revenue, replies, or sales outcomes."],
   ["What happens after I pay?", "Stripe returns you to MarketVibe after checkout, and the app sends access automatically so you can continue into lead search, audit reports, or your selected plan."],
@@ -96,8 +98,11 @@ export default function PricingPage() {
                 <Link href="/lead-search" className="inline-flex items-center justify-center rounded-full bg-white px-6 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-white/10 hover:bg-slate-100">
                   Choose a Business to Audit
                 </Link>
-                <span className="text-sm text-slate-400">Payment happens on the selected business audit page.</span>
+                <Link href="/faq" className="inline-flex items-center justify-center rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-white hover:bg-white/10">
+                  Read Buyer Q&amp;A
+                </Link>
               </div>
+              <p className="mt-3 text-sm text-slate-400">Payment happens on the selected business audit page after the buyer understands what the report includes.</p>
             </div>
             <div className="min-w-0 rounded-3xl border border-white/10 bg-white/5 p-5">
               <p className="text-sm font-semibold text-emerald-300">What the €19 audit includes</p>
@@ -132,6 +137,9 @@ export default function PricingPage() {
           <div className="max-w-3xl">
             <p className="text-sm font-semibold text-emerald-700">FAQ</p>
             <h2 className="mt-2 text-2xl font-semibold text-slate-950">Common questions before checkout.</h2>
+            <Link href="/faq" className="mt-4 inline-flex rounded-full border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-950 hover:bg-white">
+              Open full buyer Q&amp;A page
+            </Link>
           </div>
           <div className="mt-6 grid gap-4 md:grid-cols-2">
             {faqs.map(([question, answer]) => (
