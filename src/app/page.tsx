@@ -49,80 +49,81 @@ export default function Home() {
     "Uses visible public business signals",
     "No income or client guarantees",
   ];
+  const heroTrust = ["Secure checkout", "Instant access", "Public business signals", "Built for service sellers"];
 
   return (
-    <main className="bg-[radial-gradient(circle_at_top_left,#d1fae5_0,transparent_34rem),linear-gradient(180deg,#f8fafc_0%,#ffffff_42%,#f8fafc_100%)]">
+    <main className="bg-[radial-gradient(circle_at_top_left,#d1fae5_0,transparent_28rem),linear-gradient(180deg,#f8fafc_0%,#ffffff_42%,#f8fafc_100%)]">
       <section className="overflow-hidden border-b border-slate-200/80">
-        <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-[0.95fr_1.05fr] md:items-center lg:px-8 lg:py-20">
+        <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 md:grid-cols-[1fr_0.9fr] md:items-center lg:px-8 lg:py-14">
           <div className="min-w-0">
-            <p className="inline-flex flex-wrap items-center gap-2 rounded-full border border-emerald-200 bg-white/80 px-3 py-1 text-sm font-semibold text-emerald-900 shadow-sm">
+            <p className="inline-flex flex-wrap items-center gap-2 rounded-full border border-emerald-200 bg-white/85 px-3 py-1 text-xs font-semibold text-emerald-900 shadow-sm">
               <Sparkles className="h-4 w-4" /> MarketVibe Lead Engine
             </p>
-            <h1 className="mt-6 max-w-3xl text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
+            <h1 className="mt-5 max-w-2xl text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl lg:text-5xl">
               Find Businesses That Need Your Services
             </h1>
-            <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-700">
+            <p className="mt-4 max-w-xl text-base leading-7 text-slate-700 sm:text-lg">
               MarketVibe turns public business signals into lead opportunities, audit previews, and service angles for web design, SEO, booking, reviews, and local presence work.
             </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              <Link href="/free-leads" className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-6 py-3 text-sm font-semibold text-white shadow-xl shadow-slate-950/20 transition hover:bg-slate-800">
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <Link href="/free-leads" className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white shadow-xl shadow-slate-950/20 transition hover:bg-slate-800">
                 Get Free Leads <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link href="/lead-search" className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-slate-50">
+              <Link href="/lead-search" className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-slate-50">
                 Find Leads
               </Link>
             </div>
-            <div className="mt-8 grid gap-3 text-sm font-medium text-slate-700 sm:grid-cols-3">
-              {["Opportunity scoring", "Audit previews", "Secure checkout"].map((item) => (
-                <span key={item} className="inline-flex min-w-0 items-center gap-2 rounded-full bg-white/80 px-3 py-2 shadow-sm">
-                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-700" /> <span className="truncate">{item}</span>
+            <div className="mt-6 grid gap-2 text-xs font-semibold text-slate-700 sm:grid-cols-2 lg:grid-cols-4">
+              {heroTrust.map((item) => (
+                <span key={item} className="inline-flex min-w-0 items-center gap-2 rounded-full border border-slate-200 bg-white/85 px-3 py-2 shadow-sm">
+                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-700" /> <span className="truncate">{item}</span>
                 </span>
               ))}
             </div>
           </div>
 
-          <div className="min-w-0 rounded-[2rem] border border-white/80 bg-slate-950 p-3 shadow-2xl shadow-slate-950/25">
-            <div className="rounded-[1.5rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,#10b98133,transparent_18rem),#0f172a] p-4 text-white sm:p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
+          <div className="min-w-0 rounded-[1.75rem] border border-white/80 bg-slate-950 p-2.5 shadow-2xl shadow-slate-950/25 md:max-w-[520px] md:justify-self-end">
+            <div className="rounded-[1.35rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,#10b9812e,transparent_15rem),#0f172a] p-3.5 text-white sm:p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
                 <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-wide text-emerald-300">Lead intelligence preview</p>
-                  <h2 className="mt-1 truncate text-xl font-semibold">{lead.businessName}</h2>
-                  <p className="mt-1 text-sm text-slate-300">{lead.city}, {lead.country} · {lead.businessCategory}</p>
+                  <h2 className="mt-1 truncate text-lg font-semibold">{lead.businessName}</h2>
+                  <p className="mt-1 text-xs text-slate-300">{lead.city}, {lead.country} · {lead.businessCategory}</p>
                 </div>
-                <div className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-emerald-400 text-3xl font-semibold text-slate-950 shadow-lg shadow-emerald-500/20">
+                <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-emerald-400 text-2xl font-semibold text-slate-950 shadow-lg shadow-emerald-500/20">
                   {lead.audit.score}
                 </div>
               </div>
 
-              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              <div className="mt-4 grid gap-2 sm:grid-cols-3">
                 {[
                   [Globe2, "Website gaps", `${lead.audit.issues.length} signals`],
                   [Eye, "Contact visibility", lead.audit.emailVisible || lead.audit.phoneVisible ? "Detected" : "Needs review"],
                   [MousePointerClick, "CTA issue", lead.audit.clearCallToActionVisible ? "Clear" : "Weak"],
                 ].map(([Icon, label, value]) => (
-                  <div key={label as string} className="min-w-0 rounded-2xl border border-white/10 bg-white/5 p-3">
-                    <Icon className="h-4 w-4 text-emerald-300" />
-                    <p className="mt-3 text-xs text-slate-400">{label as string}</p>
-                    <p className="mt-1 truncate text-sm font-semibold">{value as string}</p>
+                  <div key={label as string} className="min-w-0 rounded-xl border border-white/10 bg-white/[0.06] p-2.5 shadow-inner shadow-white/5">
+                    <Icon className="h-3.5 w-3.5 text-emerald-300" />
+                    <p className="mt-2 text-[11px] text-slate-400">{label as string}</p>
+                    <p className="mt-0.5 truncate text-xs font-semibold">{value as string}</p>
                   </div>
                 ))}
               </div>
 
-              <div className="mt-4 grid gap-3">
+              <div className="mt-3 grid gap-2.5">
                 {visibleFindings.map((finding) => (
-                  <div key={finding.label} className="min-w-0 rounded-2xl border border-white/10 bg-white p-4 text-slate-950">
+                  <div key={finding.label} className="min-w-0 rounded-xl border border-white/10 bg-white p-3 text-slate-950 shadow-lg shadow-black/10">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="font-semibold">{finding.label}</p>
-                      <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-800">Website gap</span>
+                      <p className="text-sm font-semibold">{finding.label}</p>
+                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">Website gap</span>
                     </div>
-                    <p className="mt-1 text-sm leading-6 text-slate-600">{finding.detail}</p>
+                    <p className="mt-1 text-xs leading-5 text-slate-600">{finding.detail}</p>
                   </div>
                 ))}
               </div>
 
-              <div className="mt-4 rounded-2xl border border-emerald-300/30 bg-emerald-300/10 p-4">
+              <div className="mt-3 rounded-xl border border-emerald-300/25 bg-emerald-300/10 p-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-emerald-200">Suggested service angle</p>
-                <p className="mt-2 text-sm leading-6 text-slate-100">{lead.audit.serviceAngle}</p>
+                <p className="mt-1.5 text-xs leading-5 text-slate-100">{lead.audit.serviceAngle}</p>
               </div>
             </div>
           </div>
