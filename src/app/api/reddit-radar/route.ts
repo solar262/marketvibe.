@@ -13,6 +13,8 @@ type RedditChild = {
   };
 };
 
+type Action = "Reply" | "ManualOnly" | "Skip";
+
 const fallbackPosts = [
   {
     subreddit: "r/DigitalMarketing",
@@ -21,10 +23,11 @@ const fallbackPosts = [
     niche: "agency growth",
     target: "freelancers and agencies",
     score: "High",
-    risk: "Low",
-    reason: "Sample fallback: this is a broad discussion about whether agencies still work and how to make an offer credible.",
+    risk: "Medium",
+    action: "ManualOnly" as Action,
+    reason: "Intel: broad agency thread. Good opportunity, but avoid sounding like a consultant. Use a short personal take.",
     suggestedReply:
-      "I think agencies can still work, but the broad 'we do marketing' offer feels much harder to trust now. The ones that make sense to me are specific: one niche, one problem, one clear outcome. For example, lead gen for dentists is easier to understand than a general agency promising growth.",
+      "I think agencies can still work, but the offer has to be really specific now. Broad marketing promises feel easy to ignore. One niche, one painful problem, one clear outcome is much easier to trust.",
   },
   {
     subreddit: "r/MarketingHelp",
@@ -34,9 +37,10 @@ const fallbackPosts = [
     target: "brands and agencies",
     score: "High",
     risk: "Low",
-    reason: "Sample fallback: the thread is about how brands can join Reddit without looking fake or corporate.",
+    action: "Reply" as Action,
+    reason: "Intel: beginner-friendly Reddit marketing thread. Safe to add a useful observation, but keep it human and avoid links.",
     suggestedReply:
-      "The biggest thing I am noticing is that Reddit does not really reward polished marketing. It rewards people who sound like they actually belong in the conversation. I would treat Reddit as research first: comment for a while, learn how each niche talks, then only mention a product when it genuinely fits the problem.",
+      "The biggest thing I am noticing is that Reddit rewards people who actually sound like they belong in the conversation. I would treat it as research first: comment normally, learn the niche, and only mention a product when it genuinely fits.",
   },
 ];
 
@@ -45,78 +49,137 @@ function clean(value: string | null) {
 }
 
 function compactText(value: string) {
-  return value.replace(/\s+/g, " ").trim().slice(0, 700);
+  return value.replace(/\s+/g, " ").trim().slice(0, 900);
 }
 
-function opportunityScore(ups: number, comments: number): "High" | "Medium" | "Low" {
+function hasAny(text: string, terms: string[]) {
+  return terms.some((term) => text.includes(term));
+}
+
+function isSensitiveThread(text: string) {
+  return hasAny(text, [
+    "ai-generated",
+    "ai generated",
+    "used ai",
+    "chatgpt",
+    "actual humans",
+    "sound fake",
+    "inauthentic",
+    "remove capital letters",
+    "ai to edit",
+    "no one wants to interact",
+    "fake writing",
+  ]);
+}
+
+function isHostileThread(text: string) {
+  return hasAny(text, [
+    "stop doing",
+    "i am sick of",
+    "annoying",
+    "fake",
+    "downvote",
+    "self promotion",
+    "promotional",
+  ]);
+}
+
+function recommendedAction(title: string, body: string): Action {
+  const text = `${title} ${body}`.toLowerCase();
+  if (isSensitiveThread(text) || isHostileThread(text)) return "Skip";
+  if (hasAny(text, ["agency", "client", "hire", "website", "link", "promote", "ai", "automation"])) return "ManualOnly";
+  return "Reply";
+}
+
+function opportunityScore(ups: number, comments: number, action: Action): "High" | "Medium" | "Low" {
+  if (action === "Skip") return "Low";
   if (comments >= 15 || ups >= 20) return "High";
   if (comments >= 5 || ups >= 8) return "Medium";
   return "Low";
 }
 
-function riskScore(title: string, body: string): "Low" | "Medium" | "High" {
+function riskScore(title: string, body: string, action: Action): "Low" | "Medium" | "High" {
   const text = `${title} ${body}`.toLowerCase();
-  if (text.includes("hire") || text.includes("promote") || text.includes("self promotion") || text.includes("spam") || text.includes("buy my")) return "High";
-  if (text.includes("link") || text.includes("website") || text.includes("agency") || text.includes("client")) return "Medium";
+  if (action === "Skip" || isSensitiveThread(text) || isHostileThread(text)) return "High";
+  if (hasAny(text, ["hire", "promote", "self promotion", "link", "website", "agency", "client"])) return "Medium";
   return "Low";
 }
 
 function detectIntent(title: string, body: string) {
   const text = `${title} ${body}`.toLowerCase();
-  if (text.includes("what do you use") || text.includes("tool") || text.includes("software") || text.includes("stack")) return "tools";
-  if (text.includes("traffic") || text.includes("visitors") || text.includes("paid ads") || text.includes("organic")) return "traffic";
-  if (text.includes("client") || text.includes("customer") || text.includes("lead") || text.includes("agency")) return "customers";
-  if (text.includes("reddit") || text.includes("subreddit") || text.includes("karma")) return "reddit";
-  if (text.includes("shopify") || text.includes("store") || text.includes("ecommerce")) return "ecommerce";
-  if (text.includes("ai") || text.includes("automation") || text.includes("agent")) return "ai";
+  if (isSensitiveThread(text)) return "sensitive-ai";
+  if (hasAny(text, ["what do you use", "tool", "software", "stack"])) return "tools";
+  if (hasAny(text, ["traffic", "visitors", "paid ads", "organic"])) return "traffic";
+  if (hasAny(text, ["client", "customer", "lead", "agency"])) return "customers";
+  if (hasAny(text, ["reddit", "subreddit", "karma"])) return "reddit";
+  if (hasAny(text, ["shopify", "store", "ecommerce"])) return "ecommerce";
+  if (hasAny(text, ["ai", "automation", "agent"])) return "ai";
   return "general";
 }
 
 function extractPain(title: string, body: string) {
   const text = `${title}. ${body}`.replace(/\s+/g, " ").trim();
   const sentences = text.split(/[.!?]/).map((item) => item.trim()).filter(Boolean);
-  const pain = sentences.find((sentence) => /struggl|hard|problem|confus|not working|fail|help|stuck|traffic|client|customer|lead/i.test(sentence));
-  return pain || sentences[0] || title;
+  const pain = sentences.find((sentence) => /struggl|hard|problem|confus|not working|fail|help|stuck|traffic|client|customer|lead|fake|ai|human/i.test(sentence));
+  return compactText(pain || sentences[0] || title);
 }
 
-function makeReply(title: string, body: string, niche: string, subreddit: string) {
+function makeReply(title: string, body: string, niche: string) {
   const intent = detectIntent(title, body);
+  const action = recommendedAction(title, body);
   const pain = extractPain(title, body);
   const hasBody = body.trim().length > 60;
-  const contextLine = hasBody ? `Based on the post, it sounds like the main issue is: ${pain}.` : "Based on the title, I would keep the answer practical rather than trying to pitch anything.";
+
+  if (action === "Skip") {
+    return "SKIP THIS ONE. This thread is sensitive or already negative. A polished reply could hurt the account. If you comment anyway, write one short personal sentence manually and do not mention tools, marketing, automation, AI, or links.";
+  }
 
   if (intent === "tools") {
-    return `${contextLine}\n\nFor me, tools only help once the workflow is clear. I would separate it into: 1) where the audience hangs out, 2) what problem they are talking about, 3) what useful reply you can add, and 4) what to track after. A simple spreadsheet plus a good search process can beat a fancy tool if the offer is not clear yet.`;
+    return "I would start with the workflow before the tools. Where are the people, what are they already complaining about, and what useful answer can you add? Once that is clear, the tool choice matters a lot less.";
   }
 
   if (intent === "traffic") {
-    return `${contextLine}\n\nI would not start by chasing every traffic channel. I would pick one customer type, find the exact questions they ask, and answer those repeatedly in places where they already spend time. Reddit, Pinterest, YouTube Shorts, and SEO can all work, but only if the content is tied to a real problem rather than just pushing products.`;
+    return "I would pick one channel and one customer type first. Trying every platform at once makes it hard to learn anything. The useful content usually comes from the exact questions people are already asking.";
   }
 
   if (intent === "customers") {
-    return `${contextLine}\n\nThe thing that seems to matter most is being specific. A broad offer is easy to ignore, but a clear offer for one niche is easier to trust. I would focus on one customer type, one painful problem, and one simple result before trying to scale outreach.`;
+    return "The offer matters more than the platform. A broad service is easy to ignore, but one clear result for one type of customer is much easier to understand and trust.";
   }
 
   if (intent === "reddit") {
-    return `${contextLine}\n\nReddit seems to work better when you treat it as community research first. Comment normally, learn how the niche talks, and build a history before asking for anything. The moment it sounds like a funnel, people usually push back.`;
+    return "Reddit feels different because people can sense a funnel quickly. I would use it as research first, comment normally, and only mention something when it genuinely fits the discussion.";
   }
 
   if (intent === "ecommerce") {
-    return `${contextLine}\n\nFor ecommerce, I think the mistake is trying to sell before proving why the product matters. I would build content around the problem the product solves, then use Reddit/comments/search content to learn the objections people actually have before sending them to a store.`;
+    return "For ecommerce, I think the content has to start with the problem, not the product. People need to understand why it matters before they care about the store.";
   }
 
   if (intent === "ai") {
-    return `${contextLine}\n\nAI helps, but it needs current context and a human check. The useful setup is not full auto-posting. It is finding the right conversations, summarising the situation, drafting a natural reply, and letting a person decide whether it actually fits.`;
+    return "AI can help, but only if there is enough current context and a human check. Full automation is where it starts to sound wrong. The useful part is finding the right conversation and drafting something you can still judge yourself.";
   }
 
-  return `${contextLine}\n\nI would approach this by looking at the real conversation first, then replying with something useful from experience rather than trying to direct people somewhere. That usually comes across better and gives you a better chance of people checking your profile naturally.`;
+  if (hasBody) {
+    return `The part that stands out to me is this: ${pain}. I would answer that directly first instead of trying to turn it into a pitch.`;
+  }
+
+  return `I would keep this simple. The useful reply is probably a short personal take on ${niche || "the problem"}, not a polished explanation.`;
 }
 
 function makeReason(title: string, body: string, comments: number, ups: number, subreddit: string) {
   const intent = detectIntent(title, body);
+  const action = recommendedAction(title, body);
   const pain = extractPain(title, body);
-  const context = body.trim() ? `Post context: "${compactText(pain)}"` : "Only title/body-light context available, so reply should stay careful and general.";
-  return `Intel: ${subreddit} thread appears to be about ${intent}. ${context} Engagement: ${comments} comments and ${ups} upvotes. Best approach: answer the pain directly, no links.`;
+  const context = body.trim() ? `Context: "${pain}"` : "Only title/body-light context available.";
+
+  if (action === "Skip") {
+    return `Intel: ${subreddit} thread is high risk (${intent}). ${context} Engagement: ${comments} comments and ${ups} upvotes. Recommended action: SKIP or write one short manual sentence only.`;
+  }
+
+  if (action === "ManualOnly") {
+    return `Intel: ${subreddit} thread is useful but sensitive (${intent}). ${context} Engagement: ${comments} comments and ${ups} upvotes. Recommended action: use the draft as a starting point, then make it sound like your own quick opinion.`;
+  }
+
+  return `Intel: ${subreddit} thread appears to be about ${intent}. ${context} Engagement: ${comments} comments and ${ups} upvotes. Recommended action: safe to reply, keep it short, no links.`;
 }
 
 export async function GET(request: Request) {
@@ -131,7 +194,7 @@ export async function GET(request: Request) {
   try {
     const response = await fetch(searchUrl, {
       headers: {
-        "User-Agent": "MarketVibeRedditRadar/1.1",
+        "User-Agent": "MarketVibeRedditRadar/1.2",
         Accept: "application/json",
       },
       next: { revalidate: 300 },
@@ -152,8 +215,9 @@ export async function GET(request: Request) {
         const title = post.title || "Reddit discussion";
         const body = compactText(post.selftext || "");
         const subreddit = post.subreddit_name_prefixed || "r/Reddit";
-        const score = opportunityScore(ups, comments);
-        const risk = riskScore(title, body);
+        const action = recommendedAction(title, body);
+        const score = opportunityScore(ups, comments, action);
+        const risk = riskScore(title, body, action);
 
         return {
           subreddit,
@@ -163,8 +227,9 @@ export async function GET(request: Request) {
           target,
           score,
           risk,
+          action,
           reason: makeReason(title, body, comments, ups, subreddit),
-          suggestedReply: makeReply(title, body, niche, subreddit),
+          suggestedReply: makeReply(title, body, niche),
         };
       });
 
