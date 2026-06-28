@@ -1,9 +1,37 @@
 import Link from "next/link";
-import { ArrowRight, FileSearch, LockKeyhole, MailCheck, ShieldCheck, Sparkles } from "lucide-react";
+import type { Metadata } from "next";
+import { ArrowRight, CheckCircle2, ClipboardCheck, FileSearch, LockKeyhole, MailCheck, MapPinned, SearchCheck, ShieldCheck, Sparkles, UnlockKeyhole } from "lucide-react";
 import { sampleLeads } from "@/lib/lead-engine";
+
+export const metadata: Metadata = {
+  title: "MarketVibe Lead Engine | Find Business Leads for Service Sellers",
+  description: "Find public business opportunities, review website gaps, and create practical audit reports for web design, SEO, booking, review, and local service outreach.",
+};
 
 export default function Home() {
   const lead = sampleLeads[0];
+  const howItWorks = [
+    [MapPinned, "Choose a market", "Pick the country, city, business type, and service you want to sell."],
+    [SearchCheck, "Find public business opportunities", "MarketVibe ranks visible business signals so you can focus your research."],
+    [ClipboardCheck, "Review the audit signals", "See website gaps, contact visibility, booking routes, trust signals, and SEO basics."],
+    [UnlockKeyhole, "Unlock reports or start a plan", "Open a full audit report or choose Starter or Pro when you need more leads."],
+  ] as const;
+  const auditIncludes = [
+    "Business overview",
+    "Opportunity score",
+    "Website issues",
+    "Contact/booking visibility",
+    "Review/trust signals",
+    "Suggested service angle",
+    "Ready-to-edit outreach message",
+    "Fix checklist",
+  ];
+  const trustItems = [
+    "Secure Stripe checkout",
+    "Instant buyer access",
+    "Uses visible public business signals",
+    "Built for freelancers, agencies, web designers, SEO workers, and service sellers",
+  ];
 
   return (
     <main>
@@ -61,15 +89,19 @@ export default function Home() {
       </section>
 
       <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
-        <div className="grid gap-4 md:grid-cols-3">
-          {[
-            ["Find", "Choose country, city, business type, and the service you sell. MarketVibe returns public business profiles and contact routes."],
-            ["Scan", "Each website is checked for SEO basics, speed signals, mobile readiness, contact visibility, booking links, reviews, social links, and outdated signals."],
-            ["Sell", "Generate a plain-English audit, outreach message, pitch angle, public preview page, and secure checkout for each business."],
-          ].map(([title, body], index) => (
-            <div key={title} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <span className="grid h-10 w-10 place-items-center rounded-md bg-slate-950 text-sm font-semibold text-white">{index + 1}</span>
-              <h2 className="mt-5 text-lg font-semibold text-slate-950">{title}</h2>
+        <div className="max-w-3xl">
+          <p className="text-sm font-semibold text-emerald-700">How MarketVibe Works</p>
+          <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">Go from market idea to practical audit report.</h2>
+          <p className="mt-3 leading-7 text-slate-600">Use public business information and visible website signals to decide which opportunities are worth deeper review.</p>
+        </div>
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {howItWorks.map(([Icon, title, body], index) => (
+            <div key={title} className="min-w-0 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-slate-950 text-sm font-semibold text-white">{index + 1}</span>
+                <Icon className="h-5 w-5 text-emerald-700" />
+              </div>
+              <h3 className="mt-5 text-lg font-semibold text-slate-950">{title}</h3>
               <p className="mt-2 text-sm leading-6 text-slate-600">{body}</p>
             </div>
           ))}
@@ -94,6 +126,29 @@ export default function Home() {
       </section>
 
       <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+        <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-emerald-700">Full audit preview</p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">What a full audit report includes.</h2>
+            <p className="mt-4 leading-7 text-slate-600">
+              Start with the sample lead, then unlock deeper reports when an opportunity looks strong enough to review.
+            </p>
+            <Link href={`/audit/${lead.slug}`} className="mt-6 inline-flex items-center justify-center gap-2 rounded-md bg-slate-950 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800">
+              View Sample Audit <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+            {auditIncludes.map((item) => (
+              <div key={item} className="min-w-0 rounded-md border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-800 shadow-sm">
+                <CheckCircle2 className="mb-3 h-4 w-4 text-emerald-700" />
+                <span className="break-words">{item}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
         <div className="rounded-lg border border-slate-200 bg-slate-950 p-6 text-white">
           <div className="grid gap-6 md:grid-cols-[1fr_auto] md:items-center">
             <div>
@@ -104,6 +159,20 @@ export default function Home() {
             <Link href="/free-leads" className="inline-flex items-center justify-center rounded-md bg-white px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-slate-100">
               Get Free Leads
             </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-slate-200 bg-white py-14">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <h2 className="text-2xl font-semibold text-slate-950">Built for a safer buying flow.</h2>
+          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {trustItems.map((item) => (
+              <div key={item} className="min-w-0 rounded-md border border-slate-200 bg-slate-50 p-4 text-sm font-semibold leading-6 text-slate-800">
+                <ShieldCheck className="mb-3 h-5 w-5 text-emerald-700" />
+                <span className="break-words">{item}</span>
+              </div>
+            ))}
           </div>
         </div>
       </section>

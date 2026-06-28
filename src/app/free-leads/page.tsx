@@ -8,11 +8,13 @@ const serviceTypes = ["Web Design", "SEO", "Social Media", "Booking Systems", "R
 
 export default function FreeLeadsPage() {
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    setSuccess("");
     setLoading(true);
     const form = new FormData(event.currentTarget);
     track("free_leads_submit", { source: "free_leads_form" });
@@ -28,7 +30,10 @@ export default function FreeLeadsPage() {
       return;
     }
     track("free_leads_success", { source: "free_leads_form" });
-    window.location.href = "/lead-packs";
+    setSuccess("Your free previews are ready. Opening lead search...");
+    window.setTimeout(() => {
+      window.location.href = "/lead-search";
+    }, 800);
   }
 
   return (
@@ -73,6 +78,7 @@ export default function FreeLeadsPage() {
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             Get free previews
           </button>
+          {success && <p className="mt-4 rounded-md bg-emerald-50 p-3 text-sm font-semibold text-emerald-900">{success}</p>}
           {error && <p className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
         </form>
       </div>
