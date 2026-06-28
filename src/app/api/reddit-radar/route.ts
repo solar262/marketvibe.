@@ -26,10 +26,43 @@ type RawPost = {
 };
 
 const USER_AGENTS = [
-  "MarketVibeRedditRadar/1.7 by marketvibe1.com",
-  "Mozilla/5.0 (compatible; MarketVibeRadar/1.7; +https://marketvibe1.com)",
+  "MarketVibeRedditRadar/2.0 by marketvibe1.com",
+  "Mozilla/5.0 (compatible; MarketVibeRadar/2.0; +https://marketvibe1.com)",
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
 ];
+
+const DEFAULT_BUSINESS_SUBS = [
+  "marketing",
+  "DigitalMarketing",
+  "MarketingHelp",
+  "AskMarketing",
+  "smallbusiness",
+  "Entrepreneur",
+  "ecommerce",
+  "shopify",
+  "SEO",
+  "PPC",
+  "FacebookAds",
+  "sales",
+  "leadgeneration",
+];
+
+const SUBREDDIT_BLOCKLIST = [
+  "buildapc",
+  "gaming",
+  "memes",
+  "funny",
+  "aww",
+  "pics",
+  "movies",
+  "television",
+  "music",
+  "relationships",
+  "AskReddit",
+];
+
+const postCache = new Map<string, { expires: number; posts: RawPost[]; sourceName: string }>();
+const CACHE_MS = 1000 * 60 * 10;
 
 function clean(value: string | null) {
   return (value || "").replace(/[<>]/g, "").slice(0, 220);
@@ -41,6 +74,14 @@ function compactText(value: string) {
 
 function hasAny(text: string, terms: string[]) {
   return terms.some((term) => text.includes(term));
+}
+
+function wordTokens(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((word) => word.length >= 3 && !["the", "and", "for", "with", "from", "this", "that", "need", "best", "how", "what", "why", "are", "you", "your", "about", "advice", "beginner"].includes(word));
 }
 
 function hasAiIntent(text: string) {
@@ -212,14 +253,14 @@ function makeReason(title: string, body: string, comments: number, ups: number, 
   return `Intel: ${subreddit} thread appears to be about ${intent}. ${context} Engagement: ${comments} comments and ${ups} upvotes. Source: ${sourceName}. Recommended action: safe to reply, keep it short, no links.`;
 }
 
-async function fetchWithTimeout(url: string, userAgent: string, timeoutMs = 6500) {
+async function fetchWithTimeout(url: string, userAgent: string, timeoutMs = 8500) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     return await fetch(url, {
       signal: controller.signal,
-      cache: "no-store",
+      next: { revalidate: 120 },
       headers: {
         "User-Agent": userAgent,
         Accept: "application/json, text/html, application/xml;q=0.9, */*;q=0.8",
@@ -250,7 +291,7 @@ function parseJsonPosts(payload: unknown): RawPost[] {
 function parseRssPosts(xml: string): RawPost[] {
   const entries = xml.match(/<entry[\s\S]*?<\/entry>/g) || [];
 
-  return entries.slice(0, 10).map((entry) => {
+  return entries.slice(0, 15).map((entry) => {
     const title = decodeHtml(entry.match(/<title[^>]*>([\s\S]*?)<\/title>/)?.[1] || "Reddit discussion");
     const link = decodeHtml(entry.match(/<link[^>]*href="([^"]+)"/)?.[1] || "https://www.reddit.com/search/");
     const rawBody = decodeHtml(entry.match(/<content[^>]*>([\s\S]*?)<\/content>/)?.[1] || "");
@@ -268,20 +309,83 @@ function parseRssPosts(xml: string): RawPost[] {
   }).filter((post) => post.title && post.permalink);
 }
 
+function relevantSubreddits(queryText: string) {
+  const text = queryText.toLowerCase();
+  const subs = new Set(DEFAULT_BUSINESS_SUBS);
+
+  if (hasAny(text, ["shopify", "ecommerce", "store", "amazon", "dropship"])) {
+    ["shopify", "ecommerce", "FulfillmentByAmazon", "Entrepreneur"].forEach((sub) => subs.add(sub));
+  }
+
+  if (hasAny(text, ["roof", "roofer", "plumber", "dentist", "local", "contractor", "real estate"])) {
+    ["smallbusiness", "sales", "leadgeneration", "Entrepreneur", "marketing"].forEach((sub) => subs.add(sub));
+  }
+
+  if (hasAny(text, ["reddit", "subreddit", "community", "karma"])) {
+    ["DigitalMarketing", "MarketingHelp", "socialmedia", "AskMarketing"].forEach((sub) => subs.add(sub));
+  }
+
+  if (hasAny(text, ["seo", "google", "rank", "search"])) {
+    ["SEO", "bigseo", "marketing", "DigitalMarketing"].forEach((sub) => subs.add(sub));
+  }
+
+  return Array.from(subs).slice(0, 16);
+}
+
+function relevanceScore(post: RawPost, queryText: string) {
+  const haystack = `${post.title} ${post.body} ${post.subreddit}`.toLowerCase();
+  const subreddit = post.subreddit.replace(/^r\//i, "").toLowerCase();
+  const tokens = wordTokens(queryText);
+  let score = 0;
+
+  if (SUBREDDIT_BLOCKLIST.some((blocked) => blocked.toLowerCase() === subreddit)) return -100;
+  if (DEFAULT_BUSINESS_SUBS.map((sub) => sub.toLowerCase()).includes(subreddit)) score += 8;
+
+  for (const token of tokens) {
+    if (haystack.includes(token)) score += 4;
+    if (post.title.toLowerCase().includes(token)) score += 6;
+  }
+
+  if (detectIntent(post.title, post.body, post.comments, post.ups) !== "general") score += 5;
+  if (/[?]|\b(help|advice|struggling|problem|how do|what do|need|recommend|traffic|client|customer|lead|sale|sales)\b/i.test(`${post.title} ${post.body}`)) score += 6;
+  score += Math.min(post.comments, 30) * 0.8;
+  score += Math.min(post.ups, 50) * 0.25;
+
+  if (hasLowIntel(post.body, post.comments, post.ups)) score -= 8;
+
+  return score;
+}
+
 async function searchReddit(queryText: string) {
+  const cacheKey = queryText.toLowerCase();
+  const cached = postCache.get(cacheKey);
+  if (cached && cached.expires > Date.now() && cached.posts.length) {
+    return { posts: cached.posts, sourceName: `${cached.sourceName}-cached` };
+  }
+
   const encoded = encodeURIComponent(queryText);
-  const endpoints = [
-    { name: "reddit-json", url: `https://www.reddit.com/search.json?q=${encoded}&sort=new&t=week&limit=10&type=link&raw_json=1`, type: "json" },
-    { name: "old-reddit-json", url: `https://old.reddit.com/search.json?q=${encoded}&sort=new&t=week&limit=10&type=link&raw_json=1`, type: "json" },
-    { name: "reddit-all-json", url: `https://www.reddit.com/r/all/search.json?q=${encoded}&restrict_sr=0&sort=new&t=week&limit=10&raw_json=1`, type: "json" },
+  const endpoints: { name: string; url: string; type: "json" | "rss" }[] = [
+    { name: "reddit-json", url: `https://www.reddit.com/search.json?q=${encoded}&sort=new&t=week&limit=25&type=link&raw_json=1`, type: "json" },
+    { name: "reddit-comments-json", url: `https://www.reddit.com/search.json?q=${encoded}&sort=comments&t=month&limit=25&type=link&raw_json=1`, type: "json" },
+    { name: "old-reddit-json", url: `https://old.reddit.com/search.json?q=${encoded}&sort=new&t=week&limit=25&type=link&raw_json=1`, type: "json" },
     { name: "reddit-rss", url: `https://www.reddit.com/search.rss?q=${encoded}&sort=new&t=week`, type: "rss" },
     { name: "old-reddit-rss", url: `https://old.reddit.com/search.rss?q=${encoded}&sort=new&t=week`, type: "rss" },
   ];
 
+  for (const subreddit of relevantSubreddits(queryText)) {
+    endpoints.push(
+      { name: `r-${subreddit}-json`, url: `https://www.reddit.com/r/${subreddit}/search.json?q=${encoded}&restrict_sr=1&sort=new&t=month&limit=15&raw_json=1`, type: "json" },
+      { name: `r-${subreddit}-rss`, url: `https://www.reddit.com/r/${subreddit}/search.rss?q=${encoded}&restrict_sr=1&sort=new&t=month`, type: "rss" },
+    );
+  }
+
   const errors: string[] = [];
+  const collected: RawPost[] = [];
+  const seen = new Set<string>();
+  let winningSource = "multi-source";
 
   for (const endpoint of endpoints) {
-    for (const userAgent of USER_AGENTS) {
+    for (const userAgent of USER_AGENTS.slice(0, 2)) {
       try {
         const response = await fetchWithTimeout(endpoint.url, userAgent);
         const text = await response.text();
@@ -293,18 +397,44 @@ async function searchReddit(queryText: string) {
 
         const posts = endpoint.type === "json" ? parseJsonPosts(JSON.parse(text)) : parseRssPosts(text);
 
-        if (posts.length) {
-          return { posts, sourceName: endpoint.name };
+        for (const post of posts) {
+          const key = post.permalink || `${post.subreddit}-${post.title}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            collected.push(post);
+          }
         }
 
-        errors.push(`${endpoint.name}:empty`);
+        if (posts.length && winningSource === "multi-source") winningSource = endpoint.name;
+        if (collected.length >= 35) break;
       } catch (error) {
         errors.push(`${endpoint.name}:${error instanceof Error ? error.message : "failed"}`);
       }
     }
+    if (collected.length >= 35) break;
   }
 
-  throw new Error(errors.slice(0, 6).join(" | ") || "all reddit endpoints failed");
+  const ranked = collected
+    .map((post) => ({ post, score: relevanceScore(post, queryText) }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .map((item) => item.post);
+
+  if (ranked.length) {
+    postCache.set(cacheKey, { expires: Date.now() + CACHE_MS, posts: ranked, sourceName: winningSource });
+    return { posts: ranked, sourceName: `${winningSource}+ranked` };
+  }
+
+  const broad = collected
+    .filter((post) => !SUBREDDIT_BLOCKLIST.includes(post.subreddit.replace(/^r\//i, "")))
+    .sort((a, b) => (b.comments + b.ups) - (a.comments + a.ups));
+
+  if (broad.length) {
+    postCache.set(cacheKey, { expires: Date.now() + CACHE_MS, posts: broad, sourceName: winningSource });
+    return { posts: broad, sourceName: `${winningSource}+broad-backup` };
+  }
+
+  throw new Error(errors.slice(0, 8).join(" | ") || "all reddit endpoints failed");
 }
 
 export async function GET(request: Request) {
