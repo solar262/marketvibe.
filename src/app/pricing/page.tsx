@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { CheckCircle2, FileText, HelpCircle, ShieldCheck, Sparkles } from "lucide-react";
 import { CheckoutButton } from "@/components/CheckoutButton";
 
@@ -89,13 +90,13 @@ export default function PricingPage() {
               </p>
               <h2 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">€19 for one full business audit report</h2>
               <p className="mt-4 max-w-3xl leading-7 text-slate-300">
-                Best for testing one strong lead before choosing a monthly plan. You get a report for one selected business with the visible issues, opportunity score, suggested service angle, and outreach-ready notes.
+                Best for testing one strong lead before choosing a monthly plan. Choose a business first, open its audit preview, then pay €19 to unlock that exact report.
               </p>
               <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <CheckoutButton product="audit" className="inline-flex items-center justify-center rounded-full bg-white px-6 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-white/10 hover:bg-slate-100">
-                  Buy Full Audit Report — €19
-                </CheckoutButton>
-                <span className="text-sm text-slate-400">Instant access after Stripe checkout.</span>
+                <Link href="/lead-search" className="inline-flex items-center justify-center rounded-full bg-white px-6 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-white/10 hover:bg-slate-100">
+                  Choose a Business to Audit
+                </Link>
+                <span className="text-sm text-slate-400">Payment happens on the selected business audit page.</span>
               </div>
             </div>
             <div className="min-w-0 rounded-3xl border border-white/10 bg-white/5 p-5">
