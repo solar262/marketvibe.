@@ -19,9 +19,12 @@ export function Footer() {
         <div>
           <p className="font-semibold text-white">Company</p>
           <div className="mt-3 grid gap-2 text-slate-300">
+            <Link href="/about">About</Link>
             <Link href="/contact">Contact</Link>
             <Link href="/privacy">Privacy</Link>
             <Link href="/terms">Terms</Link>
+            <Link href="/refund-policy">Refund Policy</Link>
+            <Link href="/impressum">Legal Notice</Link>
           </div>
         </div>
       </div>
