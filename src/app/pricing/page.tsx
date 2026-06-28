@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CheckCircle2, HelpCircle, ShieldCheck, Sparkles } from "lucide-react";
+import { CheckCircle2, FileText, HelpCircle, ShieldCheck, Sparkles } from "lucide-react";
 import { CheckoutButton } from "@/components/CheckoutButton";
 
 export const metadata: Metadata = {
@@ -19,6 +19,15 @@ const included = [
   "Website/contact visibility checks",
   "Outreach angle suggestions",
   "Secure checkout and instant access",
+];
+
+const auditIncludes = [
+  "Full audit report for one selected business",
+  "Opportunity score and plain-English issue summary",
+  "Website, contact, booking, review, and trust-signal checks",
+  "Suggested service angle for web design, SEO, booking, or conversion work",
+  "Ready-to-edit outreach message",
+  "Fix checklist you can use when preparing your offer",
 ];
 
 const faqs = [
@@ -72,16 +81,33 @@ export default function PricingPage() {
           ))}
         </section>
 
-        <section className="mt-6 rounded-[2rem] border border-slate-200 bg-slate-950 p-6 text-white shadow-2xl shadow-slate-950/20">
-          <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+        <section className="mt-6 overflow-hidden rounded-[2rem] border border-emerald-400/30 bg-slate-950 text-white shadow-2xl shadow-slate-950/20">
+          <div className="grid gap-6 p-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:p-8">
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-emerald-300">One-off audit</p>
-              <h2 className="mt-2 text-2xl font-semibold">€19 per business audit report</h2>
-              <p className="mt-2 max-w-3xl leading-7 text-slate-300">Unlock the full audit, lead details, outreach message, fix checklist, and report-ready content for one business opportunity.</p>
+              <p className="inline-flex items-center gap-2 rounded-full bg-emerald-400/10 px-3 py-1 text-sm font-semibold text-emerald-300">
+                <FileText className="h-4 w-4" /> One-off full audit report
+              </p>
+              <h2 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">€19 for one full business audit report</h2>
+              <p className="mt-4 max-w-3xl leading-7 text-slate-300">
+                Best for testing one strong lead before choosing a monthly plan. You get a report for one selected business with the visible issues, opportunity score, suggested service angle, and outreach-ready notes.
+              </p>
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <CheckoutButton product="audit" className="inline-flex items-center justify-center rounded-full bg-white px-6 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-white/10 hover:bg-slate-100">
+                  Buy Full Audit Report — €19
+                </CheckoutButton>
+                <span className="text-sm text-slate-400">Instant access after Stripe checkout.</span>
+              </div>
             </div>
-            <CheckoutButton product="audit" className="inline-flex shrink-0 items-center justify-center rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-white/10 hover:bg-slate-100">
-              Buy Audit Report
-            </CheckoutButton>
+            <div className="min-w-0 rounded-3xl border border-white/10 bg-white/5 p-5">
+              <p className="text-sm font-semibold text-emerald-300">What the €19 audit includes</p>
+              <div className="mt-4 grid gap-3 text-sm text-slate-200 sm:grid-cols-2">
+                {auditIncludes.map((item) => (
+                  <span key={item} className="flex min-w-0 items-start gap-2 rounded-2xl bg-white/5 p-3">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" /> <span className="break-words">{item}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
           </div>
         </section>
 
