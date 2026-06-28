@@ -26,8 +26,8 @@ type RawPost = {
 };
 
 const USER_AGENTS = [
-  "MarketVibeRedditRadar/2.0 by marketvibe1.com",
-  "Mozilla/5.0 (compatible; MarketVibeRadar/2.0; +https://marketvibe1.com)",
+  "MarketVibeRedditRadar/2.1 by marketvibe1.com",
+  "Mozilla/5.0 (compatible; MarketVibeRadar/2.1; +https://marketvibe1.com)",
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
 ];
 
@@ -171,7 +171,7 @@ function detectIntent(title: string, body: string, comments = 0, ups = 0) {
   const text = `${title} ${body}`.toLowerCase();
   if (hasLowIntel(body, comments, ups)) return "low-intel";
   if (isSensitiveThread(text)) return "sensitive-ai";
-  if (hasAny(text, ["what do you use", "tool", "software", "stack"])) return "tools";
+  if (hasAny(text, ["what do you use", "tool", "software", "stack", "course", "courses"])) return "tools";
   if (hasAny(text, ["traffic", "visitors", "paid ads", "organic"])) return "traffic";
   if (hasAny(text, ["client", "customer", "lead", "agency"])) return "customers";
   if (hasAny(text, ["reddit", "subreddit", "karma"])) return "reddit";
@@ -183,8 +183,20 @@ function detectIntent(title: string, body: string, comments = 0, ups = 0) {
 function extractPain(title: string, body: string) {
   const text = `${title}. ${body}`.replace(/\s+/g, " ").trim();
   const sentences = text.split(/[.!?]/).map((item) => item.trim()).filter(Boolean);
-  const pain = sentences.find((sentence) => /struggl|hard|problem|confus|not working|fail|help|stuck|traffic|client|customer|lead|fake|\bhuman\b/i.test(sentence));
+  const pain = sentences.find((sentence) => /struggl|hard|problem|confus|not working|fail|help|stuck|traffic|client|customer|lead|fake|\bhuman\b|course|tool|workflow/i.test(sentence));
   return compactText(pain || sentences[0] || title);
+}
+
+function redditStyle(value: string) {
+  return value
+    .replace(/I would/g, "I’d")
+    .replace(/it is/g, "it’s")
+    .replace(/That is/g, "That’s")
+    .replace(/do not/g, "don’t")
+    .replace(/cannot/g, "can’t")
+    .replace(/a lot less/g, "way less")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function makeReply(title: string, body: string, niche: string, comments = 0, ups = 0) {
@@ -194,42 +206,34 @@ function makeReply(title: string, body: string, niche: string, comments = 0, ups
   const hasBody = body.trim().length > 60;
 
   if (intent === "low-intel") {
-    return "LOW INTEL — SKIP THIS ONE. There is not enough context or engagement to write a useful reply. Look for posts with a real question, clear problem, or active comments.";
+    return "LOW INTEL — SKIP THIS ONE. Not enough context or engagement to write a useful reply.";
   }
 
   if (action === "Skip") {
-    return "SKIP THIS ONE. This thread is sensitive or already negative. A polished reply could hurt the account. If you comment anyway, write one short personal sentence manually and do not mention tools, marketing, automation, AI, or links.";
+    return "SKIP THIS ONE. Looks sensitive or negative. If you reply, write one short sentence manually and don’t mention tools, marketing, automation, AI, or links.";
   }
+
+  let reply = "";
 
   if (intent === "tools") {
-    return "I would start with the workflow before the tools. Where are the people, what are they already complaining about, and what useful answer can you add? Once that is clear, the tool choice matters a lot less.";
+    reply = "I’d start with the workflow before the tools.\n\nWhere are the people, what are they already complaining about, and what useful answer can you add?\n\nOnce that’s clear, the actual tool matters way less.";
+  } else if (intent === "traffic") {
+    reply = "I’d pick one channel and one type of customer first.\n\nTrying every platform at once makes it hard to know what’s actually working.\n\nThe useful content usually comes from the questions people are already asking.";
+  } else if (intent === "customers") {
+    reply = "I think the offer matters more than the platform.\n\nA broad service is easy to ignore. One clear result for one type of customer is much easier to trust.";
+  } else if (intent === "reddit") {
+    reply = "Reddit is weird because people can sense a funnel really quickly.\n\nI’d use it for research first, comment normally, and only mention something when it genuinely fits the thread.";
+  } else if (intent === "ecommerce") {
+    reply = "For ecommerce, I’d start with the problem before the product.\n\nPeople need to understand why it matters before they care about the store.";
+  } else if (intent === "ai") {
+    reply = "AI can help, but only if there’s enough context and a human check.\n\nFull automation is where it usually starts sounding wrong.\n\nThe useful part is finding the right conversation and drafting something you can still judge yourself.";
+  } else if (hasBody) {
+    reply = `The bit I’d answer directly is this: ${pain}.\n\nI’d respond to that first and avoid turning it into a pitch.`;
+  } else {
+    reply = `I’d keep it simple.\n\nA short personal take on ${niche || "the problem"} will probably land better than a polished explanation.`;
   }
 
-  if (intent === "traffic") {
-    return "I would pick one channel and one customer type first. Trying every platform at once makes it hard to learn anything. The useful content usually comes from the exact questions people are already asking.";
-  }
-
-  if (intent === "customers") {
-    return "The offer matters more than the platform. A broad service is easy to ignore, but one clear result for one type of customer is much easier to understand and trust.";
-  }
-
-  if (intent === "reddit") {
-    return "Reddit feels different because people can sense a funnel quickly. I would use it as research first, comment normally, and only mention something when it genuinely fits the discussion.";
-  }
-
-  if (intent === "ecommerce") {
-    return "For ecommerce, I think the content has to start with the problem, not the product. People need to understand why it matters before they care about the store.";
-  }
-
-  if (intent === "ai") {
-    return "AI can help, but only if there is enough current context and a human check. Full automation is where it starts to sound wrong. The useful part is finding the right conversation and drafting something you can still judge yourself.";
-  }
-
-  if (hasBody) {
-    return `The part that stands out to me is this: ${pain}. I would answer that directly first instead of trying to turn it into a pitch.`;
-  }
-
-  return `I would keep this simple. The useful reply is probably a short personal take on ${niche || "the problem"}, not a polished explanation.`;
+  return redditStyle(reply).slice(0, 620);
 }
 
 function makeReason(title: string, body: string, comments: number, ups: number, subreddit: string, sourceName: string) {
@@ -347,7 +351,7 @@ function relevanceScore(post: RawPost, queryText: string) {
   }
 
   if (detectIntent(post.title, post.body, post.comments, post.ups) !== "general") score += 5;
-  if (/[?]|\b(help|advice|struggling|problem|how do|what do|need|recommend|traffic|client|customer|lead|sale|sales)\b/i.test(`${post.title} ${post.body}`)) score += 6;
+  if (/[?]|\b(help|advice|struggling|problem|how do|what do|need|recommend|traffic|client|customer|lead|sale|sales)/i.test(`${post.title} ${post.body}`)) score += 6;
   score += Math.min(post.comments, 30) * 0.8;
   score += Math.min(post.ups, 50) * 0.25;
 
