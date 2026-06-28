@@ -21,10 +21,12 @@ const {
   cleanRssBody,
   hasAiIntent,
   hasCustomerProblemSignal,
+  hasMarketVibeBuyerIntent,
   hasUsablePostSignal,
   isBlockedJobPost,
   isLowIntelPost,
   isObviousRssJunk,
+  isRejectedNonBuyerIntent,
   lowIntelIntel,
 } = sandbox.exports;
 
@@ -34,6 +36,8 @@ assert.equal(hasAiIntent("Can ChatGPT help with support replies?"), true, "ChatG
 assert.equal(hasAiIntent("Looking for an A.I. automation workflow"), true, "A.I. and automation should trigger AI intent");
 assert.equal(isBlockedJobPost("Hiring remote developer", "Full-time role, apply now, worldwide"), true, "Hiring remote developer post should be blocked");
 assert.equal(isBlockedJobPost("My Shopify store has no traffic, what should I do?", ""), false, "Shopify pain post should not be blocked as a job");
+assert.equal(hasMarketVibeBuyerIntent("How do I find web design clients?", "I need better local business leads."), true, "Web design client post should have MarketVibe buyer intent");
+assert.equal(isRejectedNonBuyerIntent("New to Shopify. Need setup help through Claude.", "I need help fixing my own store."), true, "Shopify setup help should be rejected as non-buyer intent");
 
 const rssJunk = cleanRssBody(`
   submitted by /u/example to /r/marketing
@@ -50,7 +54,8 @@ assert.equal(usefulRss.includes("submitted by"), false, "RSS metadata should be 
 
 assert.equal(isLowIntelPost("", 0, 0), true, "0/0 empty post should be low-intel");
 assert.equal(hasCustomerProblemSignal("My Shopify store has no traffic, what should I do?", ""), true, "Shopify traffic question should have customer pain");
-assert.equal(hasUsablePostSignal("My Shopify store has no traffic, what should I do?", "", 0, 0), true, "Shopify traffic question should be shown");
+assert.equal(hasUsablePostSignal("My Shopify store has no traffic, what should I do?", "", 0, 0), true, "Shopify traffic question can have a usable signal before buyer-intent filtering");
+assert.equal(hasMarketVibeBuyerIntent("My Shopify store has no traffic, what should I do?", ""), false, "Shopify store-fixing post should not have MarketVibe buyer intent");
 assert.equal(hasUsablePostSignal("Need help with traffic?", "", 0, 0), true, "Title questions with pain should remain usable");
 assert.equal(hasUsablePostSignal("Quiet launch update", "", 2, 0), true, "Active comments should remain usable");
 assert.equal(hasUsablePostSignal("Quiet launch update", "", 0, 0), false, "Thin inactive posts should not look usable");
@@ -111,7 +116,7 @@ const shopifyReply = buildSuggestedReply({
   comments: 5,
   ups: 3,
 });
-assert.match(shopifyReply, /traffic|product page|checkout|abandoned carts|trust/i, "Shopify no-traffic post should get ecommerce-specific reply");
+assert.match(shopifyReply, /LOW INTEL|SKIP/i, "Shopify no-traffic store-help post should be skipped for MarketVibe buyer intent");
 
 const shopifySetupReply = buildSuggestedReply({
   title: "New to Shopify. Need help about general setup and automating the setup through Claude.",
@@ -124,8 +129,22 @@ const shopifySetupReply = buildSuggestedReply({
   comments: 4,
   ups: 3,
 });
-assert.match(shopifySetupReply, /store structure|products|theme|navigation|checkout|policies|SEO|helper/i, "Shopify Claude setup post should get setup-specific reply");
+assert.match(shopifySetupReply, /LOW INTEL|SKIP/i, "Shopify Claude setup post should be skipped for MarketVibe buyer intent");
 assert.doesNotMatch(shopifySetupReply, /inventory|stock|reorder|forecasting|stockout/i, "Shopify setup post should not get inventory reply");
+
+const webDesignClientReply = buildSuggestedReply({
+  title: "How do I find web design clients for local business redesigns?",
+  body: "I am trying cold outreach but need a better way to spot businesses worth pitching.",
+  intent: "customers",
+  niche: "Local Lead Opportunity Finder",
+  target: "web designers and SEO freelancers",
+  subreddit: "r/web_design",
+  action: "ManualOnly",
+  comments: 8,
+  ups: 6,
+});
+assert.match(webDesignClientReply, /visible local business problems|weak sites|CTAs|SEO basics|prospect/i, "Buyer-intent post should get MarketVibe-style prospecting reply");
+assert.doesNotMatch(webDesignClientReply, /ad|buy|sign up|checkout/i, "Buyer-intent reply should not sound like an ad");
 
 const redditMarketingReply = buildSuggestedReply({
   title: "How do I market on Reddit without getting ignored?",

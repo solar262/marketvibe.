@@ -25,9 +25,11 @@ type ReplyInput = {
 };
 
 const LOW_INTEL_REPLY = "LOW INTEL — SKIP THIS ONE...\n\nThere isn't enough context or engagement to write a useful reply.\n\nLook for posts with a real question, clear problem, or active comments.";
-const PAIN_SIGNAL_PATTERN = /\b(need help|help|problem|struggling|struggle|stuck|traffic|not converting|no traffic|no sales|website not working|what should i do|how do i get|how can i get|any advice|need advice|advice|looking for tool|recommend|shopify|ecommerce|customers|clients|leads|sales|can't|cant|conversion)\b/i;
+const PAIN_SIGNAL_PATTERN = /\b(need help|help|problem|struggling|struggle|stuck|traffic|not converting|no traffic|no sales|website not working|what should i do|how do i get|how can i get|any advice|need advice|advice|looking for tool|recommend|shopify|ecommerce|customers|clients|leads|sales|prospects|prospecting|outreach|local businesses|web design clients|seo clients|agency lead generation|client acquisition)\b/i;
 const JOB_POST_PATTERN = /\b(hiring|remote developer|salary|full-time|full time|part-time|part time|job|career|vacancy|looking for developer|apply now|worldwide|per month)\b|\$\s*\/\s*month|\$\s*\d[\d,]*(?:\.\d{2})?\s*\/\s*month/i;
 const RSS_METADATA_PATTERN = /\bsubmitted by\b|\/u\/|\[comments\]|\bcomments link\b|\bpermalink\b|\breddit metadata\b|\bto \/r\/|\bfrom \/r\/|reddit\.com\/comments/i;
+const MARKETVIBE_BUYER_INTENT_PATTERN = /\b(how do i find web design clients|how do i get seo clients|where to find local business leads|how to sell websites to local businesses|how to get clients as a freelancer|cold outreach for web design|local businesses that need websites|website redesign leads|lead generation for agencies|finding businesses with bad websites|prospecting for web design|selling seo services|agency lead generation|client acquisition for web designers|web design clients|seo clients|local business leads|sell websites to local businesses|get clients as a freelancer|client acquisition|cold outreach|website redesign|redesign leads|bad websites|prospecting|businesses to pitch|find clients|find leads|get clients|get leads|lead generation|local leads|agency leads|outreach help)\b/i;
+const NON_BUYER_INTENT_PATTERN = /\b(shopify setup|new to shopify|claude setup|store automation|automating the setup|dropshipping|dropshipping beginners|fixing my website|fix my website|my website|my shopify store|my store|my ecommerce store|technical help|general business advice|business advice|setup help)\b/i;
 
 export function compactRedditText(value: string) {
   return value.replace(/\s+/g, " ").trim().slice(0, 900);
@@ -80,6 +82,15 @@ export function hasCustomerProblemSignal(title: string, body: string) {
   return PAIN_SIGNAL_PATTERN.test(`${title} ${body}`);
 }
 
+export function hasMarketVibeBuyerIntent(title: string, body: string) {
+  return MARKETVIBE_BUYER_INTENT_PATTERN.test(`${title} ${body}`);
+}
+
+export function isRejectedNonBuyerIntent(title: string, body: string) {
+  const text = `${title} ${body}`;
+  return NON_BUYER_INTENT_PATTERN.test(text) && !hasMarketVibeBuyerIntent(title, body);
+}
+
 export function usefulBodyLength(body: string) {
   return compactRedditText(body).length;
 }
@@ -108,10 +119,6 @@ function hasInventoryIntent(text: string) {
   return /\b(inventory|stock|stocks|reorder|warehouse|forecasting|stockout|stockouts|sku|skus|supply chain)\b/i.test(text);
 }
 
-function hasShopifySetupIntent(text: string) {
-  return /\bshopify\b/i.test(text) && /\b(setup|set up|setting up|new to|claude|automation|automating|theme|navigation|checkout|policies|seo|products?)\b/i.test(text);
-}
-
 function shortContext(title: string, body: string) {
   const text = compactRedditText(body || title);
   const sentences = text.split(/[.!?]/).map((item) => item.trim()).filter(Boolean);
@@ -123,7 +130,7 @@ export function buildReplyOptions(input: ReplyInput): RedditRadarReplyOptions {
   const text = `${title} ${body} ${niche} ${target} ${subreddit}`.toLowerCase();
   const context = shortContext(title, body);
 
-  if (isBlockedJobPost(title, body) || isLowIntelPost(body, comments, ups) && !hasUsablePostSignal(title, body, comments, ups)) {
+  if (isBlockedJobPost(title, body) || isRejectedNonBuyerIntent(title, body) || isLowIntelPost(body, comments, ups) && !hasUsablePostSignal(title, body, comments, ups)) {
     return {
       quickReply: LOW_INTEL_REPLY,
       deeperReply: "Not recommended",
@@ -144,21 +151,6 @@ export function buildReplyOptions(input: ReplyInput): RedditRadarReplyOptions {
     : comments > 0 || ups > 0
       ? "Good candidate. Post manually, keep it short, and do not add links."
       : "Use the quick reply by default. The deeper version only makes sense if the thread has more context.";
-
-  if (hasShopifySetupIntent(text)) {
-    return {
-      quickReply: replyParts(
-        "I'd use Claude as a helper, not the driver.",
-        "Start with store structure, products, theme, navigation, checkout, policies and basic SEO before automating anything."
-      ),
-      deeperReply: replyParts(
-        "I'd map the store manually first: collections, products, theme, navigation, checkout, policies and basic SEO.",
-        "Then use Claude to draft copy, organize tasks, and check for gaps.",
-        "I wouldn't blindly automate the setup until you know what the store actually needs."
-      ),
-      manualNote,
-    };
-  }
 
   if (hasInventoryIntent(text)) {
     return {
@@ -253,13 +245,14 @@ export function buildReplyOptions(input: ReplyInput): RedditRadarReplyOptions {
   if (intent === "customers") {
     return {
       quickReply: replyParts(
-        `For ${target || "that audience"}, I'd make the offer more specific before changing channels.`,
-        `The useful clue is: ${context}.`
+        "I'd start by narrowing the prospect list before writing outreach.",
+        "Look for visible local business problems first, like weak sites, unclear CTAs, missing trust signals, or old SEO basics."
       ),
       deeperReply: replyParts(
-        `For ${target || "that audience"}, I'd make the offer more specific before changing channels.`,
+        "I'd start by narrowing the prospect list before writing outreach.",
         `The useful clue is: ${context}.`,
-        "A clear problem/result usually beats a broader service pitch."
+        "For web design or SEO, finding visible local business problems gives you a more natural reason to reach out than a generic pitch.",
+        "Then keep the first message about the problem you noticed, not about your service."
       ),
       manualNote,
     };
@@ -281,10 +274,15 @@ export function buildReplyOptions(input: ReplyInput): RedditRadarReplyOptions {
   }
 
   return {
-    quickReply: replyParts(`I'd answer the specific bit first: ${context}.`),
+    quickReply: replyParts(
+      "I'd start with a tighter prospecting angle.",
+      "Find local businesses with visible website or SEO gaps, then reach out about one specific thing you noticed."
+    ),
     deeperReply: replyParts(
-      `I'd answer the specific bit first: ${context}.`,
-      `For ${niche || "this"}, I'd keep the reply practical and skip the pitch.`
+      "I'd start with a tighter prospecting angle.",
+      `The useful clue is: ${context}.`,
+      "For web design, SEO, or local lead gen, visible business problems make outreach feel less random.",
+      "Bad websites, weak CTAs, missing service pages, thin Google presence, or unclear contact flows are good places to look."
     ),
     manualNote,
   };
