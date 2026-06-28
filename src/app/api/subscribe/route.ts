@@ -77,7 +77,9 @@ export async function POST(request: Request) {
       htmlContent: emailHtml(firstName),
       textContent: emailText(firstName),
     });
-    await scheduleFreeLeadSequence(email, firstName);
+    await scheduleFreeLeadSequence(email, firstName).catch((error) => {
+      console.warn("Free lead follow-up scheduling skipped:", error instanceof Error ? error.message : error);
+    });
     await track("free_leads_success", { source: "free_leads_form" }).catch(() => undefined);
 
     return NextResponse.json({ ok: true });
