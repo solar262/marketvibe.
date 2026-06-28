@@ -26,8 +26,8 @@ type RawPost = {
 };
 
 const USER_AGENTS = [
-  "MarketVibeRedditRadar/1.5 by marketvibe1.com",
-  "Mozilla/5.0 (compatible; MarketVibeRadar/1.5; +https://marketvibe1.com)",
+  "MarketVibeRedditRadar/1.7 by marketvibe1.com",
+  "Mozilla/5.0 (compatible; MarketVibeRadar/1.7; +https://marketvibe1.com)",
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
 ];
 
@@ -43,8 +43,14 @@ function hasAny(text: string, terms: string[]) {
   return terms.some((term) => text.includes(term));
 }
 
+function hasAiIntent(text: string) {
+  return /\b(ai|a\.i\.|artificial intelligence|automation|automated|agent|agents)\b/i.test(text);
+}
+
 function decodeHtml(value: string) {
   return value
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, num) => String.fromCharCode(parseInt(num, 10)))
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
@@ -55,8 +61,19 @@ function decodeHtml(value: string) {
     .trim();
 }
 
+function cleanRssBody(value: string) {
+  const body = compactText(value);
+  const lower = body.toLowerCase();
+
+  if (!body) return "";
+  if (lower.includes("submitted by") || lower.includes("[comments]") || lower.includes("/u/")) return "";
+  if (body.length < 120) return "";
+
+  return body;
+}
+
 function hasLowIntel(body: string, comments: number, ups: number) {
-  return compactText(body).length < 80 && comments === 0 && ups === 0;
+  return compactText(body).length < 120 && comments === 0 && ups === 0;
 }
 
 function isSensitiveThread(text: string) {
@@ -91,7 +108,7 @@ function recommendedAction(title: string, body: string, comments = 0, ups = 0): 
   const text = `${title} ${body}`.toLowerCase();
   if (hasLowIntel(body, comments, ups)) return "Skip";
   if (isSensitiveThread(text) || isHostileThread(text)) return "Skip";
-  if (hasAny(text, ["agency", "client", "hire", "website", "link", "promote", "ai", "automation"])) return "ManualOnly";
+  if (hasAny(text, ["agency", "client", "hire", "website", "link", "promote"]) || hasAiIntent(text)) return "ManualOnly";
   return "Reply";
 }
 
@@ -105,7 +122,7 @@ function opportunityScore(ups: number, comments: number, action: Action): "High"
 function riskScore(title: string, body: string, action: Action): "Low" | "Medium" | "High" {
   const text = `${title} ${body}`.toLowerCase();
   if (action === "Skip" || isSensitiveThread(text) || isHostileThread(text)) return "High";
-  if (hasAny(text, ["hire", "promote", "self promotion", "link", "website", "agency", "client"])) return "Medium";
+  if (hasAny(text, ["hire", "promote", "self promotion", "link", "website", "agency", "client"]) || hasAiIntent(text)) return "Medium";
   return "Low";
 }
 
@@ -118,14 +135,14 @@ function detectIntent(title: string, body: string, comments = 0, ups = 0) {
   if (hasAny(text, ["client", "customer", "lead", "agency"])) return "customers";
   if (hasAny(text, ["reddit", "subreddit", "karma"])) return "reddit";
   if (hasAny(text, ["shopify", "store", "ecommerce"])) return "ecommerce";
-  if (hasAny(text, ["ai", "automation", "agent"])) return "ai";
+  if (hasAiIntent(text)) return "ai";
   return "general";
 }
 
 function extractPain(title: string, body: string) {
   const text = `${title}. ${body}`.replace(/\s+/g, " ").trim();
   const sentences = text.split(/[.!?]/).map((item) => item.trim()).filter(Boolean);
-  const pain = sentences.find((sentence) => /struggl|hard|problem|confus|not working|fail|help|stuck|traffic|client|customer|lead|fake|ai|human/i.test(sentence));
+  const pain = sentences.find((sentence) => /struggl|hard|problem|confus|not working|fail|help|stuck|traffic|client|customer|lead|fake|\bhuman\b/i.test(sentence));
   return compactText(pain || sentences[0] || title);
 }
 
@@ -181,11 +198,11 @@ function makeReason(title: string, body: string, comments: number, ups: number, 
   const context = body.trim() ? `Context: "${pain}"` : "Only title/body-light context available.";
 
   if (intent === "low-intel") {
-    return `Intel: ${subreddit} has too little context or engagement. ${context} Engagement: ${comments} comments and ${ups} upvotes. Source: ${sourceName}. Recommended action: SKIP.`;
+    return `Skip reason: low engagement / not enough context. ${context} Engagement: ${comments} comments and ${ups} upvotes. Source: ${sourceName}.`;
   }
 
   if (action === "Skip") {
-    return `Intel: ${subreddit} thread is high risk (${intent}). ${context} Engagement: ${comments} comments and ${ups} upvotes. Source: ${sourceName}. Recommended action: SKIP or write one short manual sentence only.`;
+    return `Skip reason: high-risk or sensitive thread (${intent}). ${context} Engagement: ${comments} comments and ${ups} upvotes. Source: ${sourceName}.`;
   }
 
   if (action === "ManualOnly") {
@@ -236,7 +253,8 @@ function parseRssPosts(xml: string): RawPost[] {
   return entries.slice(0, 10).map((entry) => {
     const title = decodeHtml(entry.match(/<title[^>]*>([\s\S]*?)<\/title>/)?.[1] || "Reddit discussion");
     const link = decodeHtml(entry.match(/<link[^>]*href="([^"]+)"/)?.[1] || "https://www.reddit.com/search/");
-    const body = compactText(decodeHtml(entry.match(/<content[^>]*>([\s\S]*?)<\/content>/)?.[1] || ""));
+    const rawBody = decodeHtml(entry.match(/<content[^>]*>([\s\S]*?)<\/content>/)?.[1] || "");
+    const body = cleanRssBody(rawBody);
     const subredditMatch = link.match(/reddit\.com\/r\/([^/]+)/i);
 
     return {
@@ -307,7 +325,9 @@ export async function GET(request: Request) {
   try {
     const { posts, sourceName } = await searchReddit(queryText);
 
-    const opportunities = posts.slice(0, 8).map((post) => {
+    const visiblePosts = posts.filter((post) => recommendedAction(post.title, post.body, post.comments, post.ups) !== "Skip");
+
+    const opportunities = visiblePosts.slice(0, 8).map((post) => {
       const action = recommendedAction(post.title, post.body, post.comments, post.ups);
       const score = opportunityScore(post.ups, post.comments, action);
       const risk = riskScore(post.title, post.body, action);
@@ -326,9 +346,13 @@ export async function GET(request: Request) {
       };
     });
 
+    const skippedCount = posts.length - visiblePosts.length;
+
     return NextResponse.json({
       source: opportunities.length ? "live" : "empty",
-      message: opportunities.length ? `Live Reddit posts loaded via ${sourceName}.` : "No live Reddit posts found for that search. Try different keywords.",
+      message: opportunities.length
+        ? `Live Reddit posts loaded via ${sourceName}. Hid ${skippedCount} low-intel/risky posts.`
+        : `No strong Reddit opportunities found. Hid ${skippedCount} low-intel/risky posts. Try broader keywords.`,
       opportunities,
     });
   } catch (error) {
