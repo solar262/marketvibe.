@@ -122,7 +122,16 @@ function scheduledIso(delayDays: number) {
 }
 
 async function scheduleSequence(to: string, sequence: SequenceEmail[]) {
+  const brevoTransactionalScheduleLimitDays = 3;
+  const scheduled = [];
+  const skipped = [];
+
   for (const email of sequence) {
+    if (email.delayDays > brevoTransactionalScheduleLimitDays) {
+      skipped.push({ subject: email.subject, reason: "Brevo transactional scheduling limit is 3 days." });
+      continue;
+    }
+
     await sendTransactionalEmail({
       to,
       subject: email.subject,
@@ -130,7 +139,10 @@ async function scheduleSequence(to: string, sequence: SequenceEmail[]) {
       textContent: email.textContent,
       scheduledAt: scheduledIso(email.delayDays),
     });
+    scheduled.push({ subject: email.subject, delayDays: email.delayDays });
   }
+
+  return { scheduled, skipped };
 }
 
 export async function scheduleFreeLeadSequence(to: string, firstName = "") {
