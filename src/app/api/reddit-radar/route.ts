@@ -26,8 +26,8 @@ type RawPost = {
 };
 
 const USER_AGENTS = [
-  "MarketVibeRedditRadar/2.1 by marketvibe1.com",
-  "Mozilla/5.0 (compatible; MarketVibeRadar/2.1; +https://marketvibe1.com)",
+  "MarketVibeRedditRadar/2.2 by marketvibe1.com",
+  "Mozilla/5.0 (compatible; MarketVibeRadar/2.2; +https://marketvibe1.com)",
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
 ];
 
@@ -287,20 +287,21 @@ function makeReason(title: string, body: string, comments: number, ups: number, 
   const action = recommendedAction(title, body, comments, ups);
   const pain = extractPain(title, body);
   const context = body.trim() ? `Context: "${pain}"` : "Only title/body-light context available.";
+  const intentScore = conversionIntentScore({ title, body, comments, ups, subreddit, permalink: "" });
 
   if (intent === "low-intel") {
-    return `Skip reason: low engagement / not enough context. ${context} Engagement: ${comments} comments and ${ups} upvotes. Source: ${sourceName}.`;
+    return `Skip reason: low engagement / not enough context. ${context} Engagement: ${comments} comments and ${ups} upvotes. Intent score: ${intentScore}. Source: ${sourceName}.`;
   }
 
   if (action === "Skip") {
-    return `Skip reason: high-risk or sensitive thread (${intent}). ${context} Engagement: ${comments} comments and ${ups} upvotes. Source: ${sourceName}.`;
+    return `Skip reason: high-risk or sensitive thread (${intent}). ${context} Engagement: ${comments} comments and ${ups} upvotes. Intent score: ${intentScore}. Source: ${sourceName}.`;
   }
 
   if (action === "ManualOnly") {
-    return `Intel: ${subreddit} thread is useful but sensitive (${intent}). ${context} Engagement: ${comments} comments and ${ups} upvotes. Source: ${sourceName}. Recommended action: use the draft as a starting point, then make it sound like your own quick opinion.`;
+    return `Intel: ${subreddit} thread is useful but sensitive (${intent}). ${context} Engagement: ${comments} comments and ${ups} upvotes. Intent score: ${intentScore}. Recommended action: only reply if you can add a quick useful take. Source: ${sourceName}.`;
   }
 
-  return `Intel: ${subreddit} thread appears to be about ${intent}. ${context} Engagement: ${comments} comments and ${ups} upvotes. Source: ${sourceName}. Recommended action: safe to reply, keep it short, no links.`;
+  return `Intel: ${subreddit} thread appears to be about ${intent}. ${context} Engagement: ${comments} comments and ${ups} upvotes. Intent score: ${intentScore}. Recommended action: safe to reply, keep it short, no links. Source: ${sourceName}.`;
 }
 
 async function fetchWithTimeout(url: string, userAgent: string, timeoutMs = 8500) {
@@ -382,6 +383,46 @@ function relevantSubreddits(queryText: string) {
   return Array.from(subs).slice(0, 16);
 }
 
+function conversionIntentScore(post: RawPost) {
+  const text = `${post.title} ${post.body}`.toLowerCase();
+  let score = 0;
+
+  const strongPain = [
+    "how do i", "how can i", "need help", "i need", "looking for", "anyone know", "anyone recommend",
+    "what worked", "what should i", "struggling", "stuck", "not working", "not converting", "no sales",
+    "no traffic", "get clients", "get customers", "more leads", "lead gen", "booked calls", "failed", "problem",
+    "can't", "cant", "help me", "advice on", "recommend a", "tool for", "software for", "worth it"
+  ];
+
+  const weakOpinion = [
+    "thoughts on", "hot take", "future of", "is ai replacing", "what is your favorite", "favorite tool",
+    "best course", "course worth", "courses are", "showcase", "here is my", "i built", "launching", "roast my"
+  ];
+
+  for (const phrase of strongPain) {
+    if (text.includes(phrase)) score += 7;
+  }
+
+  if (text.includes("?")) score += 5;
+  if (/\b(help|recommend|struggling|stuck|problem|traffic|clients|customers|leads|sales|convert|conversion|ads)\b/i.test(text)) score += 5;
+  if (post.comments > 0 && post.comments <= 25) score += 4;
+  if (post.ups > 0 && post.ups <= 60) score += 2;
+  if (post.comments > 80) score -= 5;
+
+  for (const phrase of weakOpinion) {
+    if (text.includes(phrase)) score -= 8;
+  }
+
+  if (hasLowIntel(post.body, post.comments, post.ups)) score -= 10;
+
+  return score;
+}
+
+function isActionablePost(post: RawPost) {
+  if (recommendedAction(post.title, post.body, post.comments, post.ups) === "Skip") return false;
+  return conversionIntentScore(post) >= 8;
+}
+
 function relevanceScore(post: RawPost, queryText: string) {
   const haystack = `${post.title} ${post.body} ${post.subreddit}`.toLowerCase();
   const subreddit = post.subreddit.replace(/^r\//i, "").toLowerCase();
@@ -398,6 +439,7 @@ function relevanceScore(post: RawPost, queryText: string) {
 
   if (detectIntent(post.title, post.body, post.comments, post.ups) !== "general") score += 5;
   if (/[?]|\b(help|advice|struggling|problem|how do|what do|need|recommend|traffic|client|customer|lead|sale|sales)\b/i.test(`${post.title} ${post.body}`)) score += 6;
+  score += conversionIntentScore(post) * 1.5;
   score += Math.min(post.comments, 30) * 0.8;
   score += Math.min(post.ups, 50) * 0.25;
 
@@ -465,26 +507,26 @@ async function searchReddit(queryText: string) {
   }
 
   const ranked = collected
-    .map((post) => ({ post, score: relevanceScore(post, queryText) }))
-    .filter((item) => item.score > 0)
+    .map((post) => ({ post, score: relevanceScore(post, queryText), intentScore: conversionIntentScore(post) }))
+    .filter((item) => item.score > 0 && item.intentScore >= 8)
     .sort((a, b) => b.score - a.score)
     .map((item) => item.post);
 
   if (ranked.length) {
     postCache.set(cacheKey, { expires: Date.now() + CACHE_MS, posts: ranked, sourceName: winningSource });
-    return { posts: ranked, sourceName: `${winningSource}+ranked` };
+    return { posts: ranked, sourceName: `${winningSource}+problem-intent-ranked` };
   }
 
   const broad = collected
-    .filter((post) => !SUBREDDIT_BLOCKLIST.includes(post.subreddit.replace(/^r\//i, "")))
-    .sort((a, b) => (b.comments + b.ups) - (a.comments + a.ups));
+    .filter((post) => isActionablePost(post) && !SUBREDDIT_BLOCKLIST.includes(post.subreddit.replace(/^r\//i, "")))
+    .sort((a, b) => conversionIntentScore(b) - conversionIntentScore(a));
 
   if (broad.length) {
     postCache.set(cacheKey, { expires: Date.now() + CACHE_MS, posts: broad, sourceName: winningSource });
-    return { posts: broad, sourceName: `${winningSource}+broad-backup` };
+    return { posts: broad, sourceName: `${winningSource}+problem-intent-backup` };
   }
 
-  throw new Error(errors.slice(0, 8).join(" | ") || "all reddit endpoints failed");
+  throw new Error(errors.slice(0, 8).join(" | ") || "no actionable Reddit posts found");
 }
 
 export async function GET(request: Request) {
@@ -505,7 +547,7 @@ export async function GET(request: Request) {
   try {
     const { posts, sourceName } = await searchReddit(queryText);
 
-    const visiblePosts = posts.filter((post) => recommendedAction(post.title, post.body, post.comments, post.ups) !== "Skip");
+    const visiblePosts = posts.filter((post) => isActionablePost(post));
 
     const opportunities = visiblePosts.slice(0, 8).map((post) => {
       const action = recommendedAction(post.title, post.body, post.comments, post.ups);
@@ -531,15 +573,15 @@ export async function GET(request: Request) {
     return NextResponse.json({
       source: opportunities.length ? "live" : "empty",
       message: opportunities.length
-        ? `Live Reddit posts loaded via ${sourceName}. Hid ${skippedCount} low-intel/risky posts.`
-        : `No strong Reddit opportunities found. Hid ${skippedCount} low-intel/risky posts. Try broader keywords.`,
+        ? `Live Reddit posts loaded via ${sourceName}. Hid ${skippedCount} weak/non-actionable posts.`
+        : `No strong problem-intent Reddit opportunities found. Try pain terms like: need help, struggling, not converting, no traffic, looking for tool.`,
       opportunities,
     });
   } catch (error) {
     return NextResponse.json({
       source: "error",
       error: error instanceof Error ? error.message : "Unable to fetch live posts",
-      message: "Live Reddit search failed. Reddit may be rate-limiting the server. Try again in a few minutes or change the search terms.",
+      message: "No strong problem-intent Reddit opportunities found right now. Try broader pain terms like need help, struggling, no traffic, not converting, or looking for tool.",
       opportunities: [],
     });
   }
