@@ -52,6 +52,10 @@ export async function POST(request: Request) {
   const selectedProductKey: MarketVibeProduct = isProduct(product) ? product : "audit";
   const number = orderNumber();
 
+  if (selectedProductKey === "audit" && items.length === 0 && !leadSlug) {
+    return NextResponse.json({ url: `${returnOrigin}/lead-search` });
+  }
+
   if (!process.env.STRIPE_SECRET_KEY) {
     return NextResponse.json({ url: `${returnOrigin}/payment-success?order=${number}` });
   }
