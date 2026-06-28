@@ -18,7 +18,9 @@ vm.runInNewContext(transpiled.outputText, sandbox, { filename: "reddit-radar.js"
 const {
   cleanRssBody,
   hasAiIntent,
+  hasUsablePostSignal,
   isLowIntelPost,
+  isObviousRssJunk,
   lowIntelIntel,
 } = sandbox.exports;
 
@@ -36,9 +38,15 @@ const usefulRss = cleanRssBody(`
   I am struggling to get any qualified leads from my local service website. The homepage gets traffic, but people do not book calls and I cannot tell if the issue is the offer, the CTA, or the contact flow.
   submitted by /u/example [comments]
 `);
-assert.equal(usefulRss, "", "RSS body containing Reddit metadata should not be used as post context");
+assert.ok(usefulRss.includes("struggling"), "Useful RSS body should be preserved after metadata lines are removed");
+assert.equal(usefulRss.includes("submitted by"), false, "RSS metadata should be removed from useful body text");
 
 assert.equal(isLowIntelPost("", 0, 0), true, "0/0 empty post should be low-intel");
+assert.equal(hasUsablePostSignal("Need help with traffic?", "", 0, 0), true, "Title questions with pain should remain usable");
+assert.equal(hasUsablePostSignal("Quiet launch update", "", 2, 0), true, "Active comments should remain usable");
+assert.equal(hasUsablePostSignal("Quiet launch update", "", 0, 0), false, "Thin inactive posts should not look usable");
+assert.equal(isObviousRssJunk("submitted by /u/example", "[comments] comments link"), true, "Obvious RSS junk should be hidden");
+assert.equal(isObviousRssJunk("Need help with no traffic?", ""), false, "Painful title-only posts should not be treated as RSS junk");
 const lowIntel = lowIntelIntel();
 assert.equal(lowIntel.action, "Skip");
 assert.equal(lowIntel.intent, "low-intel");

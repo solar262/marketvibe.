@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 import {
   cleanRssBody,
   compactRedditText as compactText,
+  hasUsablePostSignal,
   hasAiIntent,
   hasAnyTerm as hasAny,
   isLowIntelPost as hasLowIntel,
+  isObviousRssJunk,
   lowIntelIntel,
 } from "@/lib/reddit-radar";
 
@@ -128,7 +130,7 @@ function isHostileThread(text: string) {
 
 function recommendedAction(title: string, body: string, comments = 0, ups = 0): Action {
   const text = `${title} ${body}`.toLowerCase();
-  if (hasLowIntel(body, comments, ups)) return "Skip";
+  if (hasLowIntel(body, comments, ups) && !hasUsablePostSignal(title, body, comments, ups)) return "Skip";
   if (isSensitiveThread(text) || isHostileThread(text)) return "Skip";
   if (hasAny(text, ["agency", "client", "hire", "website", "link", "promote"]) || hasAiIntent(text)) return "ManualOnly";
   return "Reply";
@@ -150,7 +152,7 @@ function riskScore(title: string, body: string, action: Action): "Low" | "Medium
 
 function detectIntent(title: string, body: string, comments = 0, ups = 0) {
   const text = `${title} ${body}`.toLowerCase();
-  if (hasLowIntel(body, comments, ups)) return "low-intel";
+  if (hasLowIntel(body, comments, ups) && !hasUsablePostSignal(title, body, comments, ups)) return "low-intel";
   if (isSensitiveThread(text)) return "sensitive-ai";
   if (hasAny(text, ["what do you use", "tool", "software", "stack", "course", "courses"])) return "tools";
   if (hasAny(text, ["traffic", "visitors", "paid ads", "organic"])) return "traffic";
@@ -390,14 +392,15 @@ function conversionIntentScore(post: RawPost) {
     if (text.includes(phrase)) score -= 8;
   }
 
-  if (hasLowIntel(post.body, post.comments, post.ups)) score -= 10;
+  if (hasLowIntel(post.body, post.comments, post.ups) && !hasUsablePostSignal(post.title, post.body, post.comments, post.ups)) score -= 10;
+  if (hasUsablePostSignal(post.title, post.body, post.comments, post.ups)) score += 6;
 
   return score;
 }
 
 function isActionablePost(post: RawPost) {
-  if (recommendedAction(post.title, post.body, post.comments, post.ups) === "Skip") return false;
-  return conversionIntentScore(post) >= 8;
+  if (isObviousRssJunk(post.title, post.body)) return false;
+  return true;
 }
 
 function relevanceScore(post: RawPost, queryText: string) {
@@ -420,7 +423,8 @@ function relevanceScore(post: RawPost, queryText: string) {
   score += Math.min(post.comments, 30) * 0.8;
   score += Math.min(post.ups, 50) * 0.25;
 
-  if (hasLowIntel(post.body, post.comments, post.ups)) score -= 8;
+  if (hasLowIntel(post.body, post.comments, post.ups) && !hasUsablePostSignal(post.title, post.body, post.comments, post.ups)) score -= 8;
+  if (hasUsablePostSignal(post.title, post.body, post.comments, post.ups)) score += 5;
 
   return score;
 }
@@ -485,7 +489,7 @@ async function searchReddit(queryText: string) {
 
   const ranked = collected
     .map((post) => ({ post, score: relevanceScore(post, queryText), intentScore: conversionIntentScore(post) }))
-    .filter((item) => item.score > 0 && item.intentScore >= 8)
+    .filter((item) => !isObviousRssJunk(item.post.title, item.post.body) && hasUsablePostSignal(item.post.title, item.post.body, item.post.comments, item.post.ups) && item.score > 0 && item.intentScore >= 8)
     .sort((a, b) => b.score - a.score)
     .map((item) => item.post);
 
@@ -552,7 +556,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       source: opportunities.length ? "live" : "empty",
       message: opportunities.length
-        ? `Live Reddit posts loaded via ${sourceName}. Hid ${skippedCount} weak/non-actionable posts.`
+        ? `Live Reddit posts loaded via ${sourceName}. Hid ${skippedCount} obvious RSS junk posts.`
         : `No strong problem-intent Reddit opportunities found. Try pain terms like: need help, struggling, not converting, no traffic, looking for tool.`,
       opportunities,
     });
