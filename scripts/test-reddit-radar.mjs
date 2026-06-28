@@ -16,6 +16,7 @@ const sandbox = { exports: {} };
 vm.runInNewContext(transpiled.outputText, sandbox, { filename: "reddit-radar.js" });
 
 const {
+  buildSuggestedReply,
   cleanRssBody,
   hasAiIntent,
   hasCustomerProblemSignal,
@@ -58,5 +59,58 @@ const lowIntel = lowIntelIntel();
 assert.equal(lowIntel.action, "Skip");
 assert.equal(lowIntel.intent, "low-intel");
 assert.equal(lowIntel.reply, "LOW INTEL — SKIP THIS ONE...\n\nThere isn't enough context or engagement to write a useful reply.\n\nLook for posts with a real question, clear problem, or active comments.");
+
+const inventoryReply = buildSuggestedReply({
+  title: "Inventory management AI: what's worth using vs hype",
+  body: "We keep running into stockouts and messy reorder spreadsheets.",
+  intent: "ai",
+  niche: "AI tools for ecommerce",
+  target: "Shopify owners",
+  subreddit: "r/ecommerce",
+  action: "ManualOnly",
+  comments: 7,
+  ups: 12,
+});
+assert.match(inventoryReply, /Forecasting|reorder alerts|stockout warnings/i, "Inventory AI post should get inventory-specific reply");
+assert.doesNotMatch(inventoryReply, /as an AI|link|book a call/i, "Inventory reply should not sound like a pitch");
+
+const shopifyReply = buildSuggestedReply({
+  title: "My Shopify store has no traffic, what should I do?",
+  body: "I launched two months ago and barely get visitors. I am not sure if my product page is the issue or if nobody is seeing it.",
+  intent: "ecommerce",
+  niche: "Shopify traffic",
+  target: "store owners",
+  subreddit: "r/shopify",
+  action: "Reply",
+  comments: 5,
+  ups: 3,
+});
+assert.match(shopifyReply, /traffic|product page|checkout|abandoned carts|trust/i, "Shopify no-traffic post should get ecommerce-specific reply");
+
+const redditMarketingReply = buildSuggestedReply({
+  title: "How do I market on Reddit without getting ignored?",
+  body: "I sell to founders but every subreddit seems to hate obvious promotion.",
+  intent: "reddit",
+  niche: "Reddit marketing",
+  target: "founders",
+  subreddit: "r/marketing",
+  action: "Reply",
+  comments: 11,
+  ups: 9,
+});
+assert.match(redditMarketingReply, /community fit|comment history|niche language|links/i, "Reddit marketing post should get Reddit-specific reply");
+
+const lowIntelReply = buildSuggestedReply({
+  title: "Quick question",
+  body: "",
+  intent: "low-intel",
+  niche: "",
+  target: "",
+  subreddit: "r/marketing",
+  action: "Skip",
+  comments: 0,
+  ups: 0,
+});
+assert.equal(lowIntelReply, lowIntel.reply, "Low-intel post should keep skip reply");
 
 console.log("Reddit Radar helper tests passed.");

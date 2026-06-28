@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  buildSuggestedReply,
   cleanRssBody,
   compactRedditText as compactText,
   hasCustomerProblemSignal,
@@ -9,7 +10,6 @@ import {
   isBlockedJobPost,
   isLowIntelPost as hasLowIntel,
   isObviousRssJunk,
-  lowIntelIntel,
 } from "@/lib/reddit-radar";
 
 type RedditChild = {
@@ -177,99 +177,10 @@ function extractPain(title: string, body: string) {
   return compactText(pain || sentences[0] || title);
 }
 
-function redditReply(...parts: string[]) {
-  return parts
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .join("\n\n")
-    .replace(/\bI would\b/g, "I'd")
-    .replace(/\bdo not\b/g, "don't")
-    .replace(/\bthat is\b/g, "that's")
-    .replace(/\bthere is\b/g, "there's");
-}
-
-function makeReply(title: string, body: string, niche: string, comments = 0, ups = 0) {
+function makeReply(title: string, body: string, niche: string, target: string, subreddit: string, comments = 0, ups = 0) {
   const intent = detectIntent(title, body, comments, ups);
   const action = recommendedAction(title, body, comments, ups);
-  const pain = extractPain(title, body);
-  const hasBody = body.trim().length > 60;
-
-  if (isBlockedJobPost(title, body)) {
-    return lowIntelIntel().reply;
-  }
-
-  if (intent === "low-intel") {
-    return lowIntelIntel().reply;
-  }
-
-  if (action === "Skip") {
-    return redditReply(
-      "SKIP THIS ONE.",
-      "This thread already feels sensitive or negative.",
-      "A polished reply could hurt the account more than help it."
-    );
-  }
-
-  if (intent === "tools") {
-    return redditReply(
-      "I'd probably start with the workflow before the tools.",
-      "Where are the people, what are they already complaining about, and what useful answer can you add?",
-      "Once that's clear, the actual tool matters a lot less."
-    );
-  }
-
-  if (intent === "traffic") {
-    return redditReply(
-      "I'd pick one channel and one customer type first.",
-      "Trying every platform at once makes it hard to tell what's actually working.",
-      "Most of the good content ideas come from the exact questions people are already asking."
-    );
-  }
-
-  if (intent === "customers") {
-    return redditReply(
-      "I think the offer matters more than the platform.",
-      "Broad services are easy to ignore.",
-      "One clear result for one type of customer is much easier to understand and trust."
-    );
-  }
-
-  if (intent === "reddit") {
-    return redditReply(
-      "Reddit feels different because people can sense a funnel pretty quickly.",
-      "I'd use it as research first, comment normally, and only mention anything when it genuinely fits the discussion.",
-      "Trying to force the link is usually where it goes wrong."
-    );
-  }
-
-  if (intent === "ecommerce") {
-    return redditReply(
-      "For ecommerce, I'd start with the problem before the product.",
-      "People usually need to understand why it matters before they care about the store.",
-      "The product link is easier to add later once the post is actually useful."
-    );
-  }
-
-  if (intent === "ai") {
-    return redditReply(
-      "AI can help, but only if there's enough current context and a human check.",
-      "Full automation is where it starts to sound wrong.",
-      "The useful part is finding the right conversation and drafting something you can still judge yourself."
-    );
-  }
-
-  if (hasBody) {
-    return redditReply(
-      `The bit that stands out to me is: ${pain}.`,
-      "I'd answer that directly first.",
-      "Trying to turn it into a pitch too early is usually what makes it feel off."
-    );
-  }
-
-  return redditReply(
-    `I'd keep this simple and give a quick take on ${niche || "the problem"}.`,
-    "Not a polished explanation, just what you'd actually say if someone asked you in a normal conversation."
-  );
+  return buildSuggestedReply({ title, body, intent, niche, target, subreddit, action, comments, ups });
 }
 
 function makeReason(title: string, body: string, comments: number, ups: number, subreddit: string, sourceName: string) {
@@ -566,7 +477,7 @@ export async function GET(request: Request) {
         action,
         intent,
         reason: makeReason(post.title, post.body, post.comments, post.ups, post.subreddit, sourceName),
-        suggestedReply: makeReply(post.title, post.body, niche, post.comments, post.ups),
+        suggestedReply: makeReply(post.title, post.body, niche, target, post.subreddit, post.comments, post.ups),
       };
     });
 
