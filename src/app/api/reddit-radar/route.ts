@@ -4,15 +4,20 @@ import {
   buildSuggestedReply,
   cleanRssBody,
   compactRedditText as compactText,
+  expandRedditRadarQueries,
+  expandRedditRadarSubreddits,
   hasCustomerProblemSignal,
-  hasMarketVibeBuyerIntent,
+  hasRedditRadarProblemIntent,
   hasUsablePostSignal,
   hasAiIntent,
   hasAnyTerm as hasAny,
   isBlockedJobPost,
   isLowIntelPost as hasLowIntel,
   isObviousRssJunk,
+  isSpamOrPromotion,
   isRejectedNonBuyerIntent,
+  rankRedditRadarPosts,
+  scoreRedditRadarPost,
 } from "@/lib/reddit-radar";
 
 type RedditChild = {
@@ -133,8 +138,8 @@ function isHostileThread(text: string) {
 
 function recommendedAction(title: string, body: string, comments = 0, ups = 0): Action {
   const text = `${title} ${body}`.toLowerCase();
-  if (isBlockedJobPost(title, body) || isRejectedNonBuyerIntent(title, body)) return "Skip";
-  if (!hasMarketVibeBuyerIntent(title, body)) return "Skip";
+  if (isBlockedJobPost(title, body) || isRejectedNonBuyerIntent(title, body) || isSpamOrPromotion(title, body)) return "Skip";
+  if (!hasRedditRadarProblemIntent(title, body)) return "Skip";
   if (hasLowIntel(body, comments, ups) && !hasUsablePostSignal(title, body, comments, ups)) return "Skip";
   if (isSensitiveThread(text) || isHostileThread(text)) return "Skip";
   return "ManualOnly";
@@ -142,7 +147,7 @@ function recommendedAction(title: string, body: string, comments = 0, ups = 0): 
 
 function opportunityScore(title: string, body: string, ups: number, comments: number, action: Action): "High" | "Medium" | "Low" {
   if (action === "Skip") return "Low";
-  const hasProblem = hasCustomerProblemSignal(title, body) && hasMarketVibeBuyerIntent(title, body);
+  const hasProblem = hasCustomerProblemSignal(title, body) && hasRedditRadarProblemIntent(title, body);
   const hasQuestion = title.includes("?") || body.includes("?");
   const hasActiveComments = comments > 0;
   if (hasProblem && hasQuestion && hasActiveComments) return "High";
@@ -152,7 +157,7 @@ function opportunityScore(title: string, body: string, ups: number, comments: nu
 
 function riskScore(title: string, body: string, action: Action): "Low" | "Medium" | "High" {
   const text = `${title} ${body}`.toLowerCase();
-  if (action === "Skip" || isBlockedJobPost(title, body) || isRejectedNonBuyerIntent(title, body) || isSensitiveThread(text) || isHostileThread(text)) return "High";
+  if (action === "Skip" || isBlockedJobPost(title, body) || isRejectedNonBuyerIntent(title, body) || isSpamOrPromotion(title, body) || isSensitiveThread(text) || isHostileThread(text)) return "High";
   if (hasAny(text, ["hire", "promote", "self promotion", "link", "website", "agency", "client"]) || hasAiIntent(text)) return "Medium";
   return "Low";
 }
@@ -160,10 +165,14 @@ function riskScore(title: string, body: string, action: Action): "Low" | "Medium
 function detectIntent(title: string, body: string, comments = 0, ups = 0) {
   const text = `${title} ${body}`.toLowerCase();
   if (isBlockedJobPost(title, body)) return "blocked-job";
-  if (isRejectedNonBuyerIntent(title, body) || !hasMarketVibeBuyerIntent(title, body)) return "not-buyer-intent";
+  if (isRejectedNonBuyerIntent(title, body)) return "non-buyer-intent";
+  if (!hasRedditRadarProblemIntent(title, body)) return "low-intent";
   if (hasLowIntel(body, comments, ups) && !hasUsablePostSignal(title, body, comments, ups)) return "low-intel";
   if (isSensitiveThread(text)) return "sensitive-ai";
   if (hasAny(text, ["what do you use", "tool", "software", "stack", "course", "courses"])) return "tools";
+  if (hasAny(text, ["sneaker", "shoes", "reselling", "flipping"])) return "reselling";
+  if (hasAny(text, ["book", "books", "bookstore", "self published"])) return "books";
+  if (hasAny(text, ["roof", "roofing", "roofer", "leak", "storm damage"])) return "roofing";
   if (hasAny(text, ["traffic", "visitors", "paid ads", "organic"])) return "traffic";
   if (hasAny(text, ["client", "customer", "lead", "agency"])) return "customers";
   if (hasAny(text, ["reddit", "subreddit", "karma"])) return "reddit";
@@ -264,79 +273,17 @@ function parseRssPosts(xml: string): RawPost[] {
 }
 
 function relevantSubreddits(queryText: string) {
-  const text = queryText.toLowerCase();
-  const subs = new Set(DEFAULT_BUSINESS_SUBS);
-
-  if (hasAny(text, ["shopify", "ecommerce", "store", "amazon", "dropship"])) {
-    ["Entrepreneur", "smallbusiness", "marketing"].forEach((sub) => subs.add(sub));
-  }
-
-  if (hasAny(text, ["roof", "roofer", "plumber", "dentist", "local", "contractor", "real estate"])) {
-    ["smallbusiness", "Entrepreneur", "marketing", "web_design"].forEach((sub) => subs.add(sub));
-  }
-
-  if (hasAny(text, ["reddit", "subreddit", "community", "karma"])) {
-    ["DigitalMarketing", "MarketingHelp", "socialmedia", "AskMarketing"].forEach((sub) => subs.add(sub));
-  }
-
-  if (hasAny(text, ["seo", "google", "rank", "search"])) {
-    ["SEO", "bigseo", "marketing", "digital_marketing"].forEach((sub) => subs.add(sub));
-  }
-
-  if (hasAny(text, ["web design", "website", "freelance", "agency", "client", "lead", "prospect", "outreach"])) {
-    ["web_design", "freelance", "agency", "marketing", "smallbusiness"].forEach((sub) => subs.add(sub));
-  }
-
-  return Array.from(subs).slice(0, 16);
+  return Array.from(new Set([...DEFAULT_BUSINESS_SUBS, ...expandRedditRadarSubreddits(queryText)])).slice(0, 18);
 }
 
 function conversionIntentScore(post: RawPost) {
-  const text = `${post.title} ${post.body}`.toLowerCase();
-  let score = 0;
-
-  if (isBlockedJobPost(post.title, post.body) || isObviousRssJunk(post.title, post.body)) return -100;
-  if (isRejectedNonBuyerIntent(post.title, post.body)) return -100;
-  if (!hasMarketVibeBuyerIntent(post.title, post.body)) return 0;
-  score += 60;
-
-  const strongPain = [
-    "how do i find web design clients", "how do i get seo clients", "where to find local business leads",
-    "how to sell websites to local businesses", "how to get clients as a freelancer", "cold outreach for web design",
-    "local businesses that need websites", "website redesign leads", "lead generation for agencies",
-    "finding businesses with bad websites", "prospecting for web design", "selling seo services",
-    "agency lead generation", "client acquisition for web designers", "web design clients", "seo clients",
-    "local business leads", "get clients", "find clients", "get leads", "find leads", "prospecting", "outreach"
-  ];
-
-  const weakOpinion = [
-    "thoughts on", "hot take", "future of", "is ai replacing", "what is your favorite", "favorite tool",
-    "best course", "course worth", "courses are", "showcase", "here is my", "i built", "launching", "roast my"
-  ];
-
-  for (const phrase of strongPain) {
-    if (text.includes(phrase)) score += 7;
-  }
-
-  if (text.includes("?")) score += 8;
-  if (/\b(clients|leads|prospects|prospecting|outreach|pitch|local businesses|web design|seo|agency)\b/i.test(text)) score += 12;
-  if (post.comments > 0 && post.comments <= 25) score += 4;
-  if (post.ups > 0 && post.ups <= 60) score += 2;
-  if (post.comments > 80) score -= 5;
-
-  for (const phrase of weakOpinion) {
-    if (text.includes(phrase)) score -= 8;
-  }
-
-  if (hasLowIntel(post.body, post.comments, post.ups) && !hasUsablePostSignal(post.title, post.body, post.comments, post.ups)) score -= 10;
-  if (hasUsablePostSignal(post.title, post.body, post.comments, post.ups)) score += 6;
-
-  return score;
+  return scoreRedditRadarPost(post);
 }
 
 function isActionablePost(post: RawPost) {
-  if (isBlockedJobPost(post.title, post.body) || isRejectedNonBuyerIntent(post.title, post.body)) return false;
+  if (isBlockedJobPost(post.title, post.body) || isRejectedNonBuyerIntent(post.title, post.body) || isSpamOrPromotion(post.title, post.body)) return false;
   if (isObviousRssJunk(post.title, post.body)) return false;
-  if (!hasMarketVibeBuyerIntent(post.title, post.body)) return false;
+  if (!hasRedditRadarProblemIntent(post.title, post.body)) return false;
   if (hasLowIntel(post.body, post.comments, post.ups) && !hasUsablePostSignal(post.title, post.body, post.comments, post.ups)) return true;
   if (!hasUsablePostSignal(post.title, post.body, post.comments, post.ups)) return false;
   return true;
@@ -349,8 +296,8 @@ function relevanceScore(post: RawPost, queryText: string) {
   let score = 0;
 
   if (SUBREDDIT_BLOCKLIST.some((blocked) => blocked.toLowerCase() === subreddit)) return -100;
-  if (isBlockedJobPost(post.title, post.body) || isRejectedNonBuyerIntent(post.title, post.body) || isObviousRssJunk(post.title, post.body)) return -100;
-  if (!hasMarketVibeBuyerIntent(post.title, post.body)) return 0;
+  if (isBlockedJobPost(post.title, post.body) || isRejectedNonBuyerIntent(post.title, post.body) || isSpamOrPromotion(post.title, post.body) || isObviousRssJunk(post.title, post.body)) return -100;
+  if (!hasRedditRadarProblemIntent(post.title, post.body)) return 0;
   if (DEFAULT_BUSINESS_SUBS.map((sub) => sub.toLowerCase()).includes(subreddit)) score += 8;
 
   for (const token of tokens) {
@@ -359,7 +306,7 @@ function relevanceScore(post: RawPost, queryText: string) {
   }
 
   if (detectIntent(post.title, post.body, post.comments, post.ups) !== "general") score += 5;
-  if (/[?]|\b(clients|leads|prospects|prospecting|outreach|web design|seo|agency|local business|pitch)\b/i.test(`${post.title} ${post.body}`)) score += 15;
+  if (/[?]|\b(need help|struggling|problem|no sales|no traffic|where to sell|advice|recommend|stuck|customers|leads|clients|buyers)\b/i.test(`${post.title} ${post.body}`)) score += 15;
   score += conversionIntentScore(post) * 1.5;
   score += Math.min(post.comments, 30) * 0.8;
   score += Math.min(post.ups, 50) * 0.25;
@@ -377,62 +324,62 @@ async function searchReddit(queryText: string) {
     return { posts: cached.posts, sourceName: `${cached.sourceName}-cached` };
   }
 
-  const encoded = encodeURIComponent(queryText);
-  const endpoints: { name: string; url: string; type: "json" | "rss" }[] = [
-    { name: "reddit-json", url: `https://www.reddit.com/search.json?q=${encoded}&sort=new&t=week&limit=25&type=link&raw_json=1`, type: "json" },
-    { name: "reddit-comments-json", url: `https://www.reddit.com/search.json?q=${encoded}&sort=comments&t=month&limit=25&type=link&raw_json=1`, type: "json" },
-    { name: "old-reddit-json", url: `https://old.reddit.com/search.json?q=${encoded}&sort=new&t=week&limit=25&type=link&raw_json=1`, type: "json" },
-    { name: "reddit-rss", url: `https://www.reddit.com/search.rss?q=${encoded}&sort=new&t=week`, type: "rss" },
-    { name: "old-reddit-rss", url: `https://old.reddit.com/search.rss?q=${encoded}&sort=new&t=week`, type: "rss" },
-  ];
-
-  for (const subreddit of relevantSubreddits(queryText)) {
-    endpoints.push(
-      { name: `r-${subreddit}-json`, url: `https://www.reddit.com/r/${subreddit}/search.json?q=${encoded}&restrict_sr=1&sort=new&t=month&limit=15&raw_json=1`, type: "json" },
-      { name: `r-${subreddit}-rss`, url: `https://www.reddit.com/r/${subreddit}/search.rss?q=${encoded}&restrict_sr=1&sort=new&t=month`, type: "rss" },
-    );
-  }
-
   const errors: string[] = [];
   const collected: RawPost[] = [];
   const seen = new Set<string>();
   let winningSource = "multi-source";
+  const queries = expandRedditRadarQueries(queryText, "", "");
 
-  for (const endpoint of endpoints) {
-    for (const userAgent of USER_AGENTS.slice(0, 2)) {
-      try {
-        const response = await fetchWithTimeout(endpoint.url, userAgent);
-        const text = await response.text();
+  for (const query of queries) {
+    const encoded = encodeURIComponent(query);
+    const endpoints: { name: string; url: string; type: "json" | "rss" }[] = [
+      { name: "reddit-json", url: `https://www.reddit.com/search.json?q=${encoded}&sort=new&t=month&limit=25&type=link&raw_json=1`, type: "json" },
+      { name: "reddit-comments-json", url: `https://www.reddit.com/search.json?q=${encoded}&sort=comments&t=month&limit=25&type=link&raw_json=1`, type: "json" },
+      { name: "old-reddit-json", url: `https://old.reddit.com/search.json?q=${encoded}&sort=new&t=month&limit=25&type=link&raw_json=1`, type: "json" },
+      { name: "reddit-rss", url: `https://www.reddit.com/search.rss?q=${encoded}&sort=new&t=month`, type: "rss" },
+    ];
 
-        if (!response.ok) {
-          errors.push(`${endpoint.name}:${response.status}`);
-          continue;
-        }
-
-        const posts = endpoint.type === "json" ? parseJsonPosts(JSON.parse(text)) : parseRssPosts(text);
-
-        for (const post of posts) {
-          const key = post.permalink || `${post.subreddit}-${post.title}`;
-          if (!seen.has(key)) {
-            seen.add(key);
-            collected.push(post);
-          }
-        }
-
-        if (posts.length && winningSource === "multi-source") winningSource = endpoint.name;
-        if (collected.length >= 35) break;
-      } catch (error) {
-        errors.push(`${endpoint.name}:${error instanceof Error ? error.message : "failed"}`);
-      }
+    for (const subreddit of relevantSubreddits(query)) {
+      endpoints.push(
+        { name: `r-${subreddit}-json`, url: `https://www.reddit.com/r/${subreddit}/search.json?q=${encoded}&restrict_sr=1&sort=new&t=month&limit=15&raw_json=1`, type: "json" },
+        { name: `r-${subreddit}-rss`, url: `https://www.reddit.com/r/${subreddit}/search.rss?q=${encoded}&restrict_sr=1&sort=new&t=month`, type: "rss" },
+      );
     }
-    if (collected.length >= 35) break;
+
+    for (const endpoint of endpoints) {
+      for (const userAgent of USER_AGENTS.slice(0, 2)) {
+        try {
+          const response = await fetchWithTimeout(endpoint.url, userAgent);
+          const text = await response.text();
+
+          if (!response.ok) {
+            errors.push(`${endpoint.name}:${response.status}`);
+            continue;
+          }
+
+          const posts = endpoint.type === "json" ? parseJsonPosts(JSON.parse(text)) : parseRssPosts(text);
+
+          for (const post of posts) {
+            const key = post.permalink || `${post.subreddit}-${post.title}`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              collected.push(post);
+            }
+          }
+
+          if (posts.length && winningSource === "multi-source") winningSource = `${endpoint.name}:${query}`;
+          if (collected.length >= 40) break;
+        } catch (error) {
+          errors.push(`${endpoint.name}:${error instanceof Error ? error.message : "failed"}`);
+        }
+      }
+      if (collected.length >= 40) break;
+    }
+    if (collected.length >= 40) break;
   }
 
-  const ranked = collected
-    .map((post) => ({ post, score: relevanceScore(post, queryText), intentScore: conversionIntentScore(post) }))
-    .filter((item) => !isBlockedJobPost(item.post.title, item.post.body) && !isRejectedNonBuyerIntent(item.post.title, item.post.body) && !isObviousRssJunk(item.post.title, item.post.body) && hasMarketVibeBuyerIntent(item.post.title, item.post.body) && hasUsablePostSignal(item.post.title, item.post.body, item.post.comments, item.post.ups) && item.score > 70 && item.intentScore > 70)
-    .sort((a, b) => b.score - a.score)
-    .map((item) => item.post);
+  const ranked = rankRedditRadarPosts(collected, queryText)
+    .filter((post) => isActionablePost(post) && relevanceScore(post, queryText) > 0);
 
   if (ranked.length) {
     postCache.set(cacheKey, { expires: Date.now() + CACHE_MS, posts: ranked, sourceName: winningSource });
@@ -498,15 +445,15 @@ export async function GET(request: Request) {
     return NextResponse.json({
       source: opportunities.length ? "live" : "empty",
       message: opportunities.length
-        ? `Buyer-intent Reddit posts loaded via ${sourceName}. Hid ${skippedCount} non-buyer or junk posts.`
-        : `No strong MarketVibe buyer-intent posts found right now. Try terms like web design clients, SEO clients, local business leads, prospecting, or agency lead generation.`,
+        ? `Intent-matched Reddit posts loaded via ${sourceName}. Hid ${skippedCount} weak, duplicate, or junk posts.`
+        : `No strong Reddit opportunities found. Try adding a pain term like no sales, need help, struggling, where to sell, no traffic, or looking for tool.`,
       opportunities,
     });
   } catch (error) {
     return NextResponse.json({
       source: "error",
       error: error instanceof Error ? error.message : "Unable to fetch live posts",
-      message: "No strong MarketVibe buyer-intent posts found right now. Try terms like web design clients, SEO clients, local business leads, prospecting, or agency lead generation.",
+      message: "No strong Reddit opportunities found. Try adding a pain term like no sales, need help, struggling, where to sell, no traffic, or looking for tool.",
       opportunities: [],
     });
   }

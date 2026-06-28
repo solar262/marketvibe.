@@ -19,15 +19,20 @@ const {
   buildReplyOptions,
   buildSuggestedReply,
   cleanRssBody,
+  dedupeRedditRadarPosts,
+  expandRedditRadarQueries,
+  expandRedditRadarSubreddits,
   hasAiIntent,
   hasCustomerProblemSignal,
   hasMarketVibeBuyerIntent,
+  hasRedditRadarProblemIntent,
   hasUsablePostSignal,
   isBlockedJobPost,
   isLowIntelPost,
   isObviousRssJunk,
   isRejectedNonBuyerIntent,
   lowIntelIntel,
+  rankRedditRadarPosts,
 } = sandbox.exports;
 
 assert.equal(hasAiIntent("Vail Daily needs a new tourism website"), false, "Vail Daily should not trigger AI intent");
@@ -38,6 +43,32 @@ assert.equal(isBlockedJobPost("Hiring remote developer", "Full-time role, apply 
 assert.equal(isBlockedJobPost("My Shopify store has no traffic, what should I do?", ""), false, "Shopify pain post should not be blocked as a job");
 assert.equal(hasMarketVibeBuyerIntent("How do I find web design clients?", "I need better local business leads."), true, "Web design client post should have MarketVibe buyer intent");
 assert.equal(isRejectedNonBuyerIntent("New to Shopify. Need setup help through Claude.", "I need help fixing my own store."), true, "Shopify setup help should be rejected as non-buyer intent");
+assert.equal(hasRedditRadarProblemIntent("Where to sell sneakers?", "My stock is not moving."), true, "Broad niche pain should count as Reddit Radar problem intent");
+
+const sneakerQueries = expandRedditRadarQueries("sneaker resellers", "resellers", "sneakers");
+assert.ok(sneakerQueries.includes("sneakers no sales"), "Sneaker query should expand into no-sales search");
+assert.ok(sneakerQueries.includes("reselling sneakers stuck"), "Sneaker query should expand into stuck reseller search");
+assert.ok(sneakerQueries.includes("sneaker inventory problem"), "Sneaker query should expand into inventory problem search");
+
+const bookQueries = expandRedditRadarQueries("book sellers", "used book resellers", "books online");
+assert.ok(bookQueries.includes("book selling no sales"), "Book seller query should expand into no-sales search");
+assert.ok(bookQueries.includes("where to sell books online"), "Book seller query should expand into marketplace search");
+assert.ok(bookQueries.includes("used books inventory problem"), "Book seller query should expand into inventory search");
+
+const roofingQueries = expandRedditRadarQueries("roofers", "homeowners", "roofing");
+assert.ok(roofingQueries.includes("roof leak help"), "Roofing query should expand into leak help search");
+assert.ok(roofingQueries.includes("roofing quote problem"), "Roofing query should expand into quote problem search");
+assert.ok(roofingQueries.includes("roofing leads"), "Roofing query should expand into lead search");
+
+const ecommerceQueries = expandRedditRadarQueries("ecommerce", "store owners", "shopify");
+assert.ok(ecommerceQueries.includes("shopify no traffic"), "Ecommerce query should expand into Shopify no-traffic search");
+assert.ok(ecommerceQueries.includes("ecommerce no sales"), "Ecommerce query should expand into ecommerce no-sales search");
+assert.ok(ecommerceQueries.includes("product page not converting"), "Ecommerce query should expand into product page conversion search");
+
+const sneakerSubs = expandRedditRadarSubreddits("sneaker reselling problem");
+assert.ok(sneakerSubs.includes("Flipping") && sneakerSubs.includes("Sneakers"), "Sneaker query should add reselling subreddits");
+const roofingSubs = expandRedditRadarSubreddits("roof leak quote problem");
+assert.ok(roofingSubs.includes("HomeImprovement") && roofingSubs.includes("Roofing"), "Roofing query should add local service subreddits");
 
 const rssJunk = cleanRssBody(`
   submitted by /u/example to /r/marketing
@@ -55,7 +86,8 @@ assert.equal(usefulRss.includes("submitted by"), false, "RSS metadata should be 
 assert.equal(isLowIntelPost("", 0, 0), true, "0/0 empty post should be low-intel");
 assert.equal(hasCustomerProblemSignal("My Shopify store has no traffic, what should I do?", ""), true, "Shopify traffic question should have customer pain");
 assert.equal(hasUsablePostSignal("My Shopify store has no traffic, what should I do?", "", 0, 0), true, "Shopify traffic question can have a usable signal before buyer-intent filtering");
-assert.equal(hasMarketVibeBuyerIntent("My Shopify store has no traffic, what should I do?", ""), false, "Shopify store-fixing post should not have MarketVibe buyer intent");
+assert.equal(hasMarketVibeBuyerIntent("My Shopify store has no traffic, what should I do?", ""), false, "Shopify store-fixing post is not MarketVibe buyer intent");
+assert.equal(hasRedditRadarProblemIntent("My Shopify store has no traffic, what should I do?", ""), true, "Shopify no-traffic post should still count as broader problem intent");
 assert.equal(hasUsablePostSignal("Need help with traffic?", "", 0, 0), true, "Title questions with pain should remain usable");
 assert.equal(hasUsablePostSignal("Quiet launch update", "", 2, 0), true, "Active comments should remain usable");
 assert.equal(hasUsablePostSignal("Quiet launch update", "", 0, 0), false, "Thin inactive posts should not look usable");
@@ -116,7 +148,7 @@ const shopifyReply = buildSuggestedReply({
   comments: 5,
   ups: 3,
 });
-assert.match(shopifyReply, /LOW INTEL|SKIP/i, "Shopify no-traffic store-help post should be skipped for MarketVibe buyer intent");
+assert.match(shopifyReply, /traffic|product page|checkout|abandoned carts|trust/i, "Shopify no-traffic post should get ecommerce-specific reply");
 
 const shopifySetupReply = buildSuggestedReply({
   title: "New to Shopify. Need help about general setup and automating the setup through Claude.",
@@ -145,6 +177,58 @@ const webDesignClientReply = buildSuggestedReply({
 });
 assert.match(webDesignClientReply, /visible local business problems|weak sites|CTAs|SEO basics|prospect/i, "Buyer-intent post should get MarketVibe-style prospecting reply");
 assert.doesNotMatch(webDesignClientReply, /ad|buy|sign up|checkout/i, "Buyer-intent reply should not sound like an ad");
+
+const sneakerReply = buildSuggestedReply({
+  title: "Sneaker reselling stuck, stock not moving",
+  body: "I have pairs listed but no sales. Where should I sell sneakers now?",
+  intent: "reselling",
+  niche: "sneaker resellers",
+  target: "resellers",
+  subreddit: "r/Flipping",
+  action: "ManualOnly",
+  comments: 6,
+  ups: 4,
+});
+assert.match(sneakerReply, /demand|pricing|platform|sold listings|stock/i, "Sneaker reseller reply should match selling/platform/pricing topic");
+
+const bookReply = buildSuggestedReply({
+  title: "Used books inventory problem, no sales",
+  body: "Where to sell books online if Marketplace is slow?",
+  intent: "books",
+  niche: "book sellers",
+  target: "used book resellers",
+  subreddit: "r/bookselling",
+  action: "ManualOnly",
+  comments: 3,
+  ups: 2,
+});
+assert.match(bookReply, /listings|marketplace|pricing|niche|inventory/i, "Book seller reply should match listings/pricing/inventory topic");
+
+const roofingReply = buildSuggestedReply({
+  title: "Roof leak help after storm, quote seems high",
+  body: "Any advice on how to compare roofing quotes?",
+  intent: "roofing",
+  niche: "roofers",
+  target: "homeowners",
+  subreddit: "r/Roofing",
+  action: "ManualOnly",
+  comments: 4,
+  ups: 5,
+});
+assert.match(roofingReply, /leak|quote|trust|homeowner/i, "Roofing reply should match leaks/quotes/trust topic");
+
+const deduped = dedupeRedditRadarPosts([
+  { title: "Sneakers no sales", permalink: "https://reddit.com/a" },
+  { title: "Sneakers no sales duplicate", permalink: "https://reddit.com/a" },
+  { title: "Where to sell books", permalink: "https://reddit.com/b" },
+]);
+assert.equal(deduped.length, 2, "Duplicate posts should be removed by permalink");
+
+const ranked = rankRedditRadarPosts([
+  { title: "Favorite sneaker colorway?", body: "Just chatter", subreddit: "r/Sneakers", permalink: "https://reddit.com/generic", comments: 10, ups: 20 },
+  { title: "Sneaker reselling stuck, no sales", body: "Where to sell sneakers? My stock is not moving.", subreddit: "r/Flipping", permalink: "https://reddit.com/pain", comments: 3, ups: 2 },
+], "sneaker resellers");
+assert.equal(ranked[0].permalink, "https://reddit.com/pain", "Pain/problem posts should rank above generic chatter");
 
 const redditMarketingReply = buildSuggestedReply({
   title: "How do I market on Reddit without getting ignored?",

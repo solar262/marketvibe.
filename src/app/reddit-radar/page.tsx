@@ -38,7 +38,7 @@ const WAIT_SECONDS = 180;
 const SEEN_POSTS_KEY = "marketvibe-reddit-radar-seen-posts";
 const MAX_SEEN_POSTS = 250;
 const EMPTY_SEARCH_MESSAGE =
-  "No strong Reddit opportunities found right now. Try broader pain terms like need help, struggling, no traffic, not converting, or looking for tool.";
+  "No strong Reddit opportunities found. Try adding a pain term like no sales, need help, struggling, where to sell, no traffic, or looking for tool.";
 const SEARCH_STEPS = [
   "Searching Reddit...",
   "Checking source 1 of 5",

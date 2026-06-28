@@ -24,12 +24,23 @@ type ReplyInput = {
   ups: number;
 };
 
+export type RedditRadarRankablePost = {
+  title: string;
+  body: string;
+  subreddit: string;
+  permalink: string;
+  comments: number;
+  ups: number;
+};
+
 const LOW_INTEL_REPLY = "LOW INTEL — SKIP THIS ONE...\n\nThere isn't enough context or engagement to write a useful reply.\n\nLook for posts with a real question, clear problem, or active comments.";
 const PAIN_SIGNAL_PATTERN = /\b(need help|help|problem|struggling|struggle|stuck|traffic|not converting|no traffic|no sales|website not working|what should i do|how do i get|how can i get|any advice|need advice|advice|looking for tool|recommend|shopify|ecommerce|customers|clients|leads|sales|prospects|prospecting|outreach|local businesses|web design clients|seo clients|agency lead generation|client acquisition)\b/i;
 const JOB_POST_PATTERN = /\b(hiring|remote developer|salary|full-time|full time|part-time|part time|job|career|vacancy|looking for developer|apply now|worldwide|per month)\b|\$\s*\/\s*month|\$\s*\d[\d,]*(?:\.\d{2})?\s*\/\s*month/i;
 const RSS_METADATA_PATTERN = /\bsubmitted by\b|\/u\/|\[comments\]|\bcomments link\b|\bpermalink\b|\breddit metadata\b|\bto \/r\/|\bfrom \/r\/|reddit\.com\/comments/i;
 const MARKETVIBE_BUYER_INTENT_PATTERN = /\b(how do i find web design clients|how do i get seo clients|where to find local business leads|how to sell websites to local businesses|how to get clients as a freelancer|cold outreach for web design|local businesses that need websites|website redesign leads|lead generation for agencies|finding businesses with bad websites|prospecting for web design|selling seo services|agency lead generation|client acquisition for web designers|web design clients|seo clients|local business leads|sell websites to local businesses|get clients as a freelancer|client acquisition|cold outreach|website redesign|redesign leads|bad websites|prospecting|businesses to pitch|find clients|find leads|get clients|get leads|lead generation|local leads|agency leads|outreach help)\b/i;
-const NON_BUYER_INTENT_PATTERN = /\b(shopify setup|new to shopify|claude setup|store automation|automating the setup|dropshipping|dropshipping beginners|fixing my website|fix my website|my website|my shopify store|my store|my ecommerce store|technical help|general business advice|business advice|setup help)\b/i;
+const NON_BUYER_INTENT_PATTERN = /\b(shopify setup|new to shopify|claude setup|store automation|automating the setup|dropshipping|dropshipping beginners|fixing my website|fix my website|technical help|general business advice|business advice|setup help)\b/i;
+const BROAD_PROBLEM_INTENT_PATTERN = /\b(need help|struggling|problem|no sales|no traffic|not converting|customers|leads|where to sell|how do i|any advice|looking for tool|recommend|stuck|stock not moving|inventory problem|quote problem|customer problem|no customers|not selling|abandoned cart|product page)\b/i;
+const SPAM_PROMO_PATTERN = /\b(check out my|use my code|promo code|limited offer|dm me|buy now|launching my|i built this|my app|my course|subscribe|newsletter)\b/i;
 
 export function compactRedditText(value: string) {
   return value.replace(/\s+/g, " ").trim().slice(0, 900);
@@ -91,6 +102,15 @@ export function isRejectedNonBuyerIntent(title: string, body: string) {
   return NON_BUYER_INTENT_PATTERN.test(text) && !hasMarketVibeBuyerIntent(title, body);
 }
 
+export function hasRedditRadarProblemIntent(title: string, body: string) {
+  const text = `${title} ${body}`;
+  return hasMarketVibeBuyerIntent(title, body) || BROAD_PROBLEM_INTENT_PATTERN.test(text);
+}
+
+export function isSpamOrPromotion(title: string, body: string) {
+  return SPAM_PROMO_PATTERN.test(`${title} ${body}`);
+}
+
 export function usefulBodyLength(body: string) {
   return compactRedditText(body).length;
 }
@@ -117,6 +137,104 @@ function hasTerm(text: string, terms: string[]) {
 
 function hasInventoryIntent(text: string) {
   return /\b(inventory|stock|stocks|reorder|warehouse|forecasting|stockout|stockouts|sku|skus|supply chain)\b/i.test(text);
+}
+
+function hasSneakerIntent(text: string) {
+  return /\b(sneaker|sneakers|shoes|shoe resell|reselling shoes|flipping shoes|sneaker flipping|stock not moving)\b/i.test(text);
+}
+
+function hasBookIntent(text: string) {
+  return /\b(book seller|book selling|selling books|used books|book reseller|bookstore|self published|self-published|books online)\b/i.test(text);
+}
+
+function hasRoofingIntent(text: string) {
+  return /\b(roofer|roofers|roofing|roof leak|roof repair|storm damage|roofing quote|roofing leads)\b/i.test(text);
+}
+
+export function expandRedditRadarQueries(niche: string, customer = "", keywords = "") {
+  const base = [niche, customer, keywords].map(compactRedditText).filter(Boolean);
+  const primary = base[0] || base.join(" ");
+  const queries = new Set<string>();
+  const add = (value: string) => {
+    const cleaned = compactRedditText(value).toLowerCase();
+    if (cleaned) queries.add(cleaned);
+  };
+
+  add(base.join(" "));
+  for (const seed of base) {
+    ["need help", "problem", "struggling", "no sales", "customers", "where to sell", "how do i", "advice", "looking for tool"].forEach((pain) => add(`${seed} ${pain}`));
+  }
+
+  const text = base.join(" ").toLowerCase();
+  if (/\b(sneaker|sneakers|shoe|shoes|resell|reseller|flipping)\b/.test(text)) {
+    ["sneakers no sales", "reselling sneakers stuck", "sneaker inventory problem", "where to sell sneakers", "stock not moving", "reselling shoes advice", "sneaker flipping problem"].forEach(add);
+  }
+  if (/\b(book|books|bookstore|author|self publish|self-published)\b/.test(text)) {
+    ["book selling no sales", "selling books online help", "used books inventory problem", "where to sell books online", "book reseller advice", "bookstore no customers", "self published book not selling"].forEach(add);
+  }
+  if (/\b(roof|roofer|roofing|contractor)\b/.test(text)) {
+    ["roof leak help", "roofing quote problem", "storm damage roof advice", "roofing leads", "roof repair customer problem", "roofer no leads"].forEach(add);
+  }
+  if (/\b(ecommerce|shopify|online store|store|cart|product page)\b/.test(text)) {
+    ["shopify no traffic", "store not converting", "abandoned cart problem", "product page not converting", "ecommerce no sales", "need help with online store"].forEach(add);
+  }
+  if (!queries.size && primary) add(primary);
+
+  return Array.from(queries).slice(0, 40);
+}
+
+export function expandRedditRadarSubreddits(queryText: string) {
+  const text = queryText.toLowerCase();
+  const subs = new Set(["smallbusiness", "Entrepreneur", "startups", "marketing", "DigitalMarketing", "sales", "ecommerce"]);
+  if (/\b(sneaker|sneakers|shoe|shoes|resell|reselling|flipping)\b/.test(text)) {
+    ["Flipping", "reselling", "Sneakers", "SneakerMarket"].forEach((sub) => subs.add(sub));
+  }
+  if (/\b(book|books|bookstore|author|self publish|self-published)\b/.test(text)) {
+    ["bookselling", "selfpublish", "Flipping"].forEach((sub) => subs.add(sub));
+  }
+  if (/\b(roof|roofer|roofing|contractor|home improvement)\b/.test(text)) {
+    ["HomeImprovement", "Roofing", "Contractor", "smallbusiness"].forEach((sub) => subs.add(sub));
+  }
+  if (/\b(web design|website|seo|agency|freelance|client|lead|prospect|outreach)\b/.test(text)) {
+    ["web_design", "freelance", "SEO", "bigseo", "agency"].forEach((sub) => subs.add(sub));
+  }
+  return Array.from(subs).slice(0, 18);
+}
+
+export function dedupeRedditRadarPosts<T extends { title: string; permalink: string }>(posts: T[]) {
+  const seen = new Set<string>();
+  return posts.filter((post) => {
+    const key = compactRedditText(post.permalink || post.title).toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export function scoreRedditRadarPost(post: RedditRadarRankablePost, queryText = "") {
+  const text = `${post.title} ${post.body}`.toLowerCase();
+  if (isBlockedJobPost(post.title, post.body) || isRejectedNonBuyerIntent(post.title, post.body) || isObviousRssJunk(post.title, post.body) || isSpamOrPromotion(post.title, post.body)) return -100;
+  if (!hasRedditRadarProblemIntent(post.title, post.body)) return 0;
+
+  let score = 35;
+  if (BROAD_PROBLEM_INTENT_PATTERN.test(text)) score += 24;
+  if (hasMarketVibeBuyerIntent(post.title, post.body)) score += 14;
+  if (text.includes("?")) score += 8;
+  if (/\b(no sales|no traffic|not converting|stuck|struggling|where to sell|need help|problem|any advice|recommend|looking for tool)\b/i.test(text)) score += 16;
+  if (/\b(customers|leads|prospects|buyers|clients)\b/i.test(text)) score += 8;
+  if (queryText && queryText.toLowerCase().split(/\s+/).some((word) => word.length > 4 && text.includes(word))) score += 6;
+  score += Math.min(post.comments, 20) * 0.8;
+  score += Math.min(post.ups, 40) * 0.2;
+  if (/\b(thoughts on|hot take|favorite|showcase|i built|launching)\b/i.test(text)) score -= 18;
+  return Math.round(score);
+}
+
+export function rankRedditRadarPosts<T extends RedditRadarRankablePost>(posts: T[], queryText = "") {
+  return dedupeRedditRadarPosts(posts)
+    .map((post) => ({ post, score: scoreRedditRadarPost(post, queryText) }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .map((item) => item.post);
 }
 
 function shortContext(title: string, body: string) {
@@ -151,6 +269,30 @@ export function buildReplyOptions(input: ReplyInput): RedditRadarReplyOptions {
     : comments > 0 || ups > 0
       ? "Good candidate. Post manually, keep it short, and do not add links."
       : "Use the quick reply by default. The deeper version only makes sense if the thread has more context.";
+
+  if (hasSneakerIntent(text)) {
+    return {
+      quickReply: replyParts("I'd first check whether this is a demand problem or a pricing/platform problem.", "If stock is not moving, compare sold listings before changing where you sell."),
+      deeperReply: replyParts("I'd first check demand, pricing and platform fit separately.", "For sneakers, sold listings matter more than asking prices. If pairs sit too long, it can be the model, size, condition, timing, photos, fees, or the marketplace.", "I'd test one change at a time before buying more stock."),
+      manualNote,
+    };
+  }
+
+  if (hasBookIntent(text)) {
+    return {
+      quickReply: replyParts("I'd look at listings, niche and pricing before assuming the books are the problem.", "Used books can sit if the marketplace or keywords are wrong, even when the inventory is fine."),
+      deeperReply: replyParts("I'd separate inventory quality from listing quality.", "For books, niche demand, edition/condition, photos, keywords, shipping cost and marketplace choice all matter.", "Check sold comps first, then improve the listing before buying more inventory."),
+      manualNote,
+    };
+  }
+
+  if (hasRoofingIntent(text)) {
+    return {
+      quickReply: replyParts("I'd answer the homeowner concern first: leak, quote, timing or trust.", "For roofing, people usually need clarity and confidence before they care who gets the job."),
+      deeperReply: replyParts("I'd focus on the exact homeowner concern first.", "Leaks, storm damage, quote confusion and trust are different problems.", "Clear photos, simple explanation, proof of local work and fast follow-up usually matter more than a generic sales pitch."),
+      manualNote,
+    };
+  }
 
   if (hasInventoryIntent(text)) {
     return {
