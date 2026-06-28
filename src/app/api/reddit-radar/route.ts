@@ -46,8 +46,8 @@ type RawPost = {
 };
 
 const USER_AGENTS = [
-  "MarketVibeRedditRadar/2.2 by marketvibe1.com",
-  "Mozilla/5.0 (compatible; MarketVibeRadar/2.2; +https://marketvibe1.com)",
+  "MarketVibeRedditRadar/2.3 by marketvibe1.com",
+  "Mozilla/5.0 (compatible; MarketVibeRadar/2.3; +https://marketvibe1.com)",
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
 ];
 
@@ -81,6 +81,11 @@ const SUBREDDIT_BLOCKLIST = [
 
 const postCache = new Map<string, { expires: number; posts: RawPost[]; sourceName: string }>();
 const CACHE_MS = 1000 * 60 * 10;
+const SEARCH_DEADLINE_MS = 18000;
+const REQUEST_TIMEOUT_MS = 3500;
+const MAX_QUERIES = 6;
+const MAX_SUBREDDITS = 6;
+const MAX_RAW_CANDIDATES = 24;
 
 function clean(value: string | null) {
   return (value || "").replace(/[<>]/g, "").slice(0, 220);
@@ -216,7 +221,7 @@ function makeReason(title: string, body: string, comments: number, ups: number, 
   return `Intel: ${subreddit} thread appears to be about ${intent}. ${context} Engagement: ${comments} comments and ${ups} upvotes. Intent score: ${intentScore}. Recommended action: safe to reply, keep it short, no links. Source: ${sourceName}.`;
 }
 
-async function fetchWithTimeout(url: string, userAgent: string, timeoutMs = 8500) {
+async function fetchWithTimeout(url: string, userAgent: string, timeoutMs = REQUEST_TIMEOUT_MS) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -273,7 +278,7 @@ function parseRssPosts(xml: string): RawPost[] {
 }
 
 function relevantSubreddits(queryText: string) {
-  return Array.from(new Set([...DEFAULT_BUSINESS_SUBS, ...expandRedditRadarSubreddits(queryText)])).slice(0, 18);
+  return Array.from(new Set([...DEFAULT_BUSINESS_SUBS, ...expandRedditRadarSubreddits(queryText)])).slice(0, MAX_SUBREDDITS);
 }
 
 function conversionIntentScore(post: RawPost) {
@@ -328,54 +333,50 @@ async function searchReddit(queryText: string) {
   const collected: RawPost[] = [];
   const seen = new Set<string>();
   let winningSource = "multi-source";
-  const queries = expandRedditRadarQueries(queryText, "", "");
+  const queries = expandRedditRadarQueries(queryText, "", "").slice(0, MAX_QUERIES);
+  const startedAt = Date.now();
 
   for (const query of queries) {
+    if (Date.now() - startedAt > SEARCH_DEADLINE_MS) break;
     const encoded = encodeURIComponent(query);
     const endpoints: { name: string; url: string; type: "json" | "rss" }[] = [
-      { name: "reddit-json", url: `https://www.reddit.com/search.json?q=${encoded}&sort=new&t=month&limit=25&type=link&raw_json=1`, type: "json" },
-      { name: "reddit-comments-json", url: `https://www.reddit.com/search.json?q=${encoded}&sort=comments&t=month&limit=25&type=link&raw_json=1`, type: "json" },
-      { name: "old-reddit-json", url: `https://old.reddit.com/search.json?q=${encoded}&sort=new&t=month&limit=25&type=link&raw_json=1`, type: "json" },
+      { name: "reddit-json", url: `https://www.reddit.com/search.json?q=${encoded}&sort=new&t=month&limit=20&type=link&raw_json=1`, type: "json" },
+      { name: "reddit-comments-json", url: `https://www.reddit.com/search.json?q=${encoded}&sort=comments&t=month&limit=20&type=link&raw_json=1`, type: "json" },
       { name: "reddit-rss", url: `https://www.reddit.com/search.rss?q=${encoded}&sort=new&t=month`, type: "rss" },
     ];
 
     for (const subreddit of relevantSubreddits(query)) {
-      endpoints.push(
-        { name: `r-${subreddit}-json`, url: `https://www.reddit.com/r/${subreddit}/search.json?q=${encoded}&restrict_sr=1&sort=new&t=month&limit=15&raw_json=1`, type: "json" },
-        { name: `r-${subreddit}-rss`, url: `https://www.reddit.com/r/${subreddit}/search.rss?q=${encoded}&restrict_sr=1&sort=new&t=month`, type: "rss" },
-      );
+      endpoints.push({ name: `r-${subreddit}-json`, url: `https://www.reddit.com/r/${subreddit}/search.json?q=${encoded}&restrict_sr=1&sort=new&t=month&limit=12&raw_json=1`, type: "json" });
     }
 
     for (const endpoint of endpoints) {
-      for (const userAgent of USER_AGENTS.slice(0, 2)) {
-        try {
-          const response = await fetchWithTimeout(endpoint.url, userAgent);
-          const text = await response.text();
+      if (Date.now() - startedAt > SEARCH_DEADLINE_MS || collected.length >= MAX_RAW_CANDIDATES) break;
+      try {
+        const response = await fetchWithTimeout(endpoint.url, USER_AGENTS[0]);
+        const text = await response.text();
 
-          if (!response.ok) {
-            errors.push(`${endpoint.name}:${response.status}`);
-            continue;
-          }
-
-          const posts = endpoint.type === "json" ? parseJsonPosts(JSON.parse(text)) : parseRssPosts(text);
-
-          for (const post of posts) {
-            const key = post.permalink || `${post.subreddit}-${post.title}`;
-            if (!seen.has(key)) {
-              seen.add(key);
-              collected.push(post);
-            }
-          }
-
-          if (posts.length && winningSource === "multi-source") winningSource = `${endpoint.name}:${query}`;
-          if (collected.length >= 40) break;
-        } catch (error) {
-          errors.push(`${endpoint.name}:${error instanceof Error ? error.message : "failed"}`);
+        if (!response.ok) {
+          errors.push(`${endpoint.name}:${response.status}`);
+          continue;
         }
+
+        const posts = endpoint.type === "json" ? parseJsonPosts(JSON.parse(text)) : parseRssPosts(text);
+
+        for (const post of posts) {
+          const key = post.permalink || `${post.subreddit}-${post.title}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            collected.push(post);
+          }
+          if (collected.length >= MAX_RAW_CANDIDATES) break;
+        }
+
+        if (posts.length && winningSource === "multi-source") winningSource = `${endpoint.name}:${query}`;
+      } catch (error) {
+        errors.push(`${endpoint.name}:${error instanceof Error ? error.message : "failed"}`);
       }
-      if (collected.length >= 40) break;
     }
-    if (collected.length >= 40) break;
+    if (collected.length >= MAX_RAW_CANDIDATES) break;
   }
 
   const ranked = rankRedditRadarPosts(collected, queryText)
@@ -414,7 +415,10 @@ export async function GET(request: Request) {
   }
 
   try {
-    const { posts, sourceName } = await searchReddit(queryText);
+    const { posts, sourceName } = await Promise.race([
+      searchReddit(queryText),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Search timed out")), SEARCH_DEADLINE_MS + 2500)),
+    ]);
 
     const visiblePosts = posts.filter((post) => isActionablePost(post));
 
@@ -453,7 +457,9 @@ export async function GET(request: Request) {
     return NextResponse.json({
       source: "error",
       error: error instanceof Error ? error.message : "Unable to fetch live posts",
-      message: "No strong Reddit opportunities found. Try adding a pain term like no sales, need help, struggling, where to sell, no traffic, or looking for tool.",
+      message: error instanceof Error && error.message.includes("timed out")
+        ? "Search timed out. Try narrower or broader pain terms."
+        : "No strong Reddit opportunities found. Try adding a pain term like no sales, need help, struggling, where to sell, no traffic, or looking for tool.",
       opportunities: [],
     });
   }
