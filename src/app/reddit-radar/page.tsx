@@ -13,7 +13,6 @@ import {
   Search,
   ShieldCheck,
   SkipForward,
-  TimerReset,
 } from "lucide-react";
 
 type Opportunity = {
@@ -75,6 +74,32 @@ function writeSeenPosts(keys: string[]) {
 
 function safeMetric(value: string) {
   return value.replace(/[^a-zA-Z0-9\s,.-]/g, "").slice(0, 80) || "blank";
+}
+
+function humanizeReply(reply: string) {
+  const exactMatch: Record<string, string> = {
+    "I would start with the workflow before the tools. Where are the people, what are they already complaining about, and what useful answer can you add? Once that is clear, the tool choice matters a lot less.":
+      "I’d probably start with the workflow before the tools.\n\nWhere are the people, what are they already complaining about, and what useful answer can you add?\n\nOnce that’s clear, the actual tool matters a lot less.",
+    "The offer matters more than the platform. A broad service is easy to ignore, but one clear result for one type of customer is much easier to understand and trust.":
+      "I think the offer matters more than the platform.\n\nA broad service is easy to ignore. One clear result for one type of customer is much easier to understand and trust.",
+    "Reddit feels different because people can sense a funnel quickly. I would use it as research first, comment normally, and only mention something when it genuinely fits the discussion.":
+      "Reddit feels different because people can spot a funnel fast.\n\nI’d use it for research first, comment normally, and only mention something when it actually fits the thread.",
+    "For ecommerce, I think the content has to start with the problem, not the product. People need to understand why it matters before they care about the store.":
+      "For ecommerce, I think the content has to start with the problem, not the product.\n\nPeople usually need to understand why it matters before they care about the store.",
+  };
+
+  if (exactMatch[reply]) return exactMatch[reply];
+
+  return reply
+    .replace(/^I would /, "I’d ")
+    .replace(/I would /g, "I’d ")
+    .replace(/Once that is clear/g, "Once that’s clear")
+    .replace(/actual tool choice/g, "actual tool")
+    .replace(/trying to turn it into a pitch/g, "turning it into a pitch")
+    .split(/(?<=[.!?])\s+/)
+    .filter(Boolean)
+    .slice(0, 4)
+    .join("\n\n");
 }
 
 export default function RedditRadarPage() {
@@ -158,6 +183,7 @@ export default function RedditRadarPage() {
   }, [opportunities, postedTitles, skippedTitles]);
 
   const currentItem = activeQueue[Math.min(currentIndex, Math.max(activeQueue.length - 1, 0))];
+  const humanReply = currentItem ? humanizeReply(currentItem.suggestedReply) : "";
   const totalDone = postedTitles.length + skippedTitles.length;
   const totalCount = opportunities.length;
 
@@ -169,7 +195,7 @@ export default function RedditRadarPage() {
 
   async function copyReply() {
     if (!currentItem) return;
-    await navigator.clipboard.writeText(currentItem.suggestedReply);
+    await navigator.clipboard.writeText(humanReply);
     track("Reddit Radar Copy Reply", {
       subreddit: currentItem.subreddit,
       score: currentItem.score,
@@ -182,7 +208,7 @@ export default function RedditRadarPage() {
 
   async function copyAndOpen() {
     if (!currentItem) return;
-    await navigator.clipboard.writeText(currentItem.suggestedReply);
+    await navigator.clipboard.writeText(humanReply);
     rememberPost(currentItem);
     track("Reddit Radar Copy And Open", {
       subreddit: currentItem.subreddit,
@@ -316,7 +342,7 @@ export default function RedditRadarPage() {
               <div className="flex items-center gap-2 text-sm font-semibold text-cyan-100">
                 <ShieldCheck className="h-4 w-4" /> Reply to paste
               </div>
-              <p className="mt-3 text-base leading-7 text-slate-100">{currentItem.suggestedReply}</p>
+              <p className="mt-3 whitespace-pre-line text-base leading-7 text-slate-100">{humanReply}</p>
             </div>
 
             <button onClick={copyAndOpen} className="mt-5 flex w-full items-center justify-center gap-3 rounded-full bg-white px-6 py-5 text-lg font-bold text-slate-950 shadow-xl transition hover:bg-slate-100">
