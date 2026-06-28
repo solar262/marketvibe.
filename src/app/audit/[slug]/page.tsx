@@ -69,7 +69,11 @@ export default async function AuditPage({
               <Link href="/faq" className="inline-flex items-center justify-center gap-2 rounded-md border border-white/20 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10">
                 <HelpCircle className="h-4 w-4" /> Read Buyer Q&amp;A
               </Link>
+              <Link href="/terms" className="inline-flex items-center justify-center rounded-md border border-white/20 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10">
+                Terms
+              </Link>
             </div>
+            <p className="mt-3 text-xs leading-5 text-slate-400">By continuing to Stripe, the buyer agrees to the MarketVibe Terms of Service.</p>
           </section>
         ) : (
           <section className="mt-8 grid gap-6">
