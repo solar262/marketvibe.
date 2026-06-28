@@ -23,36 +23,12 @@ type Opportunity = {
   target: string;
   score: "High" | "Medium" | "Low";
   risk: "Low" | "Medium" | "High";
+  action?: "Reply" | "ManualOnly" | "Skip";
   reason: string;
   suggestedReply: string;
 };
 
-const starterOpportunities: Opportunity[] = [
-  {
-    subreddit: "r/DigitalMarketing",
-    title: "Worth starting a marketing agency in 2026?",
-    url: "https://www.reddit.com/r/DigitalMarketing/",
-    niche: "agency growth",
-    target: "freelancers and agencies",
-    score: "High",
-    risk: "Low",
-    reason: "Sample fallback: people are discussing customer acquisition and positioning.",
-    suggestedReply:
-      "I think agencies still work, but only when the offer is really specific. “I do marketing” feels hard to sell now. Something like lead gen for one niche, automation for one type of business, or fixing one clear revenue problem is much easier to understand and trust.",
-  },
-  {
-    subreddit: "r/MarketingHelp",
-    title: "I barely understand Reddit marketing",
-    url: "https://www.reddit.com/r/MarketingHelp/",
-    niche: "reddit marketing",
-    target: "brands and agencies",
-    score: "High",
-    risk: "Low",
-    reason: "Sample fallback: the post asks how brands can join conversations without looking fake.",
-    suggestedReply:
-      "Reddit seems to reward people who sound like they belong in the conversation, not people trying to market. The safer play is to comment usefully for a while, learn the language of each niche, and let people check your profile naturally instead of forcing links into posts.",
-  },
-];
+type SourceState = "idle" | "live" | "empty" | "error";
 
 const WAIT_SECONDS = 180;
 
@@ -78,8 +54,8 @@ export default function RedditRadarPage() {
   const [niche, setNiche] = useState("AI tools for ecommerce");
   const [customer, setCustomer] = useState("Shopify owners, agencies, freelancers");
   const [keywords, setKeywords] = useState("customers, Reddit marketing, Shopify traffic, automation");
-  const [opportunities, setOpportunities] = useState<Opportunity[]>(starterOpportunities);
-  const [source, setSource] = useState<"live" | "fallback" | "sample">("sample");
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [source, setSource] = useState<SourceState>("idle");
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("Press Search to load live Reddit posts.");
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -91,24 +67,26 @@ export default function RedditRadarPage() {
   async function loadOpportunities() {
     setLoading(true);
     setStatus("Searching Reddit...");
+    setSource("idle");
 
     try {
       const params = new URLSearchParams({ niche, target: customer, keywords });
-      const response = await fetch(`/api/reddit-radar?${params.toString()}`);
+      const response = await fetch(`/api/reddit-radar?${params.toString()}`, { cache: "no-store" });
       const data = await response.json();
-      const nextOpportunities = data.opportunities?.length ? data.opportunities : starterOpportunities;
+      const nextOpportunities: Opportunity[] = Array.isArray(data.opportunities) ? data.opportunities : [];
+
       setOpportunities(nextOpportunities);
-      setSource(data.source === "live" ? "live" : "fallback");
-      setStatus(data.source === "live" ? "Live posts loaded. Work through them one at a time." : "Live search was limited, using fallback posts.");
+      setSource(data.source === "live" ? "live" : data.source === "error" ? "error" : "empty");
+      setStatus(data.message || (nextOpportunities.length ? "Live posts loaded." : "No live Reddit posts found."));
       setCurrentIndex(0);
       setPostedTitles([]);
       setSkippedTitles([]);
       setCopied(false);
       setWaitSeconds(0);
     } catch {
-      setOpportunities(starterOpportunities);
-      setSource("fallback");
-      setStatus("Could not load live posts, using fallback posts.");
+      setOpportunities([]);
+      setSource("error");
+      setStatus("Live Reddit search failed. Try again later or change the search terms.");
     } finally {
       setLoading(false);
     }
@@ -171,6 +149,8 @@ export default function RedditRadarPage() {
     setWaitSeconds(0);
   }
 
+  const sourceLabel = source === "live" ? "Live Reddit posts" : source === "error" ? "Search error" : source === "empty" ? "No results" : "Ready";
+
   return (
     <main className="min-h-screen bg-[#050b16] text-white">
       <section className="relative overflow-hidden border-b border-white/10 px-4 py-8 sm:px-6 lg:px-8">
@@ -212,7 +192,7 @@ export default function RedditRadarPage() {
         <div className="mb-5 grid gap-3 sm:grid-cols-3">
           <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 text-center">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Progress</p>
-            <p className="mt-2 text-2xl font-semibold text-white">{Math.min(totalDone + 1, totalCount)}/{totalCount}</p>
+            <p className="mt-2 text-2xl font-semibold text-white">{totalCount ? Math.min(totalDone + 1, totalCount) : 0}/{totalCount}</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 text-center">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Posted</p>
@@ -225,7 +205,7 @@ export default function RedditRadarPage() {
         </div>
 
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-4 text-sm text-slate-300">
-          <span>{source === "live" ? "Live Reddit posts" : "Fallback posts"} · {status}</span>
+          <span>{sourceLabel} · {status}</span>
           <button onClick={resetProgress} className="rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">Reset</button>
         </div>
 
@@ -235,6 +215,7 @@ export default function RedditRadarPage() {
               <span className="rounded-full border border-white/10 bg-slate-950/45 px-3 py-1 text-xs font-semibold text-slate-200">{currentItem.subreddit}</span>
               <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${badgeClasses(currentItem.score)}`}>{currentItem.score} opportunity</span>
               <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${riskClasses(currentItem.risk)}`}>{currentItem.risk} risk</span>
+              {currentItem.action && <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-semibold text-slate-100">{currentItem.action}</span>}
             </div>
 
             <h2 className="mt-5 text-3xl font-semibold tracking-tight text-white">{currentItem.title}</h2>
@@ -265,10 +246,10 @@ export default function RedditRadarPage() {
             </div>
           </article>
         ) : (
-          <div className="rounded-[2rem] border border-emerald-300/20 bg-emerald-300/10 p-8 text-center">
-            <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-300" />
-            <h2 className="mt-4 text-3xl font-semibold text-white">Queue finished</h2>
-            <p className="mt-3 text-slate-300">Search again when you want more posts.</p>
+          <div className="rounded-[2rem] border border-amber-300/20 bg-amber-300/10 p-8 text-center">
+            <RefreshCw className="mx-auto h-10 w-10 text-amber-200" />
+            <h2 className="mt-4 text-3xl font-semibold text-white">No live Reddit posts loaded</h2>
+            <p className="mt-3 text-slate-300">{status}</p>
             <button onClick={loadOpportunities} className="mt-5 rounded-full bg-white px-6 py-3 text-sm font-bold text-slate-950">Search Again</button>
           </div>
         )}
