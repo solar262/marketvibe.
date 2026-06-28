@@ -17,6 +17,9 @@ export default function ContactPage() {
     <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
       <h1 className="text-3xl font-semibold text-slate-950">Contact MarketVibe</h1>
       <p className="mt-2 text-slate-600">Send a message and we will get back to you.</p>
+      <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950">
+        Direct support email: <a className="font-semibold underline" href="mailto:hello@marketvibe1.com">hello@marketvibe1.com</a>
+      </div>
 
       <form onSubmit={submit} className="mt-7 grid gap-4 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
         <label className="grid gap-1 text-sm font-medium">
