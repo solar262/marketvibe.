@@ -31,6 +31,8 @@ type Opportunity = {
 type SourceState = "idle" | "live" | "empty" | "error";
 
 const WAIT_SECONDS = 180;
+const SEEN_POSTS_KEY = "marketvibe-reddit-radar-seen-posts";
+const MAX_SEEN_POSTS = 250;
 
 function badgeClasses(value: string) {
   if (value === "High") return "border-emerald-300/30 bg-emerald-300/15 text-emerald-100";
@@ -48,6 +50,26 @@ function formatTimer(seconds: number) {
   const minutes = Math.floor(seconds / 60);
   const remainder = seconds % 60;
   return `${minutes}:${remainder.toString().padStart(2, "0")}`;
+}
+
+function postKey(item: Opportunity) {
+  return item.url || `${item.subreddit}-${item.title}`;
+}
+
+function readSeenPosts() {
+  if (typeof window === "undefined") return [] as string[];
+  try {
+    const saved = window.localStorage.getItem(SEEN_POSTS_KEY);
+    const parsed = saved ? JSON.parse(saved) : [];
+    return Array.isArray(parsed) ? parsed.filter((item) => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeSeenPosts(keys: string[]) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(SEEN_POSTS_KEY, JSON.stringify(keys.slice(-MAX_SEEN_POSTS)));
 }
 
 export default function RedditRadarPage() {
@@ -73,11 +95,15 @@ export default function RedditRadarPage() {
       const params = new URLSearchParams({ niche, target: customer, keywords });
       const response = await fetch(`/api/reddit-radar?${params.toString()}`, { cache: "no-store" });
       const data = await response.json();
-      const nextOpportunities: Opportunity[] = Array.isArray(data.opportunities) ? data.opportunities : [];
+      const fetchedOpportunities: Opportunity[] = Array.isArray(data.opportunities) ? data.opportunities : [];
+      const seenPosts = readSeenPosts();
+      const nextOpportunities = fetchedOpportunities.filter((item) => !seenPosts.includes(postKey(item)));
+      const hiddenSeenCount = fetchedOpportunities.length - nextOpportunities.length;
 
       setOpportunities(nextOpportunities);
       setSource(data.source === "live" ? "live" : data.source === "error" ? "error" : "empty");
-      setStatus(data.message || (nextOpportunities.length ? "Live posts loaded." : "No live Reddit posts found."));
+      const baseStatus = data.message || (nextOpportunities.length ? "Live posts loaded." : "No live Reddit posts found.");
+      setStatus(hiddenSeenCount > 0 ? `${baseStatus} Hid ${hiddenSeenCount} posts already shown before.` : baseStatus);
       setCurrentIndex(0);
       setPostedTitles([]);
       setSkippedTitles([]);
@@ -113,6 +139,12 @@ export default function RedditRadarPage() {
   const totalDone = postedTitles.length + skippedTitles.length;
   const totalCount = opportunities.length;
 
+  function rememberPost(item: Opportunity) {
+    const key = postKey(item);
+    const current = readSeenPosts().filter((savedKey) => savedKey !== key);
+    writeSeenPosts([...current, key]);
+  }
+
   async function copyReply() {
     if (!currentItem) return;
     await navigator.clipboard.writeText(currentItem.suggestedReply);
@@ -123,6 +155,7 @@ export default function RedditRadarPage() {
   async function copyAndOpen() {
     if (!currentItem) return;
     await navigator.clipboard.writeText(currentItem.suggestedReply);
+    rememberPost(currentItem);
     setCopied(true);
     window.open(currentItem.url, "_blank", "noopener,noreferrer");
     setWaitSeconds(WAIT_SECONDS);
@@ -131,6 +164,7 @@ export default function RedditRadarPage() {
 
   function markPosted() {
     if (!currentItem) return;
+    rememberPost(currentItem);
     setPostedTitles((current) => current.includes(currentItem.title) ? current : [...current, currentItem.title]);
     setCurrentIndex(0);
     setWaitSeconds(WAIT_SECONDS);
@@ -138,6 +172,7 @@ export default function RedditRadarPage() {
 
   function skip() {
     if (!currentItem) return;
+    rememberPost(currentItem);
     setSkippedTitles((current) => current.includes(currentItem.title) ? current : [...current, currentItem.title]);
     setCurrentIndex(0);
   }
@@ -147,6 +182,11 @@ export default function RedditRadarPage() {
     setSkippedTitles([]);
     setCurrentIndex(0);
     setWaitSeconds(0);
+  }
+
+  function clearSeenPosts() {
+    writeSeenPosts([]);
+    setStatus("Seen post history cleared. Search again to allow older results.");
   }
 
   const sourceLabel = source === "live" ? "Live Reddit posts" : source === "error" ? "Search error" : source === "empty" ? "No results" : "Ready";
@@ -206,7 +246,10 @@ export default function RedditRadarPage() {
 
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-4 text-sm text-slate-300">
           <span>{sourceLabel} · {status}</span>
-          <button onClick={resetProgress} className="rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">Reset</button>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={clearSeenPosts} className="rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">Clear Seen</button>
+            <button onClick={resetProgress} className="rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">Reset</button>
+          </div>
         </div>
 
         {currentItem ? (
@@ -248,7 +291,7 @@ export default function RedditRadarPage() {
         ) : (
           <div className="rounded-[2rem] border border-amber-300/20 bg-amber-300/10 p-8 text-center">
             <RefreshCw className="mx-auto h-10 w-10 text-amber-200" />
-            <h2 className="mt-4 text-3xl font-semibold text-white">No live Reddit posts loaded</h2>
+            <h2 className="mt-4 text-3xl font-semibold text-white">No new Reddit posts loaded</h2>
             <p className="mt-3 text-slate-300">{status}</p>
             <button onClick={loadOpportunities} className="mt-5 rounded-full bg-white px-6 py-3 text-sm font-bold text-slate-950">Search Again</button>
           </div>
