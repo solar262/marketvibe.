@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { track } from "@vercel/analytics";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -72,6 +73,10 @@ function writeSeenPosts(keys: string[]) {
   window.localStorage.setItem(SEEN_POSTS_KEY, JSON.stringify(keys.slice(-MAX_SEEN_POSTS)));
 }
 
+function safeMetric(value: string) {
+  return value.replace(/[^a-zA-Z0-9\s,.-]/g, "").slice(0, 80) || "blank";
+}
+
 export default function RedditRadarPage() {
   const [niche, setNiche] = useState("AI tools for ecommerce");
   const [customer, setCustomer] = useState("Shopify owners, agencies, freelancers");
@@ -99,9 +104,10 @@ export default function RedditRadarPage() {
       const seenPosts = readSeenPosts();
       const nextOpportunities = fetchedOpportunities.filter((item) => !seenPosts.includes(postKey(item)));
       const hiddenSeenCount = fetchedOpportunities.length - nextOpportunities.length;
+      const nextSource = data.source === "live" ? "live" : data.source === "error" ? "error" : "empty";
 
       setOpportunities(nextOpportunities);
-      setSource(data.source === "live" ? "live" : data.source === "error" ? "error" : "empty");
+      setSource(nextSource);
       const baseStatus = data.message || (nextOpportunities.length ? "Live posts loaded." : "No live Reddit posts found.");
       setStatus(hiddenSeenCount > 0 ? `${baseStatus} Hid ${hiddenSeenCount} posts already shown before.` : baseStatus);
       setCurrentIndex(0);
@@ -109,16 +115,32 @@ export default function RedditRadarPage() {
       setSkippedTitles([]);
       setCopied(false);
       setWaitSeconds(0);
+
+      track("Reddit Radar Search", {
+        source: nextSource,
+        niche: safeMetric(niche),
+        customer: safeMetric(customer),
+        keywords: safeMetric(keywords),
+        results: nextOpportunities.length,
+        fetched: fetchedOpportunities.length,
+        hidden_seen: hiddenSeenCount,
+      });
     } catch {
       setOpportunities([]);
       setSource("error");
       setStatus("Live Reddit search failed. Try again later or change the search terms.");
+      track("Reddit Radar Search Error", {
+        niche: safeMetric(niche),
+        customer: safeMetric(customer),
+        keywords: safeMetric(keywords),
+      });
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
+    track("Reddit Radar Visit", { page: "reddit-radar" });
     loadOpportunities();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -148,6 +170,12 @@ export default function RedditRadarPage() {
   async function copyReply() {
     if (!currentItem) return;
     await navigator.clipboard.writeText(currentItem.suggestedReply);
+    track("Reddit Radar Copy Reply", {
+      subreddit: currentItem.subreddit,
+      score: currentItem.score,
+      risk: currentItem.risk,
+      action: currentItem.action || "none",
+    });
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
   }
@@ -156,6 +184,12 @@ export default function RedditRadarPage() {
     if (!currentItem) return;
     await navigator.clipboard.writeText(currentItem.suggestedReply);
     rememberPost(currentItem);
+    track("Reddit Radar Copy And Open", {
+      subreddit: currentItem.subreddit,
+      score: currentItem.score,
+      risk: currentItem.risk,
+      action: currentItem.action || "none",
+    });
     setCopied(true);
     window.open(currentItem.url, "_blank", "noopener,noreferrer");
     setWaitSeconds(WAIT_SECONDS);
@@ -165,6 +199,12 @@ export default function RedditRadarPage() {
   function markPosted() {
     if (!currentItem) return;
     rememberPost(currentItem);
+    track("Reddit Radar Mark Posted", {
+      subreddit: currentItem.subreddit,
+      score: currentItem.score,
+      risk: currentItem.risk,
+      action: currentItem.action || "none",
+    });
     setPostedTitles((current) => current.includes(currentItem.title) ? current : [...current, currentItem.title]);
     setCurrentIndex(0);
     setWaitSeconds(WAIT_SECONDS);
@@ -173,11 +213,18 @@ export default function RedditRadarPage() {
   function skip() {
     if (!currentItem) return;
     rememberPost(currentItem);
+    track("Reddit Radar Skip", {
+      subreddit: currentItem.subreddit,
+      score: currentItem.score,
+      risk: currentItem.risk,
+      action: currentItem.action || "none",
+    });
     setSkippedTitles((current) => current.includes(currentItem.title) ? current : [...current, currentItem.title]);
     setCurrentIndex(0);
   }
 
   function resetProgress() {
+    track("Reddit Radar Reset Progress", { results: opportunities.length });
     setPostedTitles([]);
     setSkippedTitles([]);
     setCurrentIndex(0);
@@ -186,6 +233,7 @@ export default function RedditRadarPage() {
 
   function clearSeenPosts() {
     writeSeenPosts([]);
+    track("Reddit Radar Clear Seen", {});
     setStatus("Seen post history cleared. Search again to allow older results.");
   }
 
