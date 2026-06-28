@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Download, LockKeyhole } from "lucide-react";
+import { Download, HelpCircle, LockKeyhole } from "lucide-react";
 import { CheckoutButton } from "@/components/CheckoutButton";
 import { findLeadBySlug } from "@/lib/lead-engine";
 import { getAuditBySlugFromSupabase } from "@/lib/lead-persistence";
@@ -55,11 +55,21 @@ export default async function AuditPage({
         {!isUnlocked ? (
           <section className="mt-8 rounded-lg border border-slate-200 bg-slate-950 p-6 text-white">
             <LockKeyhole className="h-7 w-7 text-emerald-300" />
-            <h2 className="mt-4 text-2xl font-semibold">Unlock Full Report</h2>
-            <p className="mt-2 max-w-2xl text-slate-300">Get full lead details, all scanner findings, outreach message, fix checklist, suggested offer, and PDF-ready report content.</p>
-            <CheckoutButton product="audit" leadSlug={lead.slug} className="mt-5 inline-flex items-center justify-center gap-2 rounded-md bg-white px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-slate-100">
-              Pay €19 with Stripe
-            </CheckoutButton>
+            <h2 className="mt-4 text-2xl font-semibold">Unlock Full Report for this business</h2>
+            <p className="mt-2 max-w-2xl text-slate-300">
+              The €19 Full Audit Report unlocks this selected business audit. You get full lead details, all scanner findings, outreach message, fix checklist, suggested service angle, and report-ready content.
+            </p>
+            <div className="mt-5 rounded-md border border-white/10 bg-white/5 p-4 text-sm leading-6 text-slate-200">
+              <strong className="text-white">How buyers can use it:</strong> prepare a stronger pitch, proposal, consultation, or service offer for this business owner. MarketVibe does not guarantee replies, clients, income, or sales.
+            </div>
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <CheckoutButton product="audit" leadSlug={lead.slug} className="inline-flex items-center justify-center gap-2 rounded-md bg-white px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-slate-100">
+                Pay €19 with Stripe
+              </CheckoutButton>
+              <Link href="/faq" className="inline-flex items-center justify-center gap-2 rounded-md border border-white/20 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10">
+                <HelpCircle className="h-4 w-4" /> Read Buyer Q&amp;A
+              </Link>
+            </div>
           </section>
         ) : (
           <section className="mt-8 grid gap-6">
