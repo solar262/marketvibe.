@@ -26,8 +26,8 @@ type RawPost = {
 };
 
 const USER_AGENTS = [
-  "MarketVibeRedditRadar/1.4 by marketvibe1.com",
-  "Mozilla/5.0 (compatible; MarketVibeRadar/1.4; +https://marketvibe1.com)",
+  "MarketVibeRedditRadar/1.5 by marketvibe1.com",
+  "Mozilla/5.0 (compatible; MarketVibeRadar/1.5; +https://marketvibe1.com)",
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
 ];
 
@@ -53,6 +53,10 @@ function decodeHtml(value: string) {
     .replace(/&#x27;/g, "'")
     .replace(/<[^>]*>/g, "")
     .trim();
+}
+
+function hasLowIntel(body: string, comments: number, ups: number) {
+  return compactText(body).length < 80 && comments === 0 && ups === 0;
 }
 
 function isSensitiveThread(text: string) {
@@ -83,8 +87,9 @@ function isHostileThread(text: string) {
   ]);
 }
 
-function recommendedAction(title: string, body: string): Action {
+function recommendedAction(title: string, body: string, comments = 0, ups = 0): Action {
   const text = `${title} ${body}`.toLowerCase();
+  if (hasLowIntel(body, comments, ups)) return "Skip";
   if (isSensitiveThread(text) || isHostileThread(text)) return "Skip";
   if (hasAny(text, ["agency", "client", "hire", "website", "link", "promote", "ai", "automation"])) return "ManualOnly";
   return "Reply";
@@ -104,8 +109,9 @@ function riskScore(title: string, body: string, action: Action): "Low" | "Medium
   return "Low";
 }
 
-function detectIntent(title: string, body: string) {
+function detectIntent(title: string, body: string, comments = 0, ups = 0) {
   const text = `${title} ${body}`.toLowerCase();
+  if (hasLowIntel(body, comments, ups)) return "low-intel";
   if (isSensitiveThread(text)) return "sensitive-ai";
   if (hasAny(text, ["what do you use", "tool", "software", "stack"])) return "tools";
   if (hasAny(text, ["traffic", "visitors", "paid ads", "organic"])) return "traffic";
@@ -123,11 +129,15 @@ function extractPain(title: string, body: string) {
   return compactText(pain || sentences[0] || title);
 }
 
-function makeReply(title: string, body: string, niche: string) {
-  const intent = detectIntent(title, body);
-  const action = recommendedAction(title, body);
+function makeReply(title: string, body: string, niche: string, comments = 0, ups = 0) {
+  const intent = detectIntent(title, body, comments, ups);
+  const action = recommendedAction(title, body, comments, ups);
   const pain = extractPain(title, body);
   const hasBody = body.trim().length > 60;
+
+  if (intent === "low-intel") {
+    return "LOW INTEL — SKIP THIS ONE. There is not enough context or engagement to write a useful reply. Look for posts with a real question, clear problem, or active comments.";
+  }
 
   if (action === "Skip") {
     return "SKIP THIS ONE. This thread is sensitive or already negative. A polished reply could hurt the account. If you comment anyway, write one short personal sentence manually and do not mention tools, marketing, automation, AI, or links.";
@@ -165,10 +175,14 @@ function makeReply(title: string, body: string, niche: string) {
 }
 
 function makeReason(title: string, body: string, comments: number, ups: number, subreddit: string, sourceName: string) {
-  const intent = detectIntent(title, body);
-  const action = recommendedAction(title, body);
+  const intent = detectIntent(title, body, comments, ups);
+  const action = recommendedAction(title, body, comments, ups);
   const pain = extractPain(title, body);
   const context = body.trim() ? `Context: "${pain}"` : "Only title/body-light context available.";
+
+  if (intent === "low-intel") {
+    return `Intel: ${subreddit} has too little context or engagement. ${context} Engagement: ${comments} comments and ${ups} upvotes. Source: ${sourceName}. Recommended action: SKIP.`;
+  }
 
   if (action === "Skip") {
     return `Intel: ${subreddit} thread is high risk (${intent}). ${context} Engagement: ${comments} comments and ${ups} upvotes. Source: ${sourceName}. Recommended action: SKIP or write one short manual sentence only.`;
@@ -294,7 +308,7 @@ export async function GET(request: Request) {
     const { posts, sourceName } = await searchReddit(queryText);
 
     const opportunities = posts.slice(0, 8).map((post) => {
-      const action = recommendedAction(post.title, post.body);
+      const action = recommendedAction(post.title, post.body, post.comments, post.ups);
       const score = opportunityScore(post.ups, post.comments, action);
       const risk = riskScore(post.title, post.body, action);
 
@@ -308,7 +322,7 @@ export async function GET(request: Request) {
         risk,
         action,
         reason: makeReason(post.title, post.body, post.comments, post.ups, post.subreddit, sourceName),
-        suggestedReply: makeReply(post.title, post.body, niche),
+        suggestedReply: makeReply(post.title, post.body, niche, post.comments, post.ups),
       };
     });
 
