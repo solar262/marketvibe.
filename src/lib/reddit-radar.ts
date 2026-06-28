@@ -6,6 +6,12 @@ export type RedditRadarIntel = {
   reply: string;
 };
 
+export type RedditRadarReplyOptions = {
+  quickReply: string;
+  deeperReply: string;
+  manualNote: string;
+};
+
 type ReplyInput = {
   title: string;
   body: string;
@@ -104,98 +110,165 @@ function shortContext(title: string, body: string) {
   return sentences.find((sentence) => PAIN_SIGNAL_PATTERN.test(sentence)) || sentences[0] || title;
 }
 
-export function buildSuggestedReply(input: ReplyInput) {
+export function buildReplyOptions(input: ReplyInput): RedditRadarReplyOptions {
   const { title, body, intent, niche, target, subreddit, action, comments, ups } = input;
   const text = `${title} ${body} ${niche} ${target} ${subreddit}`.toLowerCase();
   const context = shortContext(title, body);
 
   if (isBlockedJobPost(title, body) || isLowIntelPost(body, comments, ups) && !hasUsablePostSignal(title, body, comments, ups)) {
-    return LOW_INTEL_REPLY;
+    return {
+      quickReply: LOW_INTEL_REPLY,
+      deeperReply: "Not recommended",
+      manualNote: "Skip this one. There is not enough context or engagement to write a useful Reddit reply.",
+    };
   }
 
   if (action === "Skip") {
-    return replyParts("SKIP THIS ONE.", "This looks risky or too thin to answer usefully.");
+    return {
+      quickReply: "SKIP THIS ONE.",
+      deeperReply: "Not recommended",
+      manualNote: "Skip this thread. It looks risky, sensitive, promotional, or too thin to answer safely.",
+    };
   }
 
-  const manualPrefix = action === "ManualOnly" ? "Rough starting point:" : "";
+  const manualNote = action === "ManualOnly"
+    ? "Edit before posting. Use this as a starting point and make sure it fits the thread tone."
+    : comments > 0 || ups > 0
+      ? "Good candidate. Post manually, keep it short, and do not add links."
+      : "Use the quick reply by default. The deeper version only makes sense if the thread has more context.";
 
   if (hasTerm(text, ["inventory", "stock", "reorder", "stockout", "warehouse"])) {
-    return replyParts(
-      manualPrefix,
-      "I'd separate the boring useful stuff from the shiny stuff.",
-      "Forecasting, reorder alerts, stockout warnings and messy spreadsheet cleanup are worth testing.",
-      "Fully automated buying decisions are where I'd be more careful."
-    );
+    return {
+      quickReply: replyParts(
+        "I'd separate the boring useful stuff from the shiny stuff.",
+        "Forecasting, reorder alerts and stockout warnings are worth testing. Fully automated buying decisions are where I'd be careful."
+      ),
+      deeperReply: replyParts(
+        "I'd separate the boring useful stuff from the shiny stuff.",
+        "Forecasting, reorder alerts, stockout warnings and messy spreadsheet cleanup are worth testing.",
+        "Fully automated buying decisions are where I'd be more careful, especially if the data is messy or seasonal."
+      ),
+      manualNote,
+    };
   }
 
   if (intent === "tools" || hasTerm(text, [" vs ", "worth using", "hype", "compare", "comparison", "looking for tool", "recommend"])) {
-    return replyParts(
-      manualPrefix,
-      "I'd compare them on the boring parts first.",
-      "Does it save time on the exact workflow, does it handle messy inputs, and can you undo bad output easily?",
-      "The flashier features matter less than that."
-    );
+    return {
+      quickReply: replyParts(
+        "I'd compare them on the boring parts first.",
+        "Does it save time on the exact workflow, handle messy inputs, and let you undo bad output?"
+      ),
+      deeperReply: replyParts(
+        "I'd compare them on the boring parts first.",
+        "Does it save time on the exact workflow, does it handle messy inputs, and can you undo bad output easily?",
+        "The flashier features matter less than that."
+      ),
+      manualNote,
+    };
   }
 
   if (intent === "ecommerce" || hasTerm(text, ["shopify", "ecommerce", "store", "product page", "checkout", "cart"])) {
     if (hasTerm(text, ["no traffic", "traffic", "visitors"])) {
-      return replyParts(
-        manualPrefix,
-        "I'd split this into two separate problems: getting the right traffic, then getting that traffic to trust the store.",
-        "If visits are low, fix the channel and offer first.",
-        "If visits are decent, I'd look at the product page, proof, checkout friction and abandoned carts."
-      );
+      return {
+        quickReply: replyParts(
+          "I'd split this into traffic first, conversion second.",
+          "If visits are low, fix the channel and offer. If visits are decent, check the product page, trust signals and checkout friction."
+        ),
+        deeperReply: replyParts(
+          "I'd split this into two separate problems: getting the right traffic, then getting that traffic to trust the store.",
+          "If visits are low, fix the channel and offer first.",
+          "If visits are decent, I'd look at the product page, proof, checkout friction and abandoned carts."
+        ),
+        manualNote,
+      };
     }
 
-    return replyParts(
-      manualPrefix,
-      "I'd look at where people hesitate in the store.",
-      "Usually it's product page clarity, trust, shipping/returns, checkout friction, or carts getting abandoned.",
-      "One of those will tell you more than changing everything at once."
-    );
+    return {
+      quickReply: replyParts(
+        "I'd look at where people hesitate in the store.",
+        "Product page clarity, trust, shipping/returns or checkout friction usually tells you more than changing everything."
+      ),
+      deeperReply: replyParts(
+        "I'd look at where people hesitate in the store.",
+        "Usually it's product page clarity, trust, shipping/returns, checkout friction, or carts getting abandoned.",
+        "One of those will tell you more than changing everything at once."
+      ),
+      manualNote,
+    };
   }
 
   if (intent === "reddit" || hasTerm(text, ["reddit", "subreddit", "karma", "community"])) {
-    return replyParts(
-      manualPrefix,
-      "I'd start with community fit before posting anything.",
-      "Read the comments that already get upvoted, use the same niche language, and don't drop links early.",
-      "A useful comment history matters more here than a clever pitch."
-    );
+    return {
+      quickReply: replyParts(
+        "I'd start with community fit before posting anything.",
+        "Use the niche language people already use there, comment normally, and don't drop links early."
+      ),
+      deeperReply: replyParts(
+        "I'd start with community fit before posting anything.",
+        "Read the comments that already get upvoted, use the same niche language, and don't drop links early.",
+        "A useful comment history matters more here than a clever pitch."
+      ),
+      manualNote,
+    };
   }
 
   if (intent === "traffic") {
-    return replyParts(
-      manualPrefix,
-      "I'd first figure out whether this is a traffic problem or an offer problem.",
-      `The part I'd dig into is: ${context}.`,
-      "One clear channel and one clear customer type will make the next move easier."
-    );
+    return {
+      quickReply: replyParts(
+        "I'd first figure out whether this is a traffic problem or an offer problem.",
+        `The part I'd dig into is: ${context}.`
+      ),
+      deeperReply: replyParts(
+        "I'd first figure out whether this is a traffic problem or an offer problem.",
+        `The part I'd dig into is: ${context}.`,
+        "One clear channel and one clear customer type will make the next move easier."
+      ),
+      manualNote,
+    };
   }
 
   if (intent === "customers") {
-    return replyParts(
-      manualPrefix,
-      `For ${target || "that audience"}, I'd make the offer more specific before changing channels.`,
-      `The useful clue is: ${context}.`,
-      "A clear problem/result usually beats a broader service pitch."
-    );
+    return {
+      quickReply: replyParts(
+        `For ${target || "that audience"}, I'd make the offer more specific before changing channels.`,
+        `The useful clue is: ${context}.`
+      ),
+      deeperReply: replyParts(
+        `For ${target || "that audience"}, I'd make the offer more specific before changing channels.`,
+        `The useful clue is: ${context}.`,
+        "A clear problem/result usually beats a broader service pitch."
+      ),
+      manualNote,
+    };
   }
 
   if (intent === "ai") {
-    return replyParts(
-      manualPrefix,
-      "I'd use AI for the parts that are repetitive and easy to check.",
-      "The risky bit is letting it make decisions without enough context.",
-      "A human review step is usually where it stays useful."
-    );
+    return {
+      quickReply: replyParts(
+        "I'd use AI for the repetitive parts that are easy to check.",
+        "The risky bit is letting it make decisions without enough context."
+      ),
+      deeperReply: replyParts(
+        "I'd use AI for the parts that are repetitive and easy to check.",
+        "The risky bit is letting it make decisions without enough context.",
+        "A human review step is usually where it stays useful."
+      ),
+      manualNote,
+    };
   }
 
-  return replyParts(
-    manualPrefix,
-    `I'd answer the specific bit first: ${context}.`,
-    `For ${niche || "this"}, I'd keep the reply practical and skip the pitch.`
-  );
+  return {
+    quickReply: replyParts(`I'd answer the specific bit first: ${context}.`),
+    deeperReply: replyParts(
+      `I'd answer the specific bit first: ${context}.`,
+      `For ${niche || "this"}, I'd keep the reply practical and skip the pitch.`
+    ),
+    manualNote,
+  };
+}
+
+export function buildSuggestedReply(input: ReplyInput) {
+  return buildReplyOptions(input).quickReply;
 }
 
 export function lowIntelIntel(): RedditRadarIntel {

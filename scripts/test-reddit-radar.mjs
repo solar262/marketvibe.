@@ -16,6 +16,7 @@ const sandbox = { exports: {} };
 vm.runInNewContext(transpiled.outputText, sandbox, { filename: "reddit-radar.js" });
 
 const {
+  buildReplyOptions,
   buildSuggestedReply,
   cleanRssBody,
   hasAiIntent,
@@ -73,6 +74,31 @@ const inventoryReply = buildSuggestedReply({
 });
 assert.match(inventoryReply, /Forecasting|reorder alerts|stockout warnings/i, "Inventory AI post should get inventory-specific reply");
 assert.doesNotMatch(inventoryReply, /as an AI|link|book a call/i, "Inventory reply should not sound like a pitch");
+const inventoryOptions = buildReplyOptions({
+  title: "Inventory management AI: what's worth using vs hype",
+  body: "We keep running into stockouts and messy reorder spreadsheets.",
+  intent: "ai",
+  niche: "AI tools for ecommerce",
+  target: "Shopify owners",
+  subreddit: "r/ecommerce",
+  action: "ManualOnly",
+  comments: 7,
+  ups: 12,
+});
+assert.match(inventoryOptions.quickReply, /Forecasting|reorder alerts|stockout warnings/i, "Inventory AI should return quick reply");
+assert.match(inventoryOptions.deeperReply, /messy spreadsheet cleanup|automated buying decisions/i, "Inventory AI should return deeper reply");
+assert.match(inventoryOptions.manualNote, /Edit before posting/i, "ManualOnly should warn to edit before posting");
+assert.equal(buildSuggestedReply({
+  title: "Inventory management AI: what's worth using vs hype",
+  body: "We keep running into stockouts and messy reorder spreadsheets.",
+  intent: "ai",
+  niche: "AI tools for ecommerce",
+  target: "Shopify owners",
+  subreddit: "r/ecommerce",
+  action: "ManualOnly",
+  comments: 7,
+  ups: 12,
+}), inventoryOptions.quickReply, "Copy workflow should have quick reply selected by default");
 
 const shopifyReply = buildSuggestedReply({
   title: "My Shopify store has no traffic, what should I do?",
@@ -112,5 +138,19 @@ const lowIntelReply = buildSuggestedReply({
   ups: 0,
 });
 assert.equal(lowIntelReply, lowIntel.reply, "Low-intel post should keep skip reply");
+const lowIntelOptions = buildReplyOptions({
+  title: "Quick question",
+  body: "",
+  intent: "low-intel",
+  niche: "",
+  target: "",
+  subreddit: "r/marketing",
+  action: "Skip",
+  comments: 0,
+  ups: 0,
+});
+assert.equal(lowIntelOptions.quickReply, lowIntel.reply, "Low-intel quick reply should be skip reply");
+assert.match(lowIntelOptions.deeperReply, /Not recommended/i, "Low-intel deeper reply should not be recommended");
+assert.match(lowIntelOptions.manualNote, /not enough context|engagement/i, "Low-intel manual note should explain context risk");
 
 console.log("Reddit Radar helper tests passed.");

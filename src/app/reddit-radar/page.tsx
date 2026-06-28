@@ -26,9 +26,13 @@ type Opportunity = {
   action?: "Reply" | "ManualOnly" | "Skip";
   reason: string;
   suggestedReply: string;
+  quickReply?: string;
+  deeperReply?: string;
+  manualNote?: string;
 };
 
 type SourceState = "idle" | "live" | "empty" | "error";
+type ReplyMode = "quick" | "deeper";
 
 const WAIT_SECONDS = 180;
 const SEEN_POSTS_KEY = "marketvibe-reddit-radar-seen-posts";
@@ -128,6 +132,7 @@ export default function RedditRadarPage() {
   const [skippedTitles, setSkippedTitles] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
   const [waitSeconds, setWaitSeconds] = useState(0);
+  const [replySelection, setReplySelection] = useState<{ url: string; mode: ReplyMode } | null>(null);
 
   async function loadOpportunities() {
     setLoading(true);
@@ -162,6 +167,7 @@ export default function RedditRadarPage() {
       setSkippedTitles([]);
       setCopied(false);
       setWaitSeconds(0);
+      setReplySelection(null);
 
       track("Reddit Radar Search", {
         source: nextSource,
@@ -210,7 +216,10 @@ export default function RedditRadarPage() {
   }, [opportunities, postedTitles, skippedTitles]);
 
   const currentItem = activeQueue[Math.min(currentIndex, Math.max(activeQueue.length - 1, 0))];
-  const humanReply = currentItem ? humanizeReply(currentItem.suggestedReply) : "";
+  const replyMode = currentItem && replySelection?.url === currentItem.url ? replySelection.mode : "quick";
+  const quickReply = currentItem ? humanizeReply(currentItem.quickReply || currentItem.suggestedReply) : "";
+  const deeperReply = currentItem ? humanizeReply(currentItem.deeperReply || "") : "";
+  const selectedReply = replyMode === "deeper" && deeperReply ? deeperReply : quickReply;
   const totalDone = postedTitles.length + skippedTitles.length;
   const totalCount = opportunities.length;
 
@@ -221,27 +230,29 @@ export default function RedditRadarPage() {
   }
 
   async function copyReply() {
-    if (!currentItem) return;
-    await navigator.clipboard.writeText(humanReply);
+    if (!currentItem || !selectedReply) return;
+    await navigator.clipboard.writeText(selectedReply);
     track("Reddit Radar Copy Reply", {
       subreddit: currentItem.subreddit,
       score: currentItem.score,
       risk: currentItem.risk,
       action: currentItem.action || "none",
+      reply_mode: replyMode,
     });
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
   }
 
   async function copyAndOpen() {
-    if (!currentItem) return;
-    await navigator.clipboard.writeText(humanReply);
+    if (!currentItem || !selectedReply) return;
+    await navigator.clipboard.writeText(selectedReply);
     rememberPost(currentItem);
     track("Reddit Radar Copy And Open", {
       subreddit: currentItem.subreddit,
       score: currentItem.score,
       risk: currentItem.risk,
       action: currentItem.action || "none",
+      reply_mode: replyMode,
     });
     setCopied(true);
     window.open(currentItem.url, "_blank", "noopener,noreferrer");
@@ -405,15 +416,40 @@ export default function RedditRadarPage() {
               <div className="flex items-center gap-2 text-sm font-semibold text-cyan-100">
                 <ShieldCheck className="h-4 w-4" /> Reply to paste
               </div>
-              <p className="mt-3 whitespace-pre-line text-base leading-7 text-slate-100">{humanReply}</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {(["quick", "deeper"] as ReplyMode[]).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => currentItem && setReplySelection({ url: currentItem.url, mode })}
+                    disabled={mode === "deeper" && !deeperReply}
+                    className={`rounded-full border px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${
+                      replyMode === mode
+                        ? "border-cyan-200 bg-cyan-200 text-slate-950"
+                        : "border-white/15 bg-white/10 text-white hover:bg-white/15"
+                    }`}
+                  >
+                    {mode === "quick" ? "Quick Reply" : "Deeper Reply"}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-4 whitespace-pre-line text-base leading-7 text-slate-100">{selectedReply}</p>
+              {currentItem.manualNote && (
+                <div className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm leading-6 text-amber-50">
+                  <div className="flex gap-2">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-200" />
+                    <p><strong>Manual note:</strong> {currentItem.manualNote}</p>
+                  </div>
+                </div>
+              )}
             </div>
 
-            <button onClick={copyAndOpen} className="mt-5 flex w-full items-center justify-center gap-3 rounded-full bg-white px-6 py-5 text-lg font-bold text-slate-950 shadow-xl transition hover:bg-slate-100">
+            <button onClick={copyAndOpen} disabled={!selectedReply} className="mt-5 flex w-full items-center justify-center gap-3 rounded-full bg-white px-6 py-5 text-lg font-bold text-slate-950 shadow-xl transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60">
               <Copy className="h-5 w-5" /> {copied ? "Copied — Reddit opened" : "Copy + Open Reddit"} <ExternalLink className="h-5 w-5" />
             </button>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <button onClick={copyReply} className="rounded-full border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold text-white hover:bg-white/15">Copy Only</button>
+              <button onClick={copyReply} disabled={!selectedReply} className="rounded-full border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold text-white hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60">Copy Only</button>
               <button onClick={markPosted} className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-4 py-3 text-sm font-semibold text-emerald-100 hover:bg-emerald-300/15"><CheckCircle2 className="mr-2 inline h-4 w-4" />Mark Posted</button>
               <button onClick={skip} className="rounded-full border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold text-white hover:bg-white/15"><SkipForward className="mr-2 inline h-4 w-4" />Skip</button>
             </div>

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  buildReplyOptions,
   buildSuggestedReply,
   cleanRssBody,
   compactRedditText as compactText,
@@ -477,6 +478,7 @@ export async function GET(request: Request) {
         action,
         intent,
         reason: makeReason(post.title, post.body, post.comments, post.ups, post.subreddit, sourceName),
+        ...buildReplyOptions({ title: post.title, body: post.body, intent, niche, target, subreddit: post.subreddit, action, comments: post.comments, ups: post.ups }),
         suggestedReply: makeReply(post.title, post.body, niche, target, post.subreddit, post.comments, post.ups),
       };
     });
