@@ -15,35 +15,6 @@ type RedditChild = {
 
 type Action = "Reply" | "ManualOnly" | "Skip";
 
-const fallbackPosts = [
-  {
-    subreddit: "r/DigitalMarketing",
-    title: "Worth starting a marketing agency in 2026?",
-    url: "https://www.reddit.com/r/DigitalMarketing/",
-    niche: "agency growth",
-    target: "freelancers and agencies",
-    score: "High",
-    risk: "Medium",
-    action: "ManualOnly" as Action,
-    reason: "Intel: broad agency thread. Good opportunity, but avoid sounding like a consultant. Use a short personal take.",
-    suggestedReply:
-      "I think agencies can still work, but the offer has to be really specific now. Broad marketing promises feel easy to ignore. One niche, one painful problem, one clear outcome is much easier to trust.",
-  },
-  {
-    subreddit: "r/MarketingHelp",
-    title: "I barely understand Reddit marketing",
-    url: "https://www.reddit.com/r/MarketingHelp/",
-    niche: "reddit marketing",
-    target: "brands and agencies",
-    score: "High",
-    risk: "Low",
-    action: "Reply" as Action,
-    reason: "Intel: beginner-friendly Reddit marketing thread. Safe to add a useful observation, but keep it human and avoid links.",
-    suggestedReply:
-      "The biggest thing I am noticing is that Reddit rewards people who actually sound like they belong in the conversation. I would treat it as research first: comment normally, learn the niche, and only mention a product when it genuinely fits.",
-  },
-];
-
 function clean(value: string | null) {
   return (value || "").replace(/[<>]/g, "").slice(0, 220);
 }
@@ -184,17 +155,26 @@ function makeReason(title: string, body: string, comments: number, ups: number, 
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const keywords = clean(searchParams.get("keywords")) || "customers marketing ecommerce automation";
-  const niche = clean(searchParams.get("niche")) || "online business";
+  const keywords = clean(searchParams.get("keywords"));
+  const niche = clean(searchParams.get("niche"));
   const target = clean(searchParams.get("target")) || "founders and marketers";
+  const queryText = [keywords, niche].filter(Boolean).join(" ").trim();
 
-  const query = encodeURIComponent(`${keywords} ${niche}`);
+  if (!queryText) {
+    return NextResponse.json({
+      source: "empty",
+      message: "Enter a niche or keywords to search Reddit.",
+      opportunities: [],
+    });
+  }
+
+  const query = encodeURIComponent(queryText);
   const searchUrl = `https://www.reddit.com/search.json?q=${query}&sort=new&t=week&limit=10&type=link`;
 
   try {
     const response = await fetch(searchUrl, {
       headers: {
-        "User-Agent": "MarketVibeRedditRadar/1.2",
+        "User-Agent": "MarketVibeRedditRadar/1.3",
         Accept: "application/json",
       },
       next: { revalidate: 300 },
@@ -234,14 +214,16 @@ export async function GET(request: Request) {
       });
 
     return NextResponse.json({
-      source: opportunities.length ? "live" : "fallback",
-      opportunities: opportunities.length ? opportunities : fallbackPosts,
+      source: opportunities.length ? "live" : "empty",
+      message: opportunities.length ? "Live Reddit posts loaded." : "No live Reddit posts found for that search. Try different keywords.",
+      opportunities,
     });
   } catch (error) {
     return NextResponse.json({
-      source: "fallback",
+      source: "error",
       error: error instanceof Error ? error.message : "Unable to fetch live posts",
-      opportunities: fallbackPosts,
+      message: "Live Reddit search failed. Try again later or change the search terms.",
+      opportunities: [],
     });
   }
 }
