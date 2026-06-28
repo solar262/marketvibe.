@@ -5,6 +5,7 @@ type RedditChild = {
     title?: string;
     subreddit_name_prefixed?: string;
     permalink?: string;
+    url?: string;
     selftext?: string;
     ups?: number;
     num_comments?: number;
@@ -14,6 +15,21 @@ type RedditChild = {
 };
 
 type Action = "Reply" | "ManualOnly" | "Skip";
+
+type RawPost = {
+  title: string;
+  subreddit: string;
+  permalink: string;
+  body: string;
+  ups: number;
+  comments: number;
+};
+
+const USER_AGENTS = [
+  "MarketVibeRedditRadar/1.4 by marketvibe1.com",
+  "Mozilla/5.0 (compatible; MarketVibeRadar/1.4; +https://marketvibe1.com)",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
+];
 
 function clean(value: string | null) {
   return (value || "").replace(/[<>]/g, "").slice(0, 220);
@@ -25,6 +41,18 @@ function compactText(value: string) {
 
 function hasAny(text: string, terms: string[]) {
   return terms.some((term) => text.includes(term));
+}
+
+function decodeHtml(value: string) {
+  return value
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/<[^>]*>/g, "")
+    .trim();
 }
 
 function isSensitiveThread(text: string) {
@@ -136,21 +164,115 @@ function makeReply(title: string, body: string, niche: string) {
   return `I would keep this simple. The useful reply is probably a short personal take on ${niche || "the problem"}, not a polished explanation.`;
 }
 
-function makeReason(title: string, body: string, comments: number, ups: number, subreddit: string) {
+function makeReason(title: string, body: string, comments: number, ups: number, subreddit: string, sourceName: string) {
   const intent = detectIntent(title, body);
   const action = recommendedAction(title, body);
   const pain = extractPain(title, body);
   const context = body.trim() ? `Context: "${pain}"` : "Only title/body-light context available.";
 
   if (action === "Skip") {
-    return `Intel: ${subreddit} thread is high risk (${intent}). ${context} Engagement: ${comments} comments and ${ups} upvotes. Recommended action: SKIP or write one short manual sentence only.`;
+    return `Intel: ${subreddit} thread is high risk (${intent}). ${context} Engagement: ${comments} comments and ${ups} upvotes. Source: ${sourceName}. Recommended action: SKIP or write one short manual sentence only.`;
   }
 
   if (action === "ManualOnly") {
-    return `Intel: ${subreddit} thread is useful but sensitive (${intent}). ${context} Engagement: ${comments} comments and ${ups} upvotes. Recommended action: use the draft as a starting point, then make it sound like your own quick opinion.`;
+    return `Intel: ${subreddit} thread is useful but sensitive (${intent}). ${context} Engagement: ${comments} comments and ${ups} upvotes. Source: ${sourceName}. Recommended action: use the draft as a starting point, then make it sound like your own quick opinion.`;
   }
 
-  return `Intel: ${subreddit} thread appears to be about ${intent}. ${context} Engagement: ${comments} comments and ${ups} upvotes. Recommended action: safe to reply, keep it short, no links.`;
+  return `Intel: ${subreddit} thread appears to be about ${intent}. ${context} Engagement: ${comments} comments and ${ups} upvotes. Source: ${sourceName}. Recommended action: safe to reply, keep it short, no links.`;
+}
+
+async function fetchWithTimeout(url: string, userAgent: string, timeoutMs = 6500) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, {
+      signal: controller.signal,
+      cache: "no-store",
+      headers: {
+        "User-Agent": userAgent,
+        Accept: "application/json, text/html, application/xml;q=0.9, */*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function parseJsonPosts(payload: unknown): RawPost[] {
+  const children = ((payload as { data?: { children?: RedditChild[] } })?.data?.children || []) as RedditChild[];
+
+  return children
+    .map((child) => child.data)
+    .filter((post): post is NonNullable<RedditChild["data"]> => Boolean(post?.title && post?.permalink && !post?.over_18))
+    .map((post) => ({
+      title: post.title || "Reddit discussion",
+      subreddit: post.subreddit_name_prefixed || "r/Reddit",
+      permalink: post.permalink?.startsWith("http") ? post.permalink : `https://www.reddit.com${post.permalink}`,
+      body: compactText(post.selftext || ""),
+      ups: Number(post.ups || 0),
+      comments: Number(post.num_comments || 0),
+    }));
+}
+
+function parseRssPosts(xml: string): RawPost[] {
+  const entries = xml.match(/<entry[\s\S]*?<\/entry>/g) || [];
+
+  return entries.slice(0, 10).map((entry) => {
+    const title = decodeHtml(entry.match(/<title[^>]*>([\s\S]*?)<\/title>/)?.[1] || "Reddit discussion");
+    const link = decodeHtml(entry.match(/<link[^>]*href="([^"]+)"/)?.[1] || "https://www.reddit.com/search/");
+    const body = compactText(decodeHtml(entry.match(/<content[^>]*>([\s\S]*?)<\/content>/)?.[1] || ""));
+    const subredditMatch = link.match(/reddit\.com\/r\/([^/]+)/i);
+
+    return {
+      title,
+      subreddit: subredditMatch ? `r/${subredditMatch[1]}` : "r/Reddit",
+      permalink: link,
+      body,
+      ups: 0,
+      comments: 0,
+    };
+  }).filter((post) => post.title && post.permalink);
+}
+
+async function searchReddit(queryText: string) {
+  const encoded = encodeURIComponent(queryText);
+  const endpoints = [
+    { name: "reddit-json", url: `https://www.reddit.com/search.json?q=${encoded}&sort=new&t=week&limit=10&type=link&raw_json=1`, type: "json" },
+    { name: "old-reddit-json", url: `https://old.reddit.com/search.json?q=${encoded}&sort=new&t=week&limit=10&type=link&raw_json=1`, type: "json" },
+    { name: "reddit-all-json", url: `https://www.reddit.com/r/all/search.json?q=${encoded}&restrict_sr=0&sort=new&t=week&limit=10&raw_json=1`, type: "json" },
+    { name: "reddit-rss", url: `https://www.reddit.com/search.rss?q=${encoded}&sort=new&t=week`, type: "rss" },
+    { name: "old-reddit-rss", url: `https://old.reddit.com/search.rss?q=${encoded}&sort=new&t=week`, type: "rss" },
+  ];
+
+  const errors: string[] = [];
+
+  for (const endpoint of endpoints) {
+    for (const userAgent of USER_AGENTS) {
+      try {
+        const response = await fetchWithTimeout(endpoint.url, userAgent);
+        const text = await response.text();
+
+        if (!response.ok) {
+          errors.push(`${endpoint.name}:${response.status}`);
+          continue;
+        }
+
+        const posts = endpoint.type === "json" ? parseJsonPosts(JSON.parse(text)) : parseRssPosts(text);
+
+        if (posts.length) {
+          return { posts, sourceName: endpoint.name };
+        }
+
+        errors.push(`${endpoint.name}:empty`);
+      } catch (error) {
+        errors.push(`${endpoint.name}:${error instanceof Error ? error.message : "failed"}`);
+      }
+    }
+  }
+
+  throw new Error(errors.slice(0, 6).join(" | ") || "all reddit endpoints failed");
 }
 
 export async function GET(request: Request) {
@@ -168,61 +290,38 @@ export async function GET(request: Request) {
     });
   }
 
-  const query = encodeURIComponent(queryText);
-  const searchUrl = `https://www.reddit.com/search.json?q=${query}&sort=new&t=week&limit=10&type=link`;
-
   try {
-    const response = await fetch(searchUrl, {
-      headers: {
-        "User-Agent": "MarketVibeRedditRadar/1.3",
-        Accept: "application/json",
-      },
-      next: { revalidate: 300 },
+    const { posts, sourceName } = await searchReddit(queryText);
+
+    const opportunities = posts.slice(0, 8).map((post) => {
+      const action = recommendedAction(post.title, post.body);
+      const score = opportunityScore(post.ups, post.comments, action);
+      const risk = riskScore(post.title, post.body, action);
+
+      return {
+        subreddit: post.subreddit,
+        title: post.title,
+        url: post.permalink,
+        niche,
+        target,
+        score,
+        risk,
+        action,
+        reason: makeReason(post.title, post.body, post.comments, post.ups, post.subreddit, sourceName),
+        suggestedReply: makeReply(post.title, post.body, niche),
+      };
     });
-
-    if (!response.ok) throw new Error(`Reddit search failed: ${response.status}`);
-
-    const payload = await response.json();
-    const children = (payload?.data?.children || []) as RedditChild[];
-
-    const opportunities = children
-      .map((child) => child.data)
-      .filter((post): post is NonNullable<RedditChild["data"]> => Boolean(post?.title && post?.permalink && !post?.over_18))
-      .slice(0, 8)
-      .map((post) => {
-        const ups = Number(post.ups || 0);
-        const comments = Number(post.num_comments || 0);
-        const title = post.title || "Reddit discussion";
-        const body = compactText(post.selftext || "");
-        const subreddit = post.subreddit_name_prefixed || "r/Reddit";
-        const action = recommendedAction(title, body);
-        const score = opportunityScore(ups, comments, action);
-        const risk = riskScore(title, body, action);
-
-        return {
-          subreddit,
-          title,
-          url: `https://www.reddit.com${post.permalink}`,
-          niche,
-          target,
-          score,
-          risk,
-          action,
-          reason: makeReason(title, body, comments, ups, subreddit),
-          suggestedReply: makeReply(title, body, niche),
-        };
-      });
 
     return NextResponse.json({
       source: opportunities.length ? "live" : "empty",
-      message: opportunities.length ? "Live Reddit posts loaded." : "No live Reddit posts found for that search. Try different keywords.",
+      message: opportunities.length ? `Live Reddit posts loaded via ${sourceName}.` : "No live Reddit posts found for that search. Try different keywords.",
       opportunities,
     });
   } catch (error) {
     return NextResponse.json({
       source: "error",
       error: error instanceof Error ? error.message : "Unable to fetch live posts",
-      message: "Live Reddit search failed. Try again later or change the search terms.",
+      message: "Live Reddit search failed. Reddit may be rate-limiting the server. Try again in a few minutes or change the search terms.",
       opportunities: [],
     });
   }
