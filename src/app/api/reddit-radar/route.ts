@@ -1,4 +1,12 @@
 import { NextResponse } from "next/server";
+import {
+  cleanRssBody,
+  compactRedditText as compactText,
+  hasAiIntent,
+  hasAnyTerm as hasAny,
+  isLowIntelPost as hasLowIntel,
+  lowIntelIntel,
+} from "@/lib/reddit-radar";
 
 type RedditChild = {
   data?: {
@@ -68,24 +76,12 @@ function clean(value: string | null) {
   return (value || "").replace(/[<>]/g, "").slice(0, 220);
 }
 
-function compactText(value: string) {
-  return value.replace(/\s+/g, " ").trim().slice(0, 900);
-}
-
-function hasAny(text: string, terms: string[]) {
-  return terms.some((term) => text.includes(term));
-}
-
 function wordTokens(value: string) {
   return value
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, " ")
     .split(/\s+/)
     .filter((word) => word.length >= 3 && !["the", "and", "for", "with", "from", "this", "that", "need", "best", "how", "what", "why", "are", "you", "your", "about", "advice", "beginner"].includes(word));
-}
-
-function hasAiIntent(text: string) {
-  return /\b(ai|a\.i\.|artificial intelligence|automation|automated|agent|agents)\b/i.test(text);
 }
 
 function decodeHtml(value: string) {
@@ -100,21 +96,6 @@ function decodeHtml(value: string) {
     .replace(/&#x27;/g, "'")
     .replace(/<[^>]*>/g, "")
     .trim();
-}
-
-function cleanRssBody(value: string) {
-  const body = compactText(value);
-  const lower = body.toLowerCase();
-
-  if (!body) return "";
-  if (lower.includes("submitted by") || lower.includes("[comments]") || lower.includes("/u/")) return "";
-  if (body.length < 120) return "";
-
-  return body;
-}
-
-function hasLowIntel(body: string, comments: number, ups: number) {
-  return compactText(body).length < 120 && comments === 0 && ups === 0;
 }
 
 function isSensitiveThread(text: string) {
@@ -205,11 +186,7 @@ function makeReply(title: string, body: string, niche: string, comments = 0, ups
   const hasBody = body.trim().length > 60;
 
   if (intent === "low-intel") {
-    return redditReply(
-      "LOW INTEL — SKIP THIS ONE.",
-      "There isn't enough context or engagement to write a useful reply.",
-      "Look for posts with a real question, clear problem, or active comments."
-    );
+    return lowIntelIntel().reply;
   }
 
   if (action === "Skip") {
@@ -553,6 +530,7 @@ export async function GET(request: Request) {
       const action = recommendedAction(post.title, post.body, post.comments, post.ups);
       const score = opportunityScore(post.ups, post.comments, action);
       const risk = riskScore(post.title, post.body, action);
+      const intent = detectIntent(post.title, post.body, post.comments, post.ups);
 
       return {
         subreddit: post.subreddit,
@@ -563,6 +541,7 @@ export async function GET(request: Request) {
         score,
         risk,
         action,
+        intent,
         reason: makeReason(post.title, post.body, post.comments, post.ups, post.subreddit, sourceName),
         suggestedReply: makeReply(post.title, post.body, niche, post.comments, post.ups),
       };

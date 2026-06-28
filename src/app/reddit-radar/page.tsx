@@ -166,7 +166,10 @@ export default function RedditRadarPage() {
 
   useEffect(() => {
     track("Reddit Radar Visit", { page: "reddit-radar" });
-    loadOpportunities();
+    const timer = window.setTimeout(() => {
+      loadOpportunities();
+    }, 0);
+    return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
