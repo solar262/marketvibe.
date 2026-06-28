@@ -33,6 +33,18 @@ type SourceState = "idle" | "live" | "empty" | "error";
 const WAIT_SECONDS = 180;
 const SEEN_POSTS_KEY = "marketvibe-reddit-radar-seen-posts";
 const MAX_SEEN_POSTS = 250;
+const EMPTY_SEARCH_MESSAGE =
+  "No strong Reddit opportunities found right now. Try broader pain terms like need help, struggling, no traffic, not converting, or looking for tool.";
+const SEARCH_STEPS = [
+  "Searching Reddit...",
+  "Checking source 1 of 5",
+  "Checking source 2 of 5",
+  "Checking source 3 of 5",
+  "Checking source 4 of 5",
+  "Checking source 5 of 5",
+  "Filtering weak posts",
+  "Scoring opportunities",
+];
 
 function badgeClasses(value: string) {
   if (value === "High") return "border-emerald-300/30 bg-emerald-300/15 text-emerald-100";
@@ -109,6 +121,7 @@ export default function RedditRadarPage() {
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [source, setSource] = useState<SourceState>("idle");
   const [loading, setLoading] = useState(false);
+  const [loadingStep, setLoadingStep] = useState(0);
   const [status, setStatus] = useState("Press Search to load live Reddit posts.");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [postedTitles, setPostedTitles] = useState<string[]>([]);
@@ -118,8 +131,11 @@ export default function RedditRadarPage() {
 
   async function loadOpportunities() {
     setLoading(true);
-    setStatus("Searching Reddit...");
+    setLoadingStep(0);
     setSource("idle");
+    const progressTimer = window.setInterval(() => {
+      setLoadingStep((current) => Math.min(current + 1, SEARCH_STEPS.length - 1));
+    }, 900);
 
     try {
       const params = new URLSearchParams({ niche, target: customer, keywords });
@@ -133,8 +149,14 @@ export default function RedditRadarPage() {
 
       setOpportunities(nextOpportunities);
       setSource(nextSource);
-      const baseStatus = data.message || (nextOpportunities.length ? "Live posts loaded." : "No live Reddit posts found.");
-      setStatus(hiddenSeenCount > 0 ? `${baseStatus} Hid ${hiddenSeenCount} posts already shown before.` : baseStatus);
+      setLoadingStep(SEARCH_STEPS.length - 1);
+      const baseStatus = data.message || "Live Reddit opportunities loaded.";
+      const finalStatus = nextOpportunities.length
+        ? hiddenSeenCount > 0
+          ? `${baseStatus} Hid ${hiddenSeenCount} posts already shown before.`
+          : baseStatus
+        : EMPTY_SEARCH_MESSAGE;
+      setStatus(finalStatus);
       setCurrentIndex(0);
       setPostedTitles([]);
       setSkippedTitles([]);
@@ -153,14 +175,16 @@ export default function RedditRadarPage() {
     } catch {
       setOpportunities([]);
       setSource("error");
-      setStatus("Live Reddit search failed. Try again later or change the search terms.");
+      setStatus(EMPTY_SEARCH_MESSAGE);
       track("Reddit Radar Search Error", {
         niche: safeMetric(niche),
         customer: safeMetric(customer),
         keywords: safeMetric(keywords),
       });
     } finally {
+      window.clearInterval(progressTimer);
       setLoading(false);
+      setLoadingStep(0);
     }
   }
 
@@ -266,7 +290,9 @@ export default function RedditRadarPage() {
     setStatus("Seen post history cleared. Search again to allow older results.");
   }
 
-  const sourceLabel = source === "live" ? "Live Reddit posts" : source === "error" ? "Search error" : source === "empty" ? "No results" : "Ready";
+  const sourceLabel = loading ? "Searching" : source === "live" ? "Live Reddit posts" : source === "error" ? "Search complete" : source === "empty" ? "Search complete" : "Ready";
+  const visibleStatus = loading ? SEARCH_STEPS[loadingStep] : status;
+  const progressPercent = loading ? Math.max(16, Math.round(((loadingStep + 1) / SEARCH_STEPS.length) * 100)) : 100;
 
   return (
     <main className="min-h-screen bg-[#050b16] text-white">
@@ -301,6 +327,21 @@ export default function RedditRadarPage() {
             <button onClick={loadOpportunities} disabled={loading} className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-emerald-400 to-cyan-300 px-6 py-4 text-base font-bold text-slate-950 shadow-xl shadow-emerald-950/30 transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60">
               {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />} Search Live Posts
             </button>
+            <div className="mt-4 min-h-[82px] rounded-2xl border border-white/10 bg-slate-950/55 p-4 text-sm text-slate-300">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  {loading ? <Loader2 className="h-4 w-4 shrink-0 animate-spin text-emerald-300" /> : <Radar className="h-4 w-4 shrink-0 text-cyan-200" />}
+                  <span className="min-w-0 break-words font-semibold text-slate-100">{visibleStatus}</span>
+                </div>
+                <span className="shrink-0 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{loading ? "Live" : "Ready"}</span>
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className={`h-full rounded-full bg-gradient-to-r from-emerald-300 via-cyan-300 to-teal-200 transition-all duration-500 ${loading ? "animate-pulse" : ""}`}
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -322,14 +363,33 @@ export default function RedditRadarPage() {
         </div>
 
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-4 text-sm text-slate-300">
-          <span>{sourceLabel} · {status}</span>
+          <span>{sourceLabel} · {visibleStatus}</span>
           <div className="flex flex-wrap gap-2">
             <button onClick={clearSeenPosts} className="rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">Clear Seen</button>
             <button onClick={resetProgress} className="rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">Reset</button>
           </div>
         </div>
 
-        {currentItem ? (
+        {loading ? (
+          <div className="rounded-[2rem] border border-cyan-300/20 bg-cyan-300/10 p-8 shadow-2xl shadow-black/20">
+            <div className="flex items-center gap-3 text-cyan-100">
+              <Loader2 className="h-6 w-6 animate-spin" />
+              <div>
+                <h2 className="text-2xl font-semibold text-white">Searching live Reddit sources</h2>
+                <p className="mt-1 text-sm text-slate-300">{visibleStatus}</p>
+              </div>
+            </div>
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              {[0, 1, 2].map((item) => (
+                <div key={item} className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+                  <div className="h-3 w-24 animate-pulse rounded-full bg-white/15" />
+                  <div className="mt-4 h-4 w-4/5 animate-pulse rounded-full bg-white/10" />
+                  <div className="mt-2 h-4 w-2/3 animate-pulse rounded-full bg-white/10" />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : currentItem ? (
           <article className="rounded-[2rem] border border-white/10 bg-white/[0.06] p-5 shadow-2xl shadow-black/20">
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full border border-white/10 bg-slate-950/45 px-3 py-1 text-xs font-semibold text-slate-200">{currentItem.subreddit}</span>
@@ -368,9 +428,9 @@ export default function RedditRadarPage() {
         ) : (
           <div className="rounded-[2rem] border border-amber-300/20 bg-amber-300/10 p-8 text-center">
             <RefreshCw className="mx-auto h-10 w-10 text-amber-200" />
-            <h2 className="mt-4 text-3xl font-semibold text-white">No new Reddit posts loaded</h2>
-            <p className="mt-3 text-slate-300">{status}</p>
-            <button onClick={loadOpportunities} className="mt-5 rounded-full bg-white px-6 py-3 text-sm font-bold text-slate-950">Search Again</button>
+            <h2 className="mt-4 text-3xl font-semibold text-white">No strong Reddit opportunities found right now</h2>
+            <p className="mx-auto mt-3 max-w-2xl text-slate-300">{EMPTY_SEARCH_MESSAGE}</p>
+            <button onClick={loadOpportunities} disabled={loading} className="mt-5 rounded-full bg-white px-6 py-3 text-sm font-bold text-slate-950 disabled:cursor-not-allowed disabled:opacity-60">Search Again</button>
           </div>
         )}
 
