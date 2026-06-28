@@ -7,7 +7,8 @@ export type RedditRadarIntel = {
 };
 
 const LOW_INTEL_REPLY = "LOW INTEL — SKIP THIS ONE...\n\nThere isn't enough context or engagement to write a useful reply.\n\nLook for posts with a real question, clear problem, or active comments.";
-const PAIN_SIGNAL_PATTERN = /\b(help|problem|struggling|struggle|stuck|traffic|not converting|no traffic|no sales|need advice|advice|recommend|looking for|can't|cant|conversion|clients|customers|leads|sales)\b/i;
+const PAIN_SIGNAL_PATTERN = /\b(need help|help|problem|struggling|struggle|stuck|traffic|not converting|no traffic|no sales|website not working|what should i do|how do i get|how can i get|any advice|need advice|advice|looking for tool|recommend|shopify|ecommerce|customers|clients|leads|sales|can't|cant|conversion)\b/i;
+const JOB_POST_PATTERN = /\b(hiring|remote developer|salary|full-time|full time|part-time|part time|job|career|vacancy|looking for developer|apply now|worldwide|per month)\b|\$\s*\/\s*month|\$\s*\d[\d,]*(?:\.\d{2})?\s*\/\s*month/i;
 const RSS_METADATA_PATTERN = /\bsubmitted by\b|\/u\/|\[comments\]|\bcomments link\b|\bpermalink\b|\breddit metadata\b|\bto \/r\/|\bfrom \/r\/|reddit\.com\/comments/i;
 
 export function compactRedditText(value: string) {
@@ -48,9 +49,17 @@ export function isObviousRssJunk(title: string, body: string) {
   return metadataOnly || /^(submitted by|comments|permalink|reddit metadata)$/i.test(combined);
 }
 
+export function isBlockedJobPost(title: string, body: string) {
+  return JOB_POST_PATTERN.test(`${title} ${body}`);
+}
+
 export function hasUsablePostSignal(title: string, body: string, comments: number, ups: number) {
   const text = `${title} ${body}`;
   return title.includes("?") || PAIN_SIGNAL_PATTERN.test(text) || comments > 0 || ups > 0;
+}
+
+export function hasCustomerProblemSignal(title: string, body: string) {
+  return PAIN_SIGNAL_PATTERN.test(`${title} ${body}`);
 }
 
 export function usefulBodyLength(body: string) {

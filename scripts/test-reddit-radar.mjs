@@ -18,15 +18,20 @@ vm.runInNewContext(transpiled.outputText, sandbox, { filename: "reddit-radar.js"
 const {
   cleanRssBody,
   hasAiIntent,
+  hasCustomerProblemSignal,
   hasUsablePostSignal,
+  isBlockedJobPost,
   isLowIntelPost,
   isObviousRssJunk,
   lowIntelIntel,
 } = sandbox.exports;
 
 assert.equal(hasAiIntent("Vail Daily needs a new tourism website"), false, "Vail Daily should not trigger AI intent");
+assert.equal(hasAiIntent("Vail Daily lost car key fob"), false, "Vail Daily lost car key fob should not trigger AI intent");
 assert.equal(hasAiIntent("Can ChatGPT help with support replies?"), true, "ChatGPT should trigger AI intent");
 assert.equal(hasAiIntent("Looking for an A.I. automation workflow"), true, "A.I. and automation should trigger AI intent");
+assert.equal(isBlockedJobPost("Hiring remote developer", "Full-time role, apply now, worldwide"), true, "Hiring remote developer post should be blocked");
+assert.equal(isBlockedJobPost("My Shopify store has no traffic, what should I do?", ""), false, "Shopify pain post should not be blocked as a job");
 
 const rssJunk = cleanRssBody(`
   submitted by /u/example to /r/marketing
@@ -42,6 +47,8 @@ assert.ok(usefulRss.includes("struggling"), "Useful RSS body should be preserved
 assert.equal(usefulRss.includes("submitted by"), false, "RSS metadata should be removed from useful body text");
 
 assert.equal(isLowIntelPost("", 0, 0), true, "0/0 empty post should be low-intel");
+assert.equal(hasCustomerProblemSignal("My Shopify store has no traffic, what should I do?", ""), true, "Shopify traffic question should have customer pain");
+assert.equal(hasUsablePostSignal("My Shopify store has no traffic, what should I do?", "", 0, 0), true, "Shopify traffic question should be shown");
 assert.equal(hasUsablePostSignal("Need help with traffic?", "", 0, 0), true, "Title questions with pain should remain usable");
 assert.equal(hasUsablePostSignal("Quiet launch update", "", 2, 0), true, "Active comments should remain usable");
 assert.equal(hasUsablePostSignal("Quiet launch update", "", 0, 0), false, "Thin inactive posts should not look usable");

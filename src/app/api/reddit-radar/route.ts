@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 import {
   cleanRssBody,
   compactRedditText as compactText,
+  hasCustomerProblemSignal,
   hasUsablePostSignal,
   hasAiIntent,
   hasAnyTerm as hasAny,
+  isBlockedJobPost,
   isLowIntelPost as hasLowIntel,
   isObviousRssJunk,
   lowIntelIntel,
@@ -130,28 +132,33 @@ function isHostileThread(text: string) {
 
 function recommendedAction(title: string, body: string, comments = 0, ups = 0): Action {
   const text = `${title} ${body}`.toLowerCase();
+  if (isBlockedJobPost(title, body)) return "Skip";
   if (hasLowIntel(body, comments, ups) && !hasUsablePostSignal(title, body, comments, ups)) return "Skip";
   if (isSensitiveThread(text) || isHostileThread(text)) return "Skip";
   if (hasAny(text, ["agency", "client", "hire", "website", "link", "promote"]) || hasAiIntent(text)) return "ManualOnly";
   return "Reply";
 }
 
-function opportunityScore(ups: number, comments: number, action: Action): "High" | "Medium" | "Low" {
+function opportunityScore(title: string, body: string, ups: number, comments: number, action: Action): "High" | "Medium" | "Low" {
   if (action === "Skip") return "Low";
-  if (comments >= 15 || ups >= 20) return "High";
-  if (comments >= 5 || ups >= 8) return "Medium";
+  const hasProblem = hasCustomerProblemSignal(title, body);
+  const hasQuestion = title.includes("?") || body.includes("?");
+  const hasActiveComments = comments > 0;
+  if (hasProblem && hasQuestion && hasActiveComments) return "High";
+  if (hasProblem || hasQuestion) return "Medium";
   return "Low";
 }
 
 function riskScore(title: string, body: string, action: Action): "Low" | "Medium" | "High" {
   const text = `${title} ${body}`.toLowerCase();
-  if (action === "Skip" || isSensitiveThread(text) || isHostileThread(text)) return "High";
+  if (action === "Skip" || isBlockedJobPost(title, body) || isSensitiveThread(text) || isHostileThread(text)) return "High";
   if (hasAny(text, ["hire", "promote", "self promotion", "link", "website", "agency", "client"]) || hasAiIntent(text)) return "Medium";
   return "Low";
 }
 
 function detectIntent(title: string, body: string, comments = 0, ups = 0) {
   const text = `${title} ${body}`.toLowerCase();
+  if (isBlockedJobPost(title, body)) return "blocked-job";
   if (hasLowIntel(body, comments, ups) && !hasUsablePostSignal(title, body, comments, ups)) return "low-intel";
   if (isSensitiveThread(text)) return "sensitive-ai";
   if (hasAny(text, ["what do you use", "tool", "software", "stack", "course", "courses"])) return "tools";
@@ -186,6 +193,10 @@ function makeReply(title: string, body: string, niche: string, comments = 0, ups
   const action = recommendedAction(title, body, comments, ups);
   const pain = extractPain(title, body);
   const hasBody = body.trim().length > 60;
+
+  if (isBlockedJobPost(title, body)) {
+    return lowIntelIntel().reply;
+  }
 
   if (intent === "low-intel") {
     return lowIntelIntel().reply;
@@ -366,11 +377,15 @@ function conversionIntentScore(post: RawPost) {
   const text = `${post.title} ${post.body}`.toLowerCase();
   let score = 0;
 
+  if (isBlockedJobPost(post.title, post.body) || isObviousRssJunk(post.title, post.body)) return -100;
+
   const strongPain = [
     "how do i", "how can i", "need help", "i need", "looking for", "anyone know", "anyone recommend",
     "what worked", "what should i", "struggling", "stuck", "not working", "not converting", "no sales",
     "no traffic", "get clients", "get customers", "more leads", "lead gen", "booked calls", "failed", "problem",
-    "can't", "cant", "help me", "advice on", "recommend a", "tool for", "software for", "worth it"
+    "can't", "cant", "help me", "advice on", "any advice", "recommend a", "recommend", "tool for",
+    "looking for tool", "software for", "worth it", "website not working", "customers", "leads", "sales",
+    "shopify", "ecommerce"
   ];
 
   const weakOpinion = [
@@ -399,7 +414,10 @@ function conversionIntentScore(post: RawPost) {
 }
 
 function isActionablePost(post: RawPost) {
+  if (isBlockedJobPost(post.title, post.body)) return false;
   if (isObviousRssJunk(post.title, post.body)) return false;
+  if (hasLowIntel(post.body, post.comments, post.ups) && !hasUsablePostSignal(post.title, post.body, post.comments, post.ups)) return true;
+  if (!hasUsablePostSignal(post.title, post.body, post.comments, post.ups)) return false;
   return true;
 }
 
@@ -410,6 +428,7 @@ function relevanceScore(post: RawPost, queryText: string) {
   let score = 0;
 
   if (SUBREDDIT_BLOCKLIST.some((blocked) => blocked.toLowerCase() === subreddit)) return -100;
+  if (isBlockedJobPost(post.title, post.body) || isObviousRssJunk(post.title, post.body)) return -100;
   if (DEFAULT_BUSINESS_SUBS.map((sub) => sub.toLowerCase()).includes(subreddit)) score += 8;
 
   for (const token of tokens) {
@@ -489,7 +508,7 @@ async function searchReddit(queryText: string) {
 
   const ranked = collected
     .map((post) => ({ post, score: relevanceScore(post, queryText), intentScore: conversionIntentScore(post) }))
-    .filter((item) => !isObviousRssJunk(item.post.title, item.post.body) && hasUsablePostSignal(item.post.title, item.post.body, item.post.comments, item.post.ups) && item.score > 0 && item.intentScore >= 8)
+    .filter((item) => !isBlockedJobPost(item.post.title, item.post.body) && !isObviousRssJunk(item.post.title, item.post.body) && hasUsablePostSignal(item.post.title, item.post.body, item.post.comments, item.post.ups) && item.score > 0 && item.intentScore >= 8)
     .sort((a, b) => b.score - a.score)
     .map((item) => item.post);
 
@@ -532,7 +551,7 @@ export async function GET(request: Request) {
 
     const opportunities = visiblePosts.slice(0, 8).map((post) => {
       const action = recommendedAction(post.title, post.body, post.comments, post.ups);
-      const score = opportunityScore(post.ups, post.comments, action);
+      const score = opportunityScore(post.title, post.body, post.ups, post.comments, action);
       const risk = riskScore(post.title, post.body, action);
       const intent = detectIntent(post.title, post.body, post.comments, post.ups);
 
