@@ -1,15 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
   Copy,
   ExternalLink,
+  Loader2,
   MessageSquareText,
   Radar,
+  RefreshCw,
   Search,
   ShieldCheck,
   Sparkles,
@@ -28,7 +30,7 @@ type Opportunity = {
   suggestedReply: string;
 };
 
-const sampleOpportunities: Opportunity[] = [
+const starterOpportunities: Opportunity[] = [
   {
     subreddit: "r/DigitalMarketing",
     title: "Worth starting a marketing agency in 2026?",
@@ -37,9 +39,9 @@ const sampleOpportunities: Opportunity[] = [
     target: "freelancers and agencies",
     score: "High",
     risk: "Low",
-    reason: "People are discussing customer acquisition, positioning, and whether agencies still work.",
+    reason: "Sample fallback: people are discussing customer acquisition and positioning.",
     suggestedReply:
-      "I think the agency model still works, but only when the offer is very specific. Broad 'I do marketing' feels hard to sell now. Something like lead generation for one niche, automation for one type of business, or fixing one clear revenue problem is easier to trust and easier to explain.",
+      "I think the agency model still works, but only when the offer is very specific. Broad 'I do marketing' feels hard to sell now. Something like lead generation for one niche or fixing one clear revenue problem is easier to trust and easier to explain.",
   },
   {
     subreddit: "r/MarketingHelp",
@@ -49,37 +51,13 @@ const sampleOpportunities: Opportunity[] = [
     target: "brands and agencies",
     score: "High",
     risk: "Low",
-    reason: "The post asks how brands can join Reddit conversations without looking fake or corporate.",
+    reason: "Sample fallback: the post asks how brands can join conversations without looking fake.",
     suggestedReply:
       "From what I am seeing, Reddit rewards people who sound like they belong in the conversation and punishes anything that feels like marketing. The safer play is to comment usefully for weeks, learn the language of each niche, and let people check your profile naturally instead of forcing links into posts.",
   },
-  {
-    subreddit: "r/shopify",
-    title: "How do I get traffic without paid ads?",
-    url: "https://www.reddit.com/r/shopify/",
-    niche: "shopify traffic",
-    target: "store owners",
-    score: "Medium",
-    risk: "Medium",
-    reason: "Good fit for ecommerce advice, but Shopify communities can be strict about promotion.",
-    suggestedReply:
-      "The easiest organic traffic mistake is posting product links too early. I would start with helpful content around the problem the product solves, then use Pinterest, short videos, Reddit comments, and comparison-style blog posts to create small traffic loops back to the store.",
-  },
-  {
-    subreddit: "r/Entrepreneur",
-    title: "Where do you find your first customers?",
-    url: "https://www.reddit.com/r/Entrepreneur/",
-    niche: "first customers",
-    target: "founders",
-    score: "Medium",
-    risk: "Low",
-    reason: "Good discussion for founders trying different acquisition channels.",
-    suggestedReply:
-      "The first customers usually come from conversations, not polished funnels. I would pick one narrow customer type, find where they complain online, reply with useful advice for a week, then only mention the product when it directly fits the problem.",
-  },
 ];
 
-const filters = ["All", "reddit marketing", "agency growth", "shopify traffic", "first customers"];
+const filters = ["All", "High", "Medium", "Low"];
 
 function badgeClasses(value: string) {
   if (value === "High") return "border-emerald-300/30 bg-emerald-300/15 text-emerald-100";
@@ -100,11 +78,40 @@ export default function RedditRadarPage() {
   const [activeFilter, setActiveFilter] = useState("All");
   const [copiedTitle, setCopiedTitle] = useState<string | null>(null);
   const [doneTitles, setDoneTitles] = useState<string[]>([]);
+  const [opportunities, setOpportunities] = useState<Opportunity[]>(starterOpportunities);
+  const [source, setSource] = useState<"live" | "fallback" | "sample">("sample");
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState("Ready to search live Reddit posts.");
 
-  const opportunities = useMemo(() => {
-    if (activeFilter === "All") return sampleOpportunities;
-    return sampleOpportunities.filter((item) => item.niche === activeFilter);
-  }, [activeFilter]);
+  async function loadOpportunities() {
+    setLoading(true);
+    setStatus("Searching live Reddit conversations...");
+
+    try {
+      const params = new URLSearchParams({ niche, target: customer, keywords });
+      const response = await fetch(`/api/reddit-radar?${params.toString()}`);
+      const data = await response.json();
+      setOpportunities(data.opportunities?.length ? data.opportunities : starterOpportunities);
+      setSource(data.source === "live" ? "live" : "fallback");
+      setStatus(data.source === "live" ? "Live Reddit opportunities loaded." : "Live search was limited, showing fallback opportunities.");
+    } catch {
+      setOpportunities(starterOpportunities);
+      setSource("fallback");
+      setStatus("Could not load live search, showing fallback opportunities.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadOpportunities();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const visibleOpportunities = useMemo(() => {
+    if (activeFilter === "All") return opportunities;
+    return opportunities.filter((item) => item.score === activeFilter);
+  }, [activeFilter, opportunities]);
 
   async function copyReply(item: Opportunity) {
     await navigator.clipboard.writeText(item.suggestedReply);
@@ -124,13 +131,13 @@ export default function RedditRadarPage() {
         <div className="relative mx-auto grid max-w-7xl gap-8 px-4 py-12 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:px-8 lg:py-16">
           <div>
             <p className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-white/8 px-3 py-1 text-xs font-semibold text-cyan-100 shadow-lg shadow-cyan-950/20 backdrop-blur">
-              <Radar className="h-4 w-4 text-emerald-300" /> Reddit Radar Beta
+              <Radar className="h-4 w-4 text-emerald-300" /> Live Reddit Radar
             </p>
             <h1 className="mt-5 max-w-2xl text-4xl font-semibold tracking-tight text-white sm:text-5xl lg:text-[3.6rem] lg:leading-[1.02]">
-              Find Reddit conversations worth joining.
+              Find live Reddit conversations worth joining.
             </h1>
             <p className="mt-5 max-w-xl text-base leading-7 text-slate-300 sm:text-lg">
-              Spot live discussion opportunities, score the risk, and draft helpful replies that build trust before you ever promote a link.
+              Search fresh Reddit discussions, score the risk, and draft helpful replies that build trust before you ever promote a link.
             </p>
             <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               <a href="#opportunities" className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-emerald-400 to-cyan-300 px-5 py-3 text-sm font-semibold text-slate-950 shadow-xl shadow-emerald-950/30 transition hover:brightness-105">
@@ -164,11 +171,14 @@ export default function RedditRadarPage() {
                   Keywords
                   <input value={keywords} onChange={(event) => setKeywords(event.target.value)} className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white outline-none ring-0 placeholder:text-slate-500 focus:border-cyan-300/40" />
                 </label>
+                <button onClick={loadOpportunities} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-emerald-400 to-cyan-300 px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-emerald-950/20 transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60">
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Search Live Posts
+                </button>
               </div>
               <div className="mt-5 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-3 text-sm leading-6 text-amber-50">
                 <div className="flex gap-2">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-200" />
-                  <p>No auto-posting. This beta uses sample data and keeps a human in the loop with Copy Reply + Open Reddit.</p>
+                  <p>No auto-posting. Live search only finds discussions; you still copy, review, and post manually.</p>
                 </div>
               </div>
             </div>
@@ -180,8 +190,8 @@ export default function RedditRadarPage() {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-sm font-semibold text-emerald-300">Daily opportunity queue</p>
-            <h2 className="mt-2 text-3xl font-semibold tracking-tight">Sample Reddit opportunities</h2>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">Use this to validate the workflow before adding live Reddit/search integration.</p>
+            <h2 className="mt-2 text-3xl font-semibold tracking-tight">{source === "live" ? "Live Reddit opportunities" : "Fallback opportunities"}</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">{status}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             {filters.map((filter) => (
@@ -193,10 +203,10 @@ export default function RedditRadarPage() {
         </div>
 
         <div className="mt-8 grid gap-5">
-          {opportunities.map((item) => {
+          {visibleOpportunities.map((item) => {
             const done = doneTitles.includes(item.title);
             return (
-              <article key={item.title} className="rounded-3xl border border-white/10 bg-white/[0.055] p-5 shadow-xl shadow-black/10">
+              <article key={`${item.subreddit}-${item.title}`} className="rounded-3xl border border-white/10 bg-white/[0.055] p-5 shadow-xl shadow-black/10">
                 <div className="grid gap-5 lg:grid-cols-[1fr_0.9fr]">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -252,16 +262,9 @@ export default function RedditRadarPage() {
               <div>
                 <p className="text-sm font-semibold text-emerald-300">Monetization-ready beta</p>
                 <h2 className="mt-2 text-3xl font-semibold tracking-tight">Package this as a paid MarketVibe feature.</h2>
-                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">Free users get a small daily queue. Paid users unlock more opportunities, saved niches, reply history, and client dashboards.</p>
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">Free users get a small live queue. Paid users can unlock more searches, saved niches, reply history, and client dashboards.</p>
               </div>
               <Sparkles className="h-8 w-8 text-cyan-200" />
-            </div>
-            <div className="mt-6 grid gap-4 md:grid-cols-3">
-              {["Find relevant conversations", "Generate safe human replies", "Track what turns into profile visits"].map((item) => (
-                <div key={item} className="rounded-2xl border border-white/10 bg-slate-950/35 p-4 text-sm font-semibold text-slate-100">
-                  <CheckCircle2 className="mb-3 h-5 w-5 text-emerald-300" /> {item}
-                </div>
-              ))}
             </div>
           </div>
         </div>
