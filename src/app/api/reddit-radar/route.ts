@@ -183,20 +183,19 @@ function detectIntent(title: string, body: string, comments = 0, ups = 0) {
 function extractPain(title: string, body: string) {
   const text = `${title}. ${body}`.replace(/\s+/g, " ").trim();
   const sentences = text.split(/[.!?]/).map((item) => item.trim()).filter(Boolean);
-  const pain = sentences.find((sentence) => /struggl|hard|problem|confus|not working|fail|help|stuck|traffic|client|customer|lead|fake|\bhuman\b|course|tool|workflow/i.test(sentence));
+  const pain = sentences.find((sentence) => /struggl|hard|problem|confus|not working|fail|help|stuck|traffic|client|customer|lead|fake|\bhuman\b/i.test(sentence));
   return compactText(pain || sentences[0] || title);
 }
 
-function redditStyle(value: string) {
-  return value
-    .replace(/I would/g, "I’d")
-    .replace(/it is/g, "it’s")
-    .replace(/That is/g, "That’s")
-    .replace(/do not/g, "don’t")
-    .replace(/cannot/g, "can’t")
-    .replace(/a lot less/g, "way less")
-    .replace(/\s+/g, " ")
-    .trim();
+function redditReply(...parts: string[]) {
+  return parts
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join("\n\n")
+    .replace(/\bI would\b/g, "I'd")
+    .replace(/\bdo not\b/g, "don't")
+    .replace(/\bthat is\b/g, "that's")
+    .replace(/\bthere is\b/g, "there's");
 }
 
 function makeReply(title: string, body: string, niche: string, comments = 0, ups = 0) {
@@ -206,34 +205,81 @@ function makeReply(title: string, body: string, niche: string, comments = 0, ups
   const hasBody = body.trim().length > 60;
 
   if (intent === "low-intel") {
-    return "LOW INTEL — SKIP THIS ONE. Not enough context or engagement to write a useful reply.";
+    return redditReply(
+      "LOW INTEL — SKIP THIS ONE.",
+      "There isn't enough context or engagement to write a useful reply.",
+      "Look for posts with a real question, clear problem, or active comments."
+    );
   }
 
   if (action === "Skip") {
-    return "SKIP THIS ONE. Looks sensitive or negative. If you reply, write one short sentence manually and don’t mention tools, marketing, automation, AI, or links.";
+    return redditReply(
+      "SKIP THIS ONE.",
+      "This thread already feels sensitive or negative.",
+      "A polished reply could hurt the account more than help it."
+    );
   }
-
-  let reply = "";
 
   if (intent === "tools") {
-    reply = "I’d start with the workflow before the tools.\n\nWhere are the people, what are they already complaining about, and what useful answer can you add?\n\nOnce that’s clear, the actual tool matters way less.";
-  } else if (intent === "traffic") {
-    reply = "I’d pick one channel and one type of customer first.\n\nTrying every platform at once makes it hard to know what’s actually working.\n\nThe useful content usually comes from the questions people are already asking.";
-  } else if (intent === "customers") {
-    reply = "I think the offer matters more than the platform.\n\nA broad service is easy to ignore. One clear result for one type of customer is much easier to trust.";
-  } else if (intent === "reddit") {
-    reply = "Reddit is weird because people can sense a funnel really quickly.\n\nI’d use it for research first, comment normally, and only mention something when it genuinely fits the thread.";
-  } else if (intent === "ecommerce") {
-    reply = "For ecommerce, I’d start with the problem before the product.\n\nPeople need to understand why it matters before they care about the store.";
-  } else if (intent === "ai") {
-    reply = "AI can help, but only if there’s enough context and a human check.\n\nFull automation is where it usually starts sounding wrong.\n\nThe useful part is finding the right conversation and drafting something you can still judge yourself.";
-  } else if (hasBody) {
-    reply = `The bit I’d answer directly is this: ${pain}.\n\nI’d respond to that first and avoid turning it into a pitch.`;
-  } else {
-    reply = `I’d keep it simple.\n\nA short personal take on ${niche || "the problem"} will probably land better than a polished explanation.`;
+    return redditReply(
+      "I'd probably start with the workflow before the tools.",
+      "Where are the people, what are they already complaining about, and what useful answer can you add?",
+      "Once that's clear, the actual tool matters a lot less."
+    );
   }
 
-  return redditStyle(reply).slice(0, 620);
+  if (intent === "traffic") {
+    return redditReply(
+      "I'd pick one channel and one customer type first.",
+      "Trying every platform at once makes it hard to tell what's actually working.",
+      "Most of the good content ideas come from the exact questions people are already asking."
+    );
+  }
+
+  if (intent === "customers") {
+    return redditReply(
+      "I think the offer matters more than the platform.",
+      "Broad services are easy to ignore.",
+      "One clear result for one type of customer is much easier to understand and trust."
+    );
+  }
+
+  if (intent === "reddit") {
+    return redditReply(
+      "Reddit feels different because people can sense a funnel pretty quickly.",
+      "I'd use it as research first, comment normally, and only mention anything when it genuinely fits the discussion.",
+      "Trying to force the link is usually where it goes wrong."
+    );
+  }
+
+  if (intent === "ecommerce") {
+    return redditReply(
+      "For ecommerce, I'd start with the problem before the product.",
+      "People usually need to understand why it matters before they care about the store.",
+      "The product link is easier to add later once the post is actually useful."
+    );
+  }
+
+  if (intent === "ai") {
+    return redditReply(
+      "AI can help, but only if there's enough current context and a human check.",
+      "Full automation is where it starts to sound wrong.",
+      "The useful part is finding the right conversation and drafting something you can still judge yourself."
+    );
+  }
+
+  if (hasBody) {
+    return redditReply(
+      `The bit that stands out to me is: ${pain}.`,
+      "I'd answer that directly first.",
+      "Trying to turn it into a pitch too early is usually what makes it feel off."
+    );
+  }
+
+  return redditReply(
+    `I'd keep this simple and give a quick take on ${niche || "the problem"}.`,
+    "Not a polished explanation, just what you'd actually say if someone asked you in a normal conversation."
+  );
 }
 
 function makeReason(title: string, body: string, comments: number, ups: number, subreddit: string, sourceName: string) {
@@ -351,7 +397,7 @@ function relevanceScore(post: RawPost, queryText: string) {
   }
 
   if (detectIntent(post.title, post.body, post.comments, post.ups) !== "general") score += 5;
-  if (/[?]|\b(help|advice|struggling|problem|how do|what do|need|recommend|traffic|client|customer|lead|sale|sales)/i.test(`${post.title} ${post.body}`)) score += 6;
+  if (/[?]|\b(help|advice|struggling|problem|how do|what do|need|recommend|traffic|client|customer|lead|sale|sales)\b/i.test(`${post.title} ${post.body}`)) score += 6;
   score += Math.min(post.comments, 30) * 0.8;
   score += Math.min(post.ups, 50) * 0.25;
 
