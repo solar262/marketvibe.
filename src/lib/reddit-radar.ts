@@ -104,6 +104,14 @@ function hasTerm(text: string, terms: string[]) {
   return terms.some((term) => lower.includes(term));
 }
 
+function hasInventoryIntent(text: string) {
+  return /\b(inventory|stock|stocks|reorder|warehouse|forecasting|stockout|stockouts|sku|skus|supply chain)\b/i.test(text);
+}
+
+function hasShopifySetupIntent(text: string) {
+  return /\bshopify\b/i.test(text) && /\b(setup|set up|setting up|new to|claude|automation|automating|theme|navigation|checkout|policies|seo|products?)\b/i.test(text);
+}
+
 function shortContext(title: string, body: string) {
   const text = compactRedditText(body || title);
   const sentences = text.split(/[.!?]/).map((item) => item.trim()).filter(Boolean);
@@ -137,7 +145,22 @@ export function buildReplyOptions(input: ReplyInput): RedditRadarReplyOptions {
       ? "Good candidate. Post manually, keep it short, and do not add links."
       : "Use the quick reply by default. The deeper version only makes sense if the thread has more context.";
 
-  if (hasTerm(text, ["inventory", "stock", "reorder", "stockout", "warehouse"])) {
+  if (hasShopifySetupIntent(text)) {
+    return {
+      quickReply: replyParts(
+        "I'd use Claude as a helper, not the driver.",
+        "Start with store structure, products, theme, navigation, checkout, policies and basic SEO before automating anything."
+      ),
+      deeperReply: replyParts(
+        "I'd map the store manually first: collections, products, theme, navigation, checkout, policies and basic SEO.",
+        "Then use Claude to draft copy, organize tasks, and check for gaps.",
+        "I wouldn't blindly automate the setup until you know what the store actually needs."
+      ),
+      manualNote,
+    };
+  }
+
+  if (hasInventoryIntent(text)) {
     return {
       quickReply: replyParts(
         "I'd separate the boring useful stuff from the shiny stuff.",

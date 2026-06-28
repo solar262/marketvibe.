@@ -113,6 +113,20 @@ const shopifyReply = buildSuggestedReply({
 });
 assert.match(shopifyReply, /traffic|product page|checkout|abandoned carts|trust/i, "Shopify no-traffic post should get ecommerce-specific reply");
 
+const shopifySetupReply = buildSuggestedReply({
+  title: "New to Shopify. Need help about general setup and automating the setup through Claude.",
+  body: "I am trying to figure out what to set up first and what Claude can safely help with.",
+  intent: "ai",
+  niche: "AI tools for ecommerce",
+  target: "Shopify owners",
+  subreddit: "r/shopify",
+  action: "ManualOnly",
+  comments: 4,
+  ups: 3,
+});
+assert.match(shopifySetupReply, /store structure|products|theme|navigation|checkout|policies|SEO|helper/i, "Shopify Claude setup post should get setup-specific reply");
+assert.doesNotMatch(shopifySetupReply, /inventory|stock|reorder|forecasting|stockout/i, "Shopify setup post should not get inventory reply");
+
 const redditMarketingReply = buildSuggestedReply({
   title: "How do I market on Reddit without getting ignored?",
   body: "I sell to founders but every subreddit seems to hate obvious promotion.",
