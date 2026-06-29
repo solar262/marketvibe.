@@ -4,6 +4,8 @@
   const MAX_RECENT_IMPORTS = 20;
   const SCAN_INTERVAL_MS = 1500;
   const SCAN_CLEANUP_MS = 3000;
+  const HANDLED_KEY = "marketvibe_facebook_handled_posts";
+  const MAX_HANDLED_POSTS = 500;
   if (document.getElementById("marketvibe-import-button")) return;
 
   function clean(value) {
@@ -306,6 +308,145 @@
     localStorage.setItem(CACHE_KEY, JSON.stringify([nextPost, ...recent].slice(0, MAX_RECENT_IMPORTS)));
     renderRecentImports();
   }
+  function simpleHash(value) {
+    const text = clean(value).toLowerCase();
+    let hash = 0;
+    for (let index = 0; index < text.length; index += 1) {
+      hash = ((hash << 5) - hash + text.charCodeAt(index)) | 0;
+    }
+    return String(Math.abs(hash));
+  }
+
+  function getHandledPosts() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(HANDLED_KEY) || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveHandledPostKey(key) {
+    if (!key) return;
+    const handled = getHandledPosts().filter((item) => item !== key);
+    localStorage.setItem(HANDLED_KEY, JSON.stringify([key, ...handled].slice(0, MAX_HANDLED_POSTS)));
+  }
+
+  function getPostKey(post) {
+    const url = clean(post && post.url ? post.url : "");
+    if (url && !isGenericFacebookUrl(url)) return `url:${url}`;
+    return `text:${simpleHash(post && post.text ? post.text.slice(0, 500) : "")}`;
+  }
+
+  function getNodeKey(node, score) {
+    return getPostKey(buildPostFromNode(node, score));
+  }
+
+  function isHandledPostKey(key) {
+    return Boolean(key && getHandledPosts().includes(key));
+  }
+
+  function markNodeHandled(node, score) {
+    const key = getNodeKey(node, score);
+    saveHandledPostKey(key);
+    node.setAttribute("data-marketvibe-handled", "true");
+    node.style.outline = "2px solid rgba(148,163,184,.55)";
+    node.style.background = "rgba(148,163,184,.06)";
+    node.querySelectorAll(":scope > .marketvibe-intent-badge, :scope > .marketvibe-card-actions").forEach((item) => item.remove());
+  }
+
+  function getQualifiedNodes(includeHandled = false) {
+    const nodes = Array.from(document.querySelectorAll('[role="article"], div[aria-posinset]'));
+    const seen = new Set();
+    const qualified = [];
+    for (const node of nodes) {
+      const text = getPostText(node);
+      const score = scorePost(text);
+      if (score < 25) continue;
+      const key = getNodeKey(node, score);
+      if (!includeHandled && isHandledPostKey(key)) continue;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      qualified.push({ node, score, key, top: node.getBoundingClientRect().top });
+    }
+    return qualified;
+  }
+
+  function getCurrentQualifiedNode() {
+    const qualified = getQualifiedNodes(false)
+      .map((item) => ({ ...item, distance: Math.abs(item.node.getBoundingClientRect().top - window.innerHeight * 0.28) }))
+      .sort((a, b) => a.distance - b.distance);
+    return qualified[0] || null;
+  }
+
+  function scrollToQualifiedNode(item, message = "Moved to next MarketVibe match.") {
+    if (!item || !item.node) {
+      showStatus("No unhandled high-intent post found yet. Scroll a little or try another search.");
+      return false;
+    }
+    item.node.scrollIntoView({ behavior: "smooth", block: "center" });
+    item.node.style.boxShadow = "0 0 0 5px rgba(16,185,129,.28)";
+    window.setTimeout(() => {
+      item.node.style.boxShadow = "";
+    }, 1800);
+    showStatus(message);
+    return true;
+  }
+
+  function moveToNextQualifiedPost(afterNode = null) {
+    const qualified = getQualifiedNodes(false);
+    if (!qualified.length) {
+      window.scrollBy({ top: Math.round(window.innerHeight * 0.85), behavior: "smooth" });
+      window.setTimeout(() => {
+        markFeed();
+        const next = getQualifiedNodes(false)[0];
+        scrollToQualifiedNode(next, next ? "Found next MarketVibe match." : "No next match found on loaded posts.");
+      }, 900);
+      return;
+    }
+
+    if (!afterNode) {
+      scrollToQualifiedNode(qualified[0]);
+      return;
+    }
+
+    const afterTop = afterNode.getBoundingClientRect().top;
+    const below = qualified.find((item) => item.node !== afterNode && item.node.getBoundingClientRect().top > afterTop + 20);
+    scrollToQualifiedNode(below || qualified.find((item) => item.node !== afterNode) || qualified[0]);
+  }
+
+  function skipCurrentQualifiedPost() {
+    const current = getCurrentQualifiedNode();
+    if (!current) {
+      moveToNextQualifiedPost();
+      return;
+    }
+    markNodeHandled(current.node, current.score);
+    showStatus("Skipped this post. Moving to the next match.");
+    window.setTimeout(() => moveToNextQualifiedPost(current.node), 250);
+  }
+
+  function renderQueueControls() {
+    let panel = document.getElementById("marketvibe-queue-controls");
+    if (!panel) {
+      panel = document.createElement("div");
+      panel.id = "marketvibe-queue-controls";
+      panel.style.cssText = "position:fixed;right:16px;bottom:82px;z-index:2147483647;display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;max-width:min(420px,calc(100vw - 32px));font:12px Arial,sans-serif;";
+      const next = document.createElement("button");
+      next.type = "button";
+      next.textContent = "Next match";
+      next.style.cssText = "border:1px solid rgba(103,232,249,.55);border-radius:999px;background:#07111f;color:white;font-weight:800;padding:9px 11px;box-shadow:0 10px 28px rgba(0,0,0,.28);cursor:pointer;";
+      next.addEventListener("click", () => moveToNextQualifiedPost());
+      const skip = document.createElement("button");
+      skip.type = "button";
+      skip.textContent = "Skip current";
+      skip.style.cssText = "border:1px solid rgba(251,191,36,.55);border-radius:999px;background:#07111f;color:white;font-weight:800;padding:9px 11px;box-shadow:0 10px 28px rgba(0,0,0,.28);cursor:pointer;";
+      skip.addEventListener("click", skipCurrentQualifiedPost);
+      panel.append(next, skip);
+      document.body.appendChild(panel);
+    }
+  }
+
 
   async function copyReply(post) {
     await navigator.clipboard.writeText(createReply(post));
@@ -391,7 +532,41 @@
       event.stopPropagation();
       void sendSinglePost(node, score, sendButton);
     });
-    actions.appendChild(sendButton);
+    const sendNextButton = document.createElement("button");
+    sendNextButton.type = "button";
+    sendNextButton.textContent = "Send + next";
+    sendNextButton.style.cssText = "border:1px solid rgba(103,232,249,.55);border-radius:999px;background:#07111f;color:white;font:800 12px Arial,sans-serif;padding:8px 11px;cursor:pointer;";
+    sendNextButton.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const sent = await sendSinglePost(node, score, sendNextButton);
+      if (sent) {
+        window.setTimeout(() => moveToNextQualifiedPost(node), 350);
+      }
+    });
+
+    const skipButton = document.createElement("button");
+    skipButton.type = "button";
+    skipButton.textContent = "Skip";
+    skipButton.style.cssText = "border:1px solid rgba(251,191,36,.55);border-radius:999px;background:rgba(255,255,255,.08);color:white;font:800 12px Arial,sans-serif;padding:8px 11px;cursor:pointer;";
+    skipButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      markNodeHandled(node, score);
+      window.setTimeout(() => moveToNextQualifiedPost(node), 250);
+    });
+
+    const nextButton = document.createElement("button");
+    nextButton.type = "button";
+    nextButton.textContent = "Next match";
+    nextButton.style.cssText = "border:1px solid rgba(103,232,249,.55);border-radius:999px;background:rgba(255,255,255,.08);color:white;font:800 12px Arial,sans-serif;padding:8px 11px;cursor:pointer;";
+    nextButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      moveToNextQualifiedPost(node);
+    });
+
+    actions.append(sendButton, sendNextButton, skipButton, nextButton);
     node.prepend(actions);
   }
 
@@ -408,8 +583,12 @@
         node.style.opacity = "";
         node.style.filter = "";
 
-        if (score >= 25) {
+        const key = score >= 25 ? getNodeKey(node, score) : "";
+        const handled = key ? isHandledPostKey(key) : false;
+
+        if (score >= 25 && !handled) {
           highlighted += 1;
+          node.removeAttribute("data-marketvibe-handled");
           node.style.outline = "3px solid #10b981";
           node.style.background = "rgba(16,185,129,0.06)";
           if (!node.querySelector(":scope > .marketvibe-intent-badge")) {
@@ -421,8 +600,14 @@
           }
           injectSingleImportButton(node, score);
         } else {
-          node.style.outline = "";
-          node.style.background = "";
+          if (score >= 25 && handled) {
+            node.setAttribute("data-marketvibe-handled", "true");
+            node.style.outline = "2px solid rgba(148,163,184,.45)";
+            node.style.background = "rgba(148,163,184,.05)";
+          } else {
+            node.style.outline = "";
+            node.style.background = "";
+          }
           node.querySelectorAll(":scope > .marketvibe-intent-badge, :scope > .marketvibe-card-actions").forEach((item) => item.remove());
         }
       }
@@ -446,10 +631,11 @@
       const text = getPostText(node);
       const score = scorePost(text);
       if (score < 25) continue;
-      const key = text.toLowerCase().slice(0, 180);
-      if (seen.has(key)) continue;
+      const post = buildPostFromNode(node, score);
+      const key = getPostKey(post);
+      if (isHandledPostKey(key) || seen.has(key)) continue;
       seen.add(key);
-      posts.push(buildPostFromNode(node, score));
+      posts.push(post);
       if (posts.length >= 10) break;
     }
     return posts.sort((a, b) => b.score - a.score);
@@ -479,17 +665,22 @@
 
   async function sendSinglePost(node, score, sendButton) {
     const post = buildPostFromNode(node, score);
+    const originalText = sendButton.textContent;
     sendButton.disabled = true;
     sendButton.textContent = "Sending...";
     try {
       const data = await sendPosts([post]);
       saveRecentImport(post);
+      saveHandledPostKey(getPostKey(post));
+      markNodeHandled(node, score);
       showStatus(`Sent this post to MarketVibe. Good: ${data.counts?.good || 0}.`);
       sendButton.textContent = "Sent to MarketVibe";
+      return true;
     } catch (error) {
       showStatus(`MarketVibe import failed: ${error && error.message ? error.message : "unknown error"}`);
       sendButton.disabled = false;
-      sendButton.textContent = "Send this post to MarketVibe";
+      sendButton.textContent = originalText || "Send this post to MarketVibe";
+      return false;
     }
   }
 
@@ -521,6 +712,7 @@
   button.addEventListener("click", sendVisible);
   document.body.appendChild(button);
   renderRecentImports();
+  renderQueueControls();
   markFeed();
   setInterval(markFeed, SCAN_INTERVAL_MS);
 })();
