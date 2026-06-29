@@ -6,9 +6,63 @@
     return String(value || "").replace(/\s+/g, " ").trim();
   }
 
-  function looksUseful(text) {
-    if (text.length < 40) return false;
-    return /\b(client|clients|lead|leads|traffic|sales|outreach|marketing|website|seo|shopify|customers|business|prospecting|not working|no one replies|hiring|job|guaranteed leads|dm me)\b/i.test(text);
+  const STRONG_BUYER_SIGNALS = [
+    /need more clients?/i,
+    /looking for clients?/i,
+    /how do i get clients?/i,
+    /cold outreach.*not working/i,
+    /no one replies/i,
+    /need leads/i,
+    /looking for leads/i,
+    /how to find customers/i,
+    /need customers/i,
+    /first few clients/i,
+    /client acquisition/i,
+    /lead generation help/i,
+    /how do i grow/i,
+    /seo help/i,
+    /website help/i,
+    /shopify help/i,
+    /marketing help/i,
+    /how do i scale/i,
+    /struggling to get/i,
+    /i hate cold emails/i,
+  ];
+
+  const BAD_SIGNALS = [
+    /hiring/i,
+    /job/i,
+    /commission only/i,
+    /dm me/i,
+    /guaranteed leads/i,
+    /pay per lead/i,
+    /for hire/i,
+    /we provide/i,
+    /our agency/i,
+    /lead generation service/i,
+    /book a call/i,
+    /appointment setter/i,
+    /vacancy/i,
+    /upwork/i,
+    /fiverr/i,
+    /crypto/i,
+    /forex/i,
+  ];
+
+  function scorePost(text) {
+    let score = 0;
+
+    for (const pattern of STRONG_BUYER_SIGNALS) {
+      if (pattern.test(text)) score += 20;
+    }
+
+    for (const pattern of BAD_SIGNALS) {
+      if (pattern.test(text)) score -= 35;
+    }
+
+    if (text.length < 80) score -= 20;
+
+    return score;
   }
 
   function collectVisibleCards() {
@@ -20,8 +74,10 @@
       const box = node.getBoundingClientRect();
       if (box.bottom < 0 || box.top > window.innerHeight * 2) continue;
 
-      const text = clean(node.innerText).slice(0, 1600);
-      if (!looksUseful(text)) continue;
+      const text = clean(node.innerText).slice(0, 2200);
+      const score = scorePost(text);
+
+      if (score < 20) continue;
 
       const key = text.toLowerCase().slice(0, 180);
       if (seen.has(key)) continue;
@@ -32,6 +88,7 @@
 
       posts.push({
         text,
+        score,
         sourceName: clean(document.title.replace(/\| Facebook$/i, "")),
         author: text.split(" ").slice(0, 8).join(" "),
         dateText: "",
@@ -43,7 +100,7 @@
       if (posts.length >= 10) break;
     }
 
-    return posts;
+    return posts.sort((a, b) => b.score - a.score);
   }
 
   function showStatus(message) {
@@ -60,6 +117,12 @@
 
   async function sendVisible() {
     const posts = collectVisibleCards();
+
+    if (!posts.length) {
+      showStatus("No strong buyer-intent posts detected on screen.");
+      return;
+    }
+
     button.disabled = true;
     button.textContent = "Sending to MarketVibe...";
 
@@ -77,7 +140,7 @@
       const data = await response.json();
 
       showStatus(
-        `Imported ${posts.length} visible posts. Good: ${data.counts?.good || 0}. Skipped: ${data.counts?.skipped || 0}. Open MarketVibe Facebook Radar to review.`
+        `Imported ${posts.length} buyer-intent posts. Good: ${data.counts?.good || 0}.`
       );
     } catch (error) {
       showStatus(`MarketVibe import failed: ${error && error.message ? error.message : "unknown error"}`);
