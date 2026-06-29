@@ -21,6 +21,19 @@ export type FacebookRadarResult = {
   searchUrl: string;
 };
 
+export type FacebookRadarSearchInput = {
+  targetBuyer: string;
+  niche: string;
+  painKeywords: string;
+};
+
+export type FacebookRadarSearchLink = {
+  phrase: string;
+  reason: string;
+  postsUrl: string;
+  groupsUrl: string;
+};
+
 const BUYER_PATTERN = /\b(web designer|web designers|seo freelancer|seo freelancers|seo consultant|seo agency|local marketer|digital marketer|lead generation freelancer|lead gen|small agency|agency|freelancer|sell websites|selling websites|website redesign|local business services|automation service|client acquisition)\b/i;
 const PAIN_PATTERN = /\b(need clients|how do i get clients|get clients|looking for leads|find local businesses|sell websites|get seo clients|local lead generation|cold outreach not working|no replies|prospecting help|businesses without websites|how do i prospect|agency clients|lead generation|outreach|prospecting|local business prospects|website clients|seo clients)\b/i;
 const BAD_PATTERN = /\b(hiring|apply now|remote developer|salary|full-time|part-time|job opening|vacancy|course launch|buy my|dm me for|limited offer|promo code|giveaway|i built this)\b/i;
@@ -37,6 +50,123 @@ function hasAny(text: string, pattern: RegExp) {
 function buildFacebookSearchUrl(targetBuyer: string, painKeywords: string) {
   const query = cleanText([targetBuyer, painKeywords].filter(Boolean).join(" "));
   return query ? `https://www.facebook.com/search/posts/?q=${encodeURIComponent(query)}` : "https://www.facebook.com/search/posts/";
+}
+
+function facebookPostsUrl(query: string) {
+  return `https://www.facebook.com/search/posts/?q=${encodeURIComponent(query)}`;
+}
+
+function facebookGroupsUrl(query: string) {
+  return `https://www.facebook.com/search/groups/?q=${encodeURIComponent(query)}`;
+}
+
+function splitTerms(value: string) {
+  return value
+    .split(/[,;\n]/)
+    .map((item) => cleanText(item).toLowerCase())
+    .filter(Boolean);
+}
+
+function nicheVariants(value: string) {
+  const text = value.toLowerCase();
+  const variants = new Set<string>();
+  const add = (item: string) => variants.add(item);
+
+  if (/\b(web design|website|web designer|redesign)\b/.test(text)) {
+    ["web design", "website design", "website redesign", "web designer"].forEach(add);
+  }
+  if (/\bseo|search engine|rankings?\b/.test(text)) {
+    ["SEO freelancer", "SEO clients", "local SEO"].forEach(add);
+  }
+  if (/\bshopify|ecommerce|online store|store\b/.test(text)) {
+    ["Shopify", "ecommerce", "online store", "product page"].forEach(add);
+  }
+  if (/\bsneaker|sneakers|shoe|reseller|reselling\b/.test(text)) {
+    ["sneaker reselling", "sneaker reseller", "selling sneakers", "reselling shoes"].forEach(add);
+  }
+  if (/\bbook|books|bookstore|author\b/.test(text)) {
+    ["book selling", "book seller", "selling books online", "used books"].forEach(add);
+  }
+  if (/\broof|roofer|roofing\b/.test(text)) {
+    ["roofing leads", "roof repair", "roofing quote", "roofer"].forEach(add);
+  }
+  if (/\blocal business|local businesses\b/.test(text)) {
+    ["local businesses", "local business leads", "service business"].forEach(add);
+  }
+  if (/\bfreelancer|freelance\b/.test(text)) {
+    ["freelancer", "freelance clients"].forEach(add);
+  }
+  if (/\bagency|agencies\b/.test(text)) {
+    ["small agency", "agency clients", "agency lead generation"].forEach(add);
+  }
+  if (/\bsaas|founder|startup\b/.test(text)) {
+    ["SaaS founders", "startup customers", "B2B leads"].forEach(add);
+  }
+  if (/\bcoach|coaches|consultant|consultants\b/.test(text)) {
+    ["coaches", "consultants", "consulting clients"].forEach(add);
+  }
+
+  if (!variants.size && cleanText(value)) variants.add(cleanText(value).toLowerCase());
+  return Array.from(variants).slice(0, 8);
+}
+
+export function generateFacebookSearchLinks(input: FacebookRadarSearchInput): FacebookRadarSearchLink[] {
+  const targetTerms = splitTerms(input.targetBuyer);
+  const painTerms = splitTerms(input.painKeywords);
+  const niches = nicheVariants([input.targetBuyer, input.niche, input.painKeywords].join(" "));
+  const defaultPains = [
+    "need clients",
+    "no leads",
+    "no customers",
+    "no sales",
+    "not converting",
+    "cold outreach not working",
+    "where to find customers",
+    "looking for tool",
+    "struggling with traffic",
+    "need help",
+  ];
+  const phrases = new Set<string>();
+  const add = (phrase: string) => {
+    const cleaned = cleanText(phrase).toLowerCase();
+    if (cleaned) phrases.add(cleaned);
+  };
+
+  if (/\bweb design|website|web designer\b/i.test(`${input.targetBuyer} ${input.niche}`)) {
+    ["need more clients web design", "cold outreach not working web design", "how do i sell websites", "website leads not converting"].forEach(add);
+  }
+  if (/\bseo\b/i.test(`${input.targetBuyer} ${input.niche}`)) {
+    ["looking for leads SEO freelancer", "how do I get SEO clients", "selling SEO services no clients"].forEach(add);
+  }
+  if (/\bsneaker|resell|shoe\b/i.test(`${input.targetBuyer} ${input.niche}`)) {
+    ["sneaker reselling no sales", "where to sell sneakers", "sneaker reseller no customers", "reselling shoes need help"].forEach(add);
+  }
+  if (/\bbook|bookstore|author\b/i.test(`${input.targetBuyer} ${input.niche}`)) {
+    ["book selling no sales", "where to sell books online", "book seller no customers", "selling books online need help"].forEach(add);
+  }
+  if (/\broof|roofer|roofing\b/i.test(`${input.targetBuyer} ${input.niche}`)) {
+    ["roofing leads", "roofer no leads", "roofing quote problem", "roof repair customer problem"].forEach(add);
+  }
+  if (/\bagency|local marketing|small agency\b/i.test(`${input.targetBuyer} ${input.niche}`)) {
+    ["how to get clients local marketing", "no clients small agency", "agency clients cold outreach not working"].forEach(add);
+  }
+
+  for (const niche of niches) {
+    for (const pain of [...painTerms, ...defaultPains].slice(0, 12)) add(`${pain} ${niche}`);
+  }
+
+  for (const target of targetTerms.slice(0, 4)) {
+    add(`how to get clients ${target}`);
+    add(`need more clients ${target}`);
+    add(`where to find customers ${target}`);
+  }
+
+  return Array.from(phrases).slice(0, 30).map((phrase) => ({
+    phrase,
+    reason: `Useful because it combines a buyer/niche angle with a visible pain signal: "${phrase}".`,
+    postsUrl: facebookPostsUrl(phrase),
+    groupsUrl: facebookGroupsUrl(phrase),
+  }));
 }
 
 function detectIntent(text: string) {

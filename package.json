@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:reddit-radar": "node scripts/test-reddit-radar.mjs",
+    "test:facebook-radar": "node scripts/test-facebook-radar.mjs",
     "seed:sql": "node -e \"console.log('Run scripts/seed-demo.sql in Supabase SQL editor')\""
   },
   "dependencies": {
