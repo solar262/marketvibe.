@@ -34,6 +34,7 @@ export type FacebookRadarSearchLink = {
   goodSignals: string[];
   skipSignals: string[];
   postsUrl: string;
+  mobileSearchUrl: string;
   groupsUrl: string;
 };
 
@@ -58,7 +59,11 @@ function buildFacebookSearchUrl(targetBuyer: string, painKeywords: string) {
 }
 
 function facebookPostsUrl(query: string) {
-  return `https://www.facebook.com/search/posts/?q=${encodeURIComponent(query)}`;
+  return `https://www.facebook.com/search/top/?q=${encodeURIComponent(query)}`;
+}
+
+function facebookMobileSearchUrl(query: string) {
+  return `https://m.facebook.com/search/top/?q=${encodeURIComponent(query)}`;
 }
 
 function facebookGroupsUrl(query: string) {
@@ -212,6 +217,7 @@ export function generateFacebookSearchLinks(input: FacebookRadarSearchInput): Fa
       skipSignals: SEARCH_SKIP_SIGNALS,
       reason: `MarketVibe fit ${fitScore}/100: best when results show lead, customer, traffic, conversion, or outreach pain.`,
       postsUrl: facebookPostsUrl(phrase),
+      mobileSearchUrl: facebookMobileSearchUrl(phrase),
       groupsUrl: facebookGroupsUrl(phrase),
     }));
 }

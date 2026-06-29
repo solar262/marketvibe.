@@ -35,9 +35,17 @@ const webDesignTop = linksFor({
   niche: "web design",
   painKeywords: "need clients, cold outreach not working",
 }).slice(0, 5).map((link) => link.phrase).join(" | ");
+const firstWebDesignLink = linksFor({
+  targetBuyer: "web designers, SEO freelancers",
+  niche: "web design",
+  painKeywords: "need clients, cold outreach not working",
+})[0];
 assert.doesNotMatch(webDesignTop, /\bneed clients web design\b/, "Web design input must not generate weak need-clients-web-design as a top result");
 assert.match(webDesignPhrases, /"cold outreach not working"|"how do i get clients"|"no one replies to my outreach"/, "Search phrases should include pain/question wording");
 assert.doesNotMatch(webDesignPhrases, /hiring|remote developer|pay per website|cheap website/i, "Generated searches should avoid obvious hiring intent");
+assert.match(firstWebDesignLink.postsUrl, /^https:\/\/www\.facebook\.com\/search\/top\/\?q=/, "Posts URL should use Facebook top search");
+assert.match(firstWebDesignLink.mobileSearchUrl, /^https:\/\/m\.facebook\.com\/search\/top\/\?q=/, "Mobile fallback URL should use m.facebook.com top search");
+assert.match(firstWebDesignLink.groupsUrl, /^https:\/\/www\.facebook\.com\/search\/groups\/\?q=/, "Groups URL should keep Facebook group search");
 
 const sneakerPhrases = phrasesFor({
   targetBuyer: "sneaker resellers",
