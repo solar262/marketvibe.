@@ -43,8 +43,8 @@ const firstWebDesignLink = linksFor({
 assert.doesNotMatch(webDesignTop, /\bneed clients web design\b/, "Web design input must not generate weak need-clients-web-design as a top result");
 assert.match(webDesignPhrases, /"cold outreach not working"|"how do i get clients"|"no one replies to my outreach"/, "Search phrases should include pain/question wording");
 assert.doesNotMatch(webDesignPhrases, /hiring|remote developer|pay per website|cheap website/i, "Generated searches should avoid obvious hiring intent");
-assert.match(firstWebDesignLink.postsUrl, /^https:\/\/www\.facebook\.com\/search\/posts\/\?q=/, "Posts URL should use Facebook posts search");
-assert.match(firstWebDesignLink.groupsUrl, /^https:\/\/www\.facebook\.com\/search\/groups\/\?q=/, "Groups URL should keep Facebook group search");
+assert.match(firstWebDesignLink.postsUrl, /^https:\/\/(www|m)\.facebook\.com\/search\/posts\/\?q=/, "Posts URL should use Facebook posts search");
+assert.match(firstWebDesignLink.groupsUrl, /^https:\/\/(www|m)\.facebook\.com\/search\/groups\/\?q=/, "Groups URL should keep Facebook group search");
 
 const sneakerPhrases = phrasesFor({
   targetBuyer: "sneaker resellers",

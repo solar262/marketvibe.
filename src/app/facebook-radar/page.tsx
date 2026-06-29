@@ -42,6 +42,7 @@ export default function FacebookRadarPage() {
 
   const searchLinks = useMemo(() => generateFacebookSearchLinks({ targetBuyer, niche, painKeywords }), [targetBuyer, niche, painKeywords]);
   const visibleSearchLinks = searchLinks.filter((link) => !searched.includes(link.phrase) && !skippedSearches.includes(link.phrase));
+  const activeSearchLink = visibleSearchLinks[0];
   const selectedReply = useMemo(() => {
     if (!result) return "";
     return replyMode === "deeper" && result.deeperReply ? result.deeperReply : result.quickReply;
@@ -89,6 +90,29 @@ export default function FacebookRadarPage() {
     track("Facebook Radar Skip Search", { phrase: link.phrase });
   }
 
+  function openSearch(link: FacebookRadarSearchLink, url: string, searchType: "posts" | "groups") {
+    void navigator.clipboard.writeText(link.phrase).then(() => setCopied(true)).catch(() => setCopied(false));
+    track("Facebook Radar Open Search", { phrase: link.phrase, search_type: searchType });
+    window.open(url, "_blank", "noopener,noreferrer");
+    window.setTimeout(() => setCopied(false), 1600);
+  }
+
+  function markBadNext(link?: FacebookRadarSearchLink) {
+    if (!link) return;
+    skipSearch(link);
+  }
+
+  function markGoodAnalyze(link?: FacebookRadarSearchLink) {
+    if (!link) return;
+    markSearch(link);
+    setSourceUrl(link.postsUrl);
+    setPostText("");
+    setResult(null);
+    setReplyMode("quick");
+    setMode("analyze");
+    track("Facebook Radar Mark Good Analyze", { phrase: link.phrase });
+  }
+
   function clearWorkflowState() {
     setSearched([]);
     setSkippedSearches([]);
@@ -132,7 +156,7 @@ export default function FacebookRadarPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#050b16] text-white">
+    <main className="min-h-screen bg-[#050b16] pb-28 text-white">
       <section className="relative overflow-hidden border-b border-white/10 px-4 py-8 sm:px-6 lg:px-8">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,#10b98135,transparent_24rem),radial-gradient(circle_at_82%_20%,#2563eb30,transparent_26rem),linear-gradient(135deg,#06111f_0%,#071827_46%,#030712_100%)]" />
         <div className="relative mx-auto max-w-5xl">
@@ -239,7 +263,10 @@ export default function FacebookRadarPage() {
               </p>
             )}
             <div className="mt-5 grid gap-3">
-              {visibleSearchLinks.map((link) => (
+              {activeSearchLink ? (
+                (() => {
+                  const link = activeSearchLink;
+                  return (
                 <div key={link.phrase} className="rounded-3xl border border-white/10 bg-slate-950/35 p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <p className="min-w-0 break-words text-lg font-semibold text-white">{link.phrase}</p>
@@ -261,25 +288,34 @@ export default function FacebookRadarPage() {
                   <p className="mt-3 rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-2 text-sm font-semibold text-slate-200">
                     Bad results? Try next search. If the first screen is mostly jobs, spam, or offers, mark searched/skip and move on.
                   </p>
-                  <div className="mt-4 grid gap-2 sm:grid-cols-5">
-                    <a href={link.postsUrl} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-4 py-3 text-sm font-bold text-slate-950 hover:bg-slate-100 sm:col-span-2">
-                      <ExternalLink className="h-4 w-4" /> Open Posts Search
-                    </a>
-                    <a href={link.groupsUrl} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-full border border-cyan-300/30 bg-cyan-300/10 px-4 py-3 text-sm font-semibold text-cyan-100 hover:bg-cyan-300/15 sm:col-span-2">
-                      <ExternalLink className="h-4 w-4" /> Open Groups Search
-                    </a>
+                  <p className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm font-bold text-amber-50">
+                    Check first screen only. If mostly jobs/spam/offers, come back and press Skip.
+                  </p>
+                  <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                    <button onClick={() => openSearch(link, link.postsUrl, "posts")} className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-5 py-4 text-base font-bold text-slate-950 hover:bg-slate-100">
+                      <ExternalLink className="h-5 w-5" /> Open Posts
+                    </button>
+                    <button onClick={() => openSearch(link, link.groupsUrl, "groups")} className="inline-flex items-center justify-center gap-2 rounded-full border border-cyan-300/30 bg-cyan-300/10 px-5 py-4 text-base font-bold text-cyan-100 hover:bg-cyan-300/15">
+                      <ExternalLink className="h-5 w-5" /> Open Groups
+                    </button>
+                    <button onClick={() => markBadNext(link)} className="rounded-full border border-white/15 bg-white/10 px-5 py-4 text-base font-bold text-white hover:bg-white/15">
+                      <SkipForward className="mr-2 inline h-5 w-5" />Mark Bad / Next
+                    </button>
+                    <button onClick={() => markGoodAnalyze(link)} className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-5 py-4 text-base font-bold text-emerald-100 hover:bg-emerald-300/15">
+                      <CheckCircle2 className="mr-2 inline h-5 w-5" />Mark Good / Analyze
+                    </button>
+                  </div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
                     <button onClick={() => copyText(link.phrase, "Facebook Radar Copy Search Phrase")} className="rounded-full border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold text-white hover:bg-white/15">
                       <Copy className="mr-2 inline h-4 w-4" />Copy exact search
                     </button>
+                    <button onClick={() => markSearch(link)} className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-4 py-3 text-sm font-semibold text-emerald-100 hover:bg-emerald-300/15"><CheckCircle2 className="mr-2 inline h-4 w-4" />Mark searched</button>
                   </div>
                   <p className="mt-2 text-xs font-semibold text-slate-400">Use Posts first to find conversations. Use Groups only to find places to join.</p>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    <button onClick={() => markSearch(link)} className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-4 py-3 text-sm font-semibold text-emerald-100 hover:bg-emerald-300/15"><CheckCircle2 className="mr-2 inline h-4 w-4" />Mark searched</button>
-                    <button onClick={() => skipSearch(link)} className="rounded-full border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold text-white hover:bg-white/15"><SkipForward className="mr-2 inline h-4 w-4" />Skip</button>
-                  </div>
                 </div>
-              ))}
-              {!visibleSearchLinks.length && (
+                  );
+                })()
+              ) : (
                 <div className="rounded-3xl border border-amber-300/20 bg-amber-300/10 p-8 text-center text-amber-50">
                   All generated searches are marked. Reset or change the inputs for a fresh queue.
                 </div>
@@ -341,6 +377,22 @@ export default function FacebookRadarPage() {
 
         {copied && <p className="mt-4 text-center text-sm font-semibold text-emerald-300">Copied.</p>}
       </section>
+
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-slate-950/95 px-4 py-3 shadow-2xl shadow-black/40 backdrop-blur">
+        <div className="mx-auto flex max-w-5xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p className="min-w-0 truncate text-sm font-semibold text-slate-200">
+            {mode === "find" ? activeSearchLink?.phrase || "Search queue complete" : "Back to Radar / Next Search"}
+          </p>
+          <div className="grid grid-cols-2 gap-2 sm:flex">
+            <button onClick={() => setMode("find")} className="rounded-full border border-white/15 bg-white/10 px-4 py-3 text-sm font-bold text-white hover:bg-white/15">
+              Back to Radar
+            </button>
+            <button onClick={() => markBadNext(activeSearchLink)} disabled={mode !== "find" || !activeSearchLink} className="rounded-full border border-amber-300/25 bg-amber-300/10 px-4 py-3 text-sm font-bold text-amber-100 hover:bg-amber-300/15 disabled:cursor-not-allowed disabled:opacity-50">
+              Next Search
+            </button>
+          </div>
+        </div>
+      </div>
     </main>
   );
 }
