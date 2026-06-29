@@ -9,7 +9,6 @@ const links = [
   ["Free Leads", "/free-leads"],
   ["Lead Search", "/lead-search"],
   ["Reddit Radar", "/reddit-radar"],
-  ["Facebook Radar", "/facebook-radar"],
   ["Pricing", "/pricing"],
   ["Contact", "/contact"],
 ];

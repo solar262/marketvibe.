@@ -140,6 +140,9 @@ export default function FacebookRadarPage() {
             <p className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-white/8 px-3 py-1 text-xs font-semibold text-cyan-100 shadow-lg shadow-cyan-950/20 backdrop-blur">
               <Radar className="h-4 w-4 text-emerald-300" /> Facebook Lead Radar
             </p>
+            <p className="mx-auto mt-3 inline-flex rounded-full border border-amber-300/25 bg-amber-300/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-amber-100">
+              Internal Growth Tool - not customer-facing
+            </p>
             <h1 className="mt-5 text-4xl font-semibold tracking-tight text-white sm:text-5xl">Internal Growth Tool</h1>
             <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-300">
               Find Facebook search angles, analyze pasted posts, and manually engage where buyers ask for clients, leads, traffic, websites, SEO, ecommerce, or automation help.
