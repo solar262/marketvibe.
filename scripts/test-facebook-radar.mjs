@@ -224,7 +224,15 @@ assert.match(extensionSource, /Send this post to MarketVibe/, "Highlighted posts
 assert.match(extensionSource, /function sendSinglePost/, "Per-post import workflow should exist");
 assert.match(extensionSource, /sendPosts\(\[post\]\)/, "Per-post import should send only one post");
 assert.match(extensionSource, /function sendVisible/, "Bulk visible import should remain as backup");
-assert.match(extensionSource, /setInterval\(markFeed, 1500\)/, "Extension should rescan Facebook cards every 1.5 seconds");
+assert.match(extensionSource, /const SCAN_INTERVAL_MS = 1500/, "Extension should rescan Facebook cards every 1.5 seconds");
+assert.match(extensionSource, /const SCAN_CLEANUP_MS = 3000/, "Extension should clean scan UI if scanning takes more than 3 seconds");
+assert.match(extensionSource, /setInterval\(markFeed, SCAN_INTERVAL_MS\)/, "Extension should use one interval scanner without repeatedly adding overlays");
+assert.match(extensionSource, /function cleanupScanUi/, "Extension should always clean scan UI");
+assert.match(extensionSource, /finally \{[\s\S]*cleanupScanUi\(\)/, "Failed scans should clean up scan UI in finally");
+assert.match(extensionSource, /No high-intent posts found on visible page/, "Extension should show no-results status in the floating badge");
+assert.match(extensionSource, /pointer-events:none/, "Floating scan status should not block normal Facebook clicks");
+assert.doesNotMatch(extensionSource, /opacity = "0\.12"/, "Extension should not dim non-qualifying Facebook posts");
+assert.doesNotMatch(extensionSource, /grayscale\(1\)/, "Extension should not grey out the Facebook page");
 assert.match(extensionSource, /marketvibe-intent-badge/, "Extension should avoid duplicate buyer-intent badges");
 assert.match(extensionSource, /marketvibe-card-actions/, "Extension should avoid duplicate one-post buttons");
 assert.match(extensionSource, /const MAX_RECENT_IMPORTS = 20/, "Local import cache should keep a max of 20 posts");

@@ -2,6 +2,8 @@
   const API_URL = "https://www.marketvibe1.com/api/facebook-radar/import";
   const CACHE_KEY = "marketvibe_recent_facebook_imports";
   const MAX_RECENT_IMPORTS = 20;
+  const SCAN_INTERVAL_MS = 1500;
+  const SCAN_CLEANUP_MS = 3000;
   if (document.getElementById("marketvibe-import-button")) return;
 
   function clean(value) {
@@ -275,6 +277,28 @@
     }
   }
 
+  function cleanupScanUi() {
+    document.querySelectorAll(".marketvibe-scan-overlay, #marketvibe-scan-overlay").forEach((item) => item.remove());
+  }
+
+  function showScanStatus(message) {
+    cleanupScanUi();
+    let badge = document.getElementById("marketvibe-scan-status");
+    if (!badge) {
+      badge = document.createElement("div");
+      badge.id = "marketvibe-scan-status";
+      badge.style.cssText = "position:fixed;right:16px;top:76px;z-index:2147483647;max-width:min(340px,calc(100vw - 32px));border-radius:999px;background:#07111f;color:white;border:1px solid rgba(16,185,129,.45);box-shadow:0 12px 32px rgba(0,0,0,.28);padding:9px 12px;font:700 12px Arial,sans-serif;pointer-events:none;";
+      document.body.appendChild(badge);
+    }
+    badge.textContent = message;
+    window.clearTimeout(showScanStatus.hideTimer);
+    showScanStatus.hideTimer = window.setTimeout(() => {
+      badge.remove();
+    }, 3500);
+  }
+
+  showScanStatus.hideTimer = 0;
+
   function injectSingleImportButton(node, score) {
     if (node.querySelector(":scope > .marketvibe-card-actions")) return;
 
@@ -295,27 +319,43 @@
   }
 
   function markFeed() {
-    const nodes = Array.from(document.querySelectorAll('[role="article"], div[aria-posinset]'));
-    for (const node of nodes) {
-      const text = getPostText(node);
-      const score = scorePost(text);
-      if (score >= 25) {
-        node.style.outline = "3px solid #10b981";
-        node.style.background = "rgba(16,185,129,0.06)";
+    let highlighted = 0;
+    const cleanupTimer = window.setTimeout(cleanupScanUi, SCAN_CLEANUP_MS);
+
+    try {
+      cleanupScanUi();
+      const nodes = Array.from(document.querySelectorAll('[role="article"], div[aria-posinset]'));
+      for (const node of nodes) {
+        const text = getPostText(node);
+        const score = scorePost(text);
         node.style.opacity = "";
         node.style.filter = "";
-        if (!node.querySelector(":scope > .marketvibe-intent-badge")) {
-          const badge = document.createElement("div");
-          badge.className = "marketvibe-intent-badge";
-          badge.textContent = `MarketVibe Buyer Intent ${score}`;
-          badge.style.cssText = "position:sticky;top:0;z-index:9999;background:#10b981;color:#041018;font:700 12px Arial;padding:6px 10px;border-radius:8px;margin:6px;display:inline-block;";
-          node.prepend(badge);
+
+        if (score >= 25) {
+          highlighted += 1;
+          node.style.outline = "3px solid #10b981";
+          node.style.background = "rgba(16,185,129,0.06)";
+          if (!node.querySelector(":scope > .marketvibe-intent-badge")) {
+            const badge = document.createElement("div");
+            badge.className = "marketvibe-intent-badge";
+            badge.textContent = `MarketVibe Buyer Intent ${score}`;
+            badge.style.cssText = "position:sticky;top:0;z-index:9999;background:#10b981;color:#041018;font:700 12px Arial;padding:6px 10px;border-radius:8px;margin:6px;display:inline-block;";
+            node.prepend(badge);
+          }
+          injectSingleImportButton(node, score);
+        } else {
+          node.style.outline = "";
+          node.style.background = "";
+          node.querySelectorAll(":scope > .marketvibe-intent-badge, :scope > .marketvibe-card-actions").forEach((item) => item.remove());
         }
-        injectSingleImportButton(node, score);
-      } else {
-        node.style.opacity = "0.12";
-        node.style.filter = "grayscale(1)";
       }
+
+      showScanStatus(highlighted ? `${highlighted} high-intent post${highlighted === 1 ? "" : "s"} found on visible page` : "No high-intent posts found on visible page");
+    } catch (error) {
+      showScanStatus(`MarketVibe scan failed: ${error && error.message ? error.message : "unknown error"}`);
+    } finally {
+      window.clearTimeout(cleanupTimer);
+      cleanupScanUi();
     }
   }
 
@@ -405,5 +445,5 @@
   document.body.appendChild(button);
   renderRecentImports();
   markFeed();
-  setInterval(markFeed, 1500);
+  setInterval(markFeed, SCAN_INTERVAL_MS);
 })();
