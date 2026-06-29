@@ -6,6 +6,19 @@
   const SCAN_CLEANUP_MS = 3000;
   const HANDLED_KEY = "marketvibe_facebook_handled_posts";
   const MAX_HANDLED_POSTS = 500;
+  const LEAD_HUNT_KEY = "marketvibe_lead_hunt_autopilot";
+  const LEAD_HUNT_PRESETS = [
+    "I need leads",
+    "how do I get clients",
+    "struggling to get clients",
+    "need more customers",
+    "looking for leads",
+    "need clients fast",
+    "my outreach is not working",
+    "web designer need leads",
+    "SEO freelancer need clients",
+    "agency owner need leads",
+  ];
   if (document.getElementById("marketvibe-import-button")) return;
 
   function clean(value) {
@@ -266,7 +279,7 @@
     return nonGeneric || location.href;
   }
 
-  function buildPostFromNode(node, score) {
+  function buildPostFromNode(node, score, meta = {}) {
     const text = getPostText(node);
     return {
       text,
@@ -277,7 +290,20 @@
       reactions: "",
       comments: "",
       url: extractPostUrl(node),
+      queryUsed: meta.queryUsed || "",
+      sourceUsed: meta.sourceUsed || "",
+      painPoint: meta.painPoint || detectPainPoint(text),
     };
+  }
+
+  function detectPainPoint(text) {
+    if (/\b(outreach|no one replies)\b/i.test(text)) return "outreach not working";
+    if (/\b(leads?|clients?|customers?)\b/i.test(text)) return "customer acquisition";
+    if (/\b(website|web design)\b/i.test(text)) return "website help";
+    if (/\b(seo|google)\b/i.test(text)) return "SEO help";
+    if (/\b(ads?|advertising)\b/i.test(text)) return "ads help";
+    if (/\b(ecommerce|shopify|sales|store)\b/i.test(text)) return "ecommerce or sales growth";
+    return "buyer-intent problem";
   }
 
   function createReply(post) {
@@ -445,6 +471,321 @@
       panel.append(next, skip);
       document.body.appendChild(panel);
     }
+  }
+
+  function defaultLeadHuntConfig() {
+    return {
+      queries: LEAD_HUNT_PRESETS,
+      sources: {
+        facebook: true,
+        google: true,
+        bing: true,
+      },
+      caps: {
+        maxSearches: 10,
+        maxImportedLeads: 10,
+        delayMs: 3500,
+      },
+    };
+  }
+
+  function buildLeadHuntSearches(config) {
+    const searches = [];
+    const queries = Array.isArray(config.queries) && config.queries.length ? config.queries : LEAD_HUNT_PRESETS;
+    const sources = config.sources || {};
+    for (const query of queries) {
+      const cleanedQuery = clean(query);
+      if (!cleanedQuery) continue;
+      if (sources.facebook !== false) {
+        searches.push({
+          source: "Facebook Search",
+          query: cleanedQuery,
+          url: `https://www.facebook.com/search/posts/?q=${encodeURIComponent(cleanedQuery)}`,
+        });
+      }
+      if (sources.google !== false) {
+        searches.push({
+          source: "Google indexed Facebook results",
+          query: cleanedQuery,
+          url: `https://www.google.com/search?q=${encodeURIComponent(`site:facebook.com/groups ${cleanedQuery}`)}`,
+        });
+      }
+      if (sources.bing !== false) {
+        searches.push({
+          source: "Bing indexed Facebook results",
+          query: cleanedQuery,
+          url: `https://www.bing.com/search?q=${encodeURIComponent(`site:facebook.com/groups ${cleanedQuery}`)}`,
+        });
+      }
+    }
+    return searches.slice(0, Math.max(1, Number(config.caps?.maxSearches || 10)));
+  }
+
+  function getLeadHuntState() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(LEAD_HUNT_KEY) || "null");
+      return parsed && typeof parsed === "object" ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function saveLeadHuntState(nextState) {
+    localStorage.setItem(LEAD_HUNT_KEY, JSON.stringify(nextState));
+    renderLeadHuntPanel();
+  }
+
+  function withLeadHuntStateHash(url, state) {
+    try {
+      const nextUrl = new URL(url, location.href);
+      nextUrl.hash = `marketvibeLeadHuntState=${encodeURIComponent(JSON.stringify(state))}`;
+      return nextUrl.toString();
+    } catch {
+      return url;
+    }
+  }
+
+  function stopLeadHunt(message = "Lead Hunt stopped.") {
+    const state = getLeadHuntState();
+    if (state) {
+      saveLeadHuntState({ ...state, active: false, paused: false, status: message });
+    }
+    showStatus(message);
+  }
+
+  function leadHuntDelay(state) {
+    const base = Math.max(1500, Number(state.caps?.delayMs || 3500));
+    return base + Math.floor(Math.random() * 900);
+  }
+
+  function currentLeadHuntSearch(state) {
+    return state.searches?.[state.currentSearchIndex || 0] || null;
+  }
+
+  function navigateWithDelay(url, state, reason) {
+    const nextState = { ...state, status: reason, nextActionAt: Date.now() + leadHuntDelay(state) };
+    saveLeadHuntState(nextState);
+    window.setTimeout(() => {
+      const latest = getLeadHuntState();
+      if (latest?.active && !latest.paused) window.location.assign(withLeadHuntStateHash(url, latest));
+    }, Math.max(300, nextState.nextActionAt - Date.now()));
+  }
+
+  function startLeadHunt(config = defaultLeadHuntConfig()) {
+    const searches = buildLeadHuntSearches(config);
+    const state = {
+      active: true,
+      paused: false,
+      currentSearchIndex: 0,
+      currentResultIndex: 0,
+      currentResultUrls: [],
+      importedCount: 0,
+      skippedCount: 0,
+      duplicateCount: 0,
+      resultNumber: 0,
+      caps: config.caps || defaultLeadHuntConfig().caps,
+      searches,
+      seen: getHandledPosts(),
+      errors: [],
+      status: "Lead Hunt starting.",
+    };
+    saveLeadHuntState(state);
+    const first = currentLeadHuntSearch(state);
+    if (first) navigateWithDelay(first.url, state, "Opening first buyer-intent search.");
+  }
+
+  function parseLeadHuntLaunch() {
+    const stateMatch = location.hash.match(/marketvibeLeadHuntState=([^&]+)/);
+    if (stateMatch) {
+      try {
+        const state = JSON.parse(decodeURIComponent(stateMatch[1]));
+        history.replaceState(null, document.title, location.pathname + location.search);
+        saveLeadHuntState(state);
+        return;
+      } catch {
+        showStatus("Lead Hunt state could not be restored on this page.");
+      }
+    }
+
+    const match = location.hash.match(/marketvibeLeadHunt=([^&]+)/);
+    if (!match) return;
+    try {
+      const config = JSON.parse(decodeURIComponent(match[1]));
+      history.replaceState(null, document.title, location.pathname + location.search);
+      startLeadHunt(config);
+    } catch {
+      showStatus("Lead Hunt launch settings could not be read.");
+    }
+  }
+
+  function pauseLeadHunt() {
+    const state = getLeadHuntState();
+    if (state) saveLeadHuntState({ ...state, paused: true, status: "Paused. Resume when ready." });
+  }
+
+  function resumeLeadHunt() {
+    const state = getLeadHuntState();
+    if (state) saveLeadHuntState({ ...state, active: true, paused: false, status: "Resuming Lead Hunt." });
+  }
+
+  function nextLeadHuntSearch(state, reason) {
+    const nextIndex = (state.currentSearchIndex || 0) + 1;
+    if (nextIndex >= (state.searches || []).length || nextIndex >= Number(state.caps?.maxSearches || 10)) {
+      stopLeadHunt(`Lead Hunt complete. Imported ${state.importedCount || 0} lead(s).`);
+      return;
+    }
+    const nextState = {
+      ...state,
+      currentSearchIndex: nextIndex,
+      currentResultIndex: 0,
+      currentResultUrls: [],
+      resultNumber: 0,
+      status: reason,
+    };
+    const search = currentLeadHuntSearch(nextState);
+    if (search) navigateWithDelay(search.url, nextState, `Opening next search: ${search.query}`);
+  }
+
+  function collectIndexedFacebookResultUrls() {
+    const urls = Array.from(document.querySelectorAll("a[href]"))
+      .map((link) => {
+        try {
+          const raw = link.getAttribute("href") || "";
+          const parsed = new URL(raw, location.origin);
+          const redirected = parsed.searchParams.get("q") || parsed.searchParams.get("url") || raw;
+          return normalizeFacebookUrl(redirected);
+        } catch {
+          return "";
+        }
+      })
+      .filter((url) => /https:\/\/(www\.)?facebook\.com\//i.test(url))
+      .filter((url) => !/\/login|\/share|\/plugins|\/privacy|\/help/i.test(url));
+    return Array.from(new Set(urls)).slice(0, 12);
+  }
+
+  function collectAutopilotPosts(state, search) {
+    return getQualifiedNodes(false)
+      .filter((item) => item.score >= 55)
+      .map((item) => ({ item, post: buildPostFromNode(item.node, item.score, { queryUsed: search?.query || "", sourceUsed: search?.source || "" }) }))
+      .filter(({ post }) => {
+        const key = getPostKey(post);
+        return key && !isHandledPostKey(key) && !(state.seen || []).includes(key);
+      })
+      .slice(0, Math.max(0, Number(state.caps?.maxImportedLeads || 10) - Number(state.importedCount || 0)));
+  }
+
+  async function runLeadHuntTick() {
+    const state = getLeadHuntState();
+    if (!state?.active || state.paused) return;
+    if (Date.now() < Number(state.nextActionAt || 0)) return;
+
+    const search = currentLeadHuntSearch(state);
+    if (!search) {
+      stopLeadHunt("Lead Hunt complete. No searches left.");
+      return;
+    }
+    if (Number(state.importedCount || 0) >= Number(state.caps?.maxImportedLeads || 10)) {
+      stopLeadHunt(`Daily import cap reached. Imported ${state.importedCount} lead(s).`);
+      return;
+    }
+
+    try {
+      if (/google\.com|bing\.com/i.test(location.hostname)) {
+        const resultUrls = collectIndexedFacebookResultUrls();
+        if (!resultUrls.length) {
+          nextLeadHuntSearch({ ...state, skippedCount: (state.skippedCount || 0) + 1 }, "No indexed Facebook results found.");
+          return;
+        }
+        const nextState = { ...state, currentResultUrls: resultUrls, currentResultIndex: 0, resultNumber: 1 };
+        navigateWithDelay(resultUrls[0], nextState, `Opening indexed Facebook result 1 of ${resultUrls.length}.`);
+        return;
+      }
+
+      if (/facebook\.com/i.test(location.hostname)) {
+        markFeed();
+        const posts = collectAutopilotPosts(state, search);
+        if (posts.length) {
+          const sentPosts = posts.map(({ post }) => post);
+          const data = await sendPosts(sentPosts, search.query);
+          sentPosts.forEach((post) => {
+            saveRecentImport(post);
+            saveHandledPostKey(getPostKey(post));
+          });
+          const importedCount = Number(state.importedCount || 0) + sentPosts.length;
+          const seen = Array.from(new Set([...(state.seen || []), ...sentPosts.map(getPostKey)]));
+          saveLeadHuntState({
+            ...state,
+            importedCount,
+            seen,
+            status: `Imported ${sentPosts.length} high-intent lead(s). Good: ${data.counts?.good || 0}.`,
+            nextActionAt: Date.now() + leadHuntDelay(state),
+          });
+          if (importedCount >= Number(state.caps?.maxImportedLeads || 10)) {
+            stopLeadHunt(`Daily import cap reached. Imported ${importedCount} lead(s).`);
+          }
+          return;
+        }
+
+        const urls = state.currentResultUrls || [];
+        const nextResultIndex = Number(state.currentResultIndex || 0) + 1;
+        if (urls[nextResultIndex]) {
+          navigateWithDelay(urls[nextResultIndex], { ...state, currentResultIndex: nextResultIndex, resultNumber: nextResultIndex + 1, skippedCount: (state.skippedCount || 0) + 1 }, `No high-intent match here. Opening result ${nextResultIndex + 1}.`);
+          return;
+        }
+        nextLeadHuntSearch({ ...state, skippedCount: (state.skippedCount || 0) + 1 }, "No high-intent match on this result.");
+      }
+    } catch (error) {
+      saveLeadHuntState({
+        ...state,
+        errors: [`${new Date().toLocaleTimeString()} ${error && error.message ? error.message : "Unknown Lead Hunt error"}`, ...(state.errors || [])].slice(0, 8),
+        skippedCount: (state.skippedCount || 0) + 1,
+        status: "Recovered from a blocked, blank, or unavailable page.",
+        nextActionAt: Date.now() + leadHuntDelay(state),
+      });
+    }
+  }
+
+  function renderLeadHuntPanel() {
+    let panel = document.getElementById("marketvibe-lead-hunt-panel");
+    const state = getLeadHuntState();
+    if (!panel) {
+      panel = document.createElement("div");
+      panel.id = "marketvibe-lead-hunt-panel";
+      panel.style.cssText = "position:fixed;left:16px;top:76px;z-index:2147483647;width:min(360px,calc(100vw - 32px));border-radius:16px;background:#07111f;color:white;border:1px solid rgba(16,185,129,.45);box-shadow:0 16px 42px rgba(0,0,0,.34);padding:12px;font:12px Arial,sans-serif;";
+      document.body.appendChild(panel);
+    }
+    const search = state ? currentLeadHuntSearch(state) : null;
+    panel.innerHTML = `
+      <div style="font-weight:900;color:#a7f3d0;margin-bottom:6px;">MarketVibe Lead Hunt</div>
+      <div style="line-height:1.45;color:#e5eef9;margin-bottom:8px;">${state?.status || "Ready. Public/read-only discovery only. No auto-DM or auto-comment."}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;color:#cbd5e1;">
+        <div>Query: ${search?.query || "not started"}</div>
+        <div>Source: ${search?.source || "none"}</div>
+        <div>Result: ${state?.resultNumber || 0}</div>
+        <div>Imported: ${state?.importedCount || 0}</div>
+        <div>Skipped: ${state?.skippedCount || 0}</div>
+        <div>Duplicates: ${state?.duplicateCount || 0}</div>
+      </div>
+    `;
+    const controls = document.createElement("div");
+    controls.style.cssText = "display:flex;gap:7px;flex-wrap:wrap;";
+    const start = document.createElement("button");
+    start.type = "button";
+    start.textContent = "Start Lead Hunt";
+    start.style.cssText = "border:0;border-radius:999px;background:#10b981;color:#03131f;font-weight:900;padding:8px 10px;cursor:pointer;";
+    start.addEventListener("click", () => startLeadHunt(defaultLeadHuntConfig()));
+    const pause = document.createElement("button");
+    pause.type = "button";
+    pause.textContent = state?.paused ? "Resume" : "Pause";
+    pause.style.cssText = "border:1px solid rgba(255,255,255,.2);border-radius:999px;background:rgba(255,255,255,.08);color:white;font-weight:800;padding:8px 10px;cursor:pointer;";
+    pause.addEventListener("click", () => state?.paused ? resumeLeadHunt() : pauseLeadHunt());
+    const stop = document.createElement("button");
+    stop.type = "button";
+    stop.textContent = "Stop";
+    stop.style.cssText = "border:1px solid rgba(251,113,133,.55);border-radius:999px;background:rgba(255,255,255,.08);color:white;font-weight:800;padding:8px 10px;cursor:pointer;";
+    stop.addEventListener("click", () => stopLeadHunt());
+    controls.append(start, pause, stop);
+    panel.appendChild(controls);
   }
 
 
@@ -653,11 +994,11 @@
     window.setTimeout(() => box.remove(), 4500);
   }
 
-  async function sendPosts(posts) {
+  async function sendPosts(posts, searchPhrase = new URLSearchParams(location.search).get("q") || "") {
     const response = await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ posts, searchPhrase: new URLSearchParams(location.search).get("q") || "" }),
+      body: JSON.stringify({ posts, searchPhrase }),
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.json();
@@ -711,8 +1052,11 @@
   button.style.cssText = "position:fixed;right:18px;bottom:24px;z-index:2147483647;border:0;border-radius:999px;background:linear-gradient(90deg,#10b981,#67e8f9);color:#03131f;font:800 14px Arial,sans-serif;padding:13px 17px;box-shadow:0 12px 34px rgba(0,0,0,.32);cursor:pointer;";
   button.addEventListener("click", sendVisible);
   document.body.appendChild(button);
+  parseLeadHuntLaunch();
   renderRecentImports();
   renderQueueControls();
+  renderLeadHuntPanel();
   markFeed();
   setInterval(markFeed, SCAN_INTERVAL_MS);
+  setInterval(runLeadHuntTick, SCAN_INTERVAL_MS);
 })();

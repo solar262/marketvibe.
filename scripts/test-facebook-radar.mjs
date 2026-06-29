@@ -6,8 +6,10 @@ import ts from "typescript";
 const source = fs.readFileSync("src/lib/facebook-radar.ts", "utf8");
 const importSource = fs.readFileSync("src/lib/facebook-radar-import.ts", "utf8");
 const pageSource = fs.readFileSync("src/app/facebook-radar/page.tsx", "utf8");
+const leadHuntPageSource = fs.readFileSync("src/app/lead-hunt-autopilot/page.tsx", "utf8");
 const importedPageSource = fs.readFileSync("src/app/facebook-radar/imported/page.tsx", "utf8");
 const extensionSource = fs.readFileSync("browser-extension/facebook-radar-importer/content.js", "utf8");
+const extensionManifest = fs.readFileSync("browser-extension/facebook-radar-importer/manifest.json", "utf8");
 const transpiled = ts.transpileModule(source, {
   compilerOptions: {
     module: ts.ModuleKind.CommonJS,
@@ -229,6 +231,17 @@ assert.match(pageSource, /setCurrentSearchIndex\(0\)/, "Reset should clear progr
 assert.match(pageSource, /Previous Search/, "Previous Search button should exist");
 assert.match(pageSource, /Open Posts/, "Open Posts primary button should exist");
 
+assert.match(leadHuntPageSource, /Run Lead Hunt/, "Lead Hunt Autopilot should have one main run button");
+assert.match(leadHuntPageSource, /Facebook Search/, "Lead Hunt Autopilot should include Facebook source toggle");
+assert.match(leadHuntPageSource, /Google indexed Facebook results/, "Lead Hunt Autopilot should include Google indexed Facebook source");
+assert.match(leadHuntPageSource, /Bing indexed Facebook results/, "Lead Hunt Autopilot should include Bing indexed Facebook source");
+assert.match(leadHuntPageSource, /Max searches/, "Lead Hunt Autopilot should include max searches cap");
+assert.match(leadHuntPageSource, /Max imported leads/, "Lead Hunt Autopilot should include max imported leads cap");
+assert.match(leadHuntPageSource, /Delay between actions/, "Lead Hunt Autopilot should include delay cap");
+assert.match(leadHuntPageSource, /marketvibeLeadHunt/, "Lead Hunt Autopilot should launch extension mode with encoded settings");
+assert.match(leadHuntPageSource, /Final imported leads/, "Lead Hunt Autopilot should show final imported leads only");
+assert.match(leadHuntPageSource, /No auto-DM, no auto-comment, no private data/, "Lead Hunt Autopilot should show safety guardrails");
+
 assert.match(extensionSource, /function extractPostUrl/, "Facebook importer should extract exact post URLs");
 assert.match(extensionSource, /function cleanLeadText/, "Extension should clean imported lead text");
 assert.match(extensionSource, /function trimRepeatedWords/, "Extension should trim repeated words");
@@ -280,11 +293,30 @@ assert.match(extensionSource, /getRecentImports\(\)\.slice\(0, 3\)/, "Recent imp
 assert.match(extensionSource, /function createReply/, "Cached posts should have a copyable reply");
 assert.match(extensionSource, /MarketVibe helps spot public business signals/, "Copy reply should mention MarketVibe");
 assert.match(extensionSource, /https:\/\/www\.marketvibe1\.com/, "Copy reply should include the MarketVibe URL");
+assert.match(extensionManifest, /www\.google\.com/, "Extension should be allowed to inspect Google result pages");
+assert.match(extensionManifest, /www\.bing\.com/, "Extension should be allowed to inspect Bing result pages");
+assert.match(extensionSource, /LEAD_HUNT_PRESETS/, "Extension should include Lead Hunt query presets");
+assert.match(extensionSource, /function startLeadHunt/, "Extension should include Start Lead Hunt mode");
+assert.match(extensionSource, /function withLeadHuntStateHash/, "Autopilot should preserve queue state while moving across Facebook, Google, and Bing");
+assert.match(extensionSource, /marketvibeLeadHuntState/, "Autopilot should restore cross-domain queue state from URL hash");
+assert.match(extensionSource, /function pauseLeadHunt/, "Extension should include Pause Lead Hunt control");
+assert.match(extensionSource, /function resumeLeadHunt/, "Extension should include Resume Lead Hunt control");
+assert.match(extensionSource, /function stopLeadHunt/, "Extension should include Stop Lead Hunt control");
+assert.match(extensionSource, /function collectIndexedFacebookResultUrls/, "Extension should collect indexed public Facebook result URLs");
+assert.match(extensionSource, /function collectAutopilotPosts/, "Extension should scan visible posts for autopilot");
+assert.match(extensionSource, /item\.score >= 55/, "Autopilot should only import higher-intent matches by default");
+assert.match(extensionSource, /isHandledPostKey/, "Autopilot should skip duplicate or handled posts");
+assert.match(extensionSource, /maxImportedLeads/, "Autopilot should stop at imported lead cap");
+assert.match(extensionSource, /maxSearches/, "Autopilot should stop at search cap");
+assert.match(extensionSource, /No auto-DM or auto-comment/, "Extension panel should show no messaging/commenting safety");
+assert.match(extensionSource, /Recovered from a blocked, blank, or unavailable page/, "Autopilot should recover from blocked or blank pages");
 
 assert.match(importedPageSource, /<strong className="text-white">Group:<\/strong>/, "Imported page should show group name");
 assert.match(importedPageSource, /<strong className="text-white">Author:<\/strong>/, "Imported page should show author name");
 assert.match(importedPageSource, /<strong className="text-white">Post:<\/strong>/, "Imported page should show clean post text");
 assert.match(importedPageSource, /<strong className="text-white">Score:<\/strong>/, "Imported page should show score");
+assert.match(importedPageSource, /card\.queryUsed/, "Imported page should show query used when available");
+assert.match(importedPageSource, /card\.sourceUsed/, "Imported page should show source used when available");
 
 const helperSource = source.toLowerCase();
 assert.equal(helperSource.includes("fetch("), false, "Facebook Radar helper should not scrape or fetch Facebook");

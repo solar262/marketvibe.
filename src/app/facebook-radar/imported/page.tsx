@@ -10,6 +10,9 @@ type ImportCard = {
   author?: string;
   dateText?: string;
   url?: string;
+  queryUsed?: string;
+  sourceUsed?: string;
+  painPoint?: string;
   fitRank: number;
   label: string;
   analysis: {
@@ -98,7 +101,9 @@ export default function ImportedFacebookResultsPage() {
                 <p><strong className="text-white">Timestamp:</strong> {card.dateText || "Not available"}</p>
                 <p><strong className="text-white">Score:</strong> {card.fitRank}</p>
                 <p><strong className="text-white">Intent:</strong> {card.analysis.intent}</p>
-                <p><strong className="text-white">Pain point:</strong> {card.analysis.intent.replace(/-/g, " ")}</p>
+                <p><strong className="text-white">Pain point:</strong> {card.painPoint || card.analysis.intent.replace(/-/g, " ")}</p>
+                {card.queryUsed && <p><strong className="text-white">Query:</strong> {card.queryUsed}</p>}
+                {card.sourceUsed && <p><strong className="text-white">Source:</strong> {card.sourceUsed}</p>}
               </div>
               <p className="mt-4 text-sm leading-6 text-slate-300"><strong className="text-white">Why:</strong> {card.analysis.reason}</p>
               <p className="mt-4 rounded-2xl border border-white/10 bg-slate-950/40 p-4 leading-7 text-slate-100"><strong className="text-white">Post:</strong> {card.text || "Facebook post imported"}</p>

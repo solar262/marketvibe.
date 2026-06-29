@@ -7,12 +7,14 @@
   "host_permissions": [
     "https://www.facebook.com/*",
     "https://m.facebook.com/*",
+    "https://www.google.com/*",
+    "https://www.bing.com/*",
     "https://www.marketvibe1.com/*",
     "https://marketvibe1.com/*"
   ],
   "content_scripts": [
     {
-      "matches": ["https://www.facebook.com/*", "https://m.facebook.com/*"],
+      "matches": ["https://www.facebook.com/*", "https://m.facebook.com/*", "https://www.google.com/*", "https://www.bing.com/*"],
       "js": ["content.js"],
       "run_at": "document_idle"
     }
