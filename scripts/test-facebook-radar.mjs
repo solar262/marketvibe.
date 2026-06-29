@@ -4,6 +4,7 @@ import vm from "node:vm";
 import ts from "typescript";
 
 const source = fs.readFileSync("src/lib/facebook-radar.ts", "utf8");
+const pageSource = fs.readFileSync("src/app/facebook-radar/page.tsx", "utf8");
 const transpiled = ts.transpileModule(source, {
   compilerOptions: {
     module: ts.ModuleKind.CommonJS,
@@ -45,27 +46,15 @@ assert.match(webDesignPhrases, /"cold outreach not working"|"how do i get client
 assert.doesNotMatch(webDesignPhrases, /hiring|remote developer|pay per website|cheap website/i, "Generated searches should avoid obvious hiring intent");
 assert.match(firstWebDesignLink.postsUrl, /^https:\/\/(www|m)\.facebook\.com\/search\/posts\/\?q=/, "Posts URL should use Facebook posts search");
 assert.match(firstWebDesignLink.groupsUrl, /^https:\/\/(www|m)\.facebook\.com\/search\/groups\/\?q=/, "Groups URL should keep Facebook group search");
+assert.ok(firstWebDesignLink.fitScore >= 90, "High-intent searches should rank first");
 
-const sneakerPhrases = phrasesFor({
-  targetBuyer: "sneaker resellers",
-  niche: "sneaker reselling",
-  painKeywords: "no sales, need customers",
+const highIntentPhrases = phrasesFor({
+  targetBuyer: "founders, freelancers, agencies",
+  niche: "customer acquisition",
+  painKeywords: "no leads, no traffic, cold outreach not working",
 });
-assert.match(sneakerPhrases, /"no sales" "sneaker reselling"|"where do i find customers" "sneaker reseller"|"need help getting customers" "selling sneakers"/, "Sneaker reseller input should create sneaker selling/reselling links");
-
-const bookPhrases = phrasesFor({
-  targetBuyer: "book sellers",
-  niche: "book selling",
-  painKeywords: "no sales",
-});
-assert.match(bookPhrases, /"no sales" "book selling"|"where do i find customers" "book seller"|"need help getting customers" "selling books online"/, "Book seller input should create book selling/no sales links");
-
-const roofingPhrases = phrasesFor({
-  targetBuyer: "roofers",
-  niche: "roofing",
-  painKeywords: "need leads",
-});
-assert.match(roofingPhrases, /"how do i get leads" "roofing"|"my business has no leads" "roofer"|"how do i get bookings" "roofing"/, "Roofer input should create roofing lead/search links");
+assert.match(highIntentPhrases, /"no one replies to my outreach"|"cold outreach not working"|"how do i get clients"|"looking for a tool to find leads"/, "Searches should prioritize high-intent buyer pain");
+assert.doesNotMatch(highIntentPhrases, /need clients web design|web design clients|looking for web developer|need web developer|cheap website|hire developer|buy leads|guaranteed leads/i, "Weak or hiring searches should be removed");
 
 const analysis = analyzeFacebookLead({
   postText: "I run a small web design service and cold outreach is not working. How do I get clients without spamming people?",
@@ -116,6 +105,15 @@ const guaranteedLeads = analyzeFacebookLead({
   sourceUrl: "",
 });
 assert.equal(guaranteedLeads.action, "Skip", "Guaranteed lead offer posts should be Skip / bad fit");
+
+assert.match(pageSource, /activeSearchLink = availableSearchLinks/, "One-card workflow state should use one active search card");
+assert.match(pageSource, /function markBadNext/, "Mark Bad / Next workflow should exist");
+assert.match(pageSource, /skipSearch\(link\)/, "Mark Bad should move the current card into skipped searches");
+assert.match(pageSource, /setMode\("analyze"\)/, "Mark Good should switch to Analyze mode");
+assert.match(pageSource, /setPostText\(PASTE_PROMPT\)/, "Mark Good should prefill paste prompt");
+assert.match(pageSource, /setCurrentSearchIndex\(0\)/, "Reset should clear progress to the first search");
+assert.match(pageSource, /Previous Search/, "Previous Search button should exist");
+assert.match(pageSource, /Open Posts/, "Open Posts primary button should exist");
 
 const helperSource = source.toLowerCase();
 assert.equal(helperSource.includes("fetch("), false, "Facebook Radar helper should not scrape or fetch Facebook");

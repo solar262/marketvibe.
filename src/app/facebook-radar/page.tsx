@@ -11,6 +11,7 @@ type ToolMode = "find" | "analyze";
 const DEFAULT_BUYER = "web designers, SEO freelancers, local marketers, small agencies";
 const DEFAULT_NICHE = "web design, SEO, local marketing agencies";
 const DEFAULT_PAIN = "need clients, looking for leads, cold outreach not working, no customers";
+const PASTE_PROMPT = "Paste the Facebook post text here.";
 
 function badgeClasses(value: string) {
   if (value === "High") return "border-emerald-300/30 bg-emerald-300/15 text-emerald-100";
@@ -39,17 +40,19 @@ export default function FacebookRadarPage() {
   const [doneCount, setDoneCount] = useState(0);
   const [skippedCount, setSkippedCount] = useState(0);
   const [resetNotice, setResetNotice] = useState("");
+  const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
 
   const searchLinks = useMemo(() => generateFacebookSearchLinks({ targetBuyer, niche, painKeywords }), [targetBuyer, niche, painKeywords]);
-  const visibleSearchLinks = searchLinks.filter((link) => !searched.includes(link.phrase) && !skippedSearches.includes(link.phrase));
-  const activeSearchLink = visibleSearchLinks[0];
+  const availableSearchLinks = searchLinks.filter((link) => !searched.includes(link.phrase) && !skippedSearches.includes(link.phrase));
+  const activeSearchLink = availableSearchLinks[Math.min(currentSearchIndex, Math.max(availableSearchLinks.length - 1, 0))];
   const selectedReply = useMemo(() => {
     if (!result) return "";
     return replyMode === "deeper" && result.deeperReply ? result.deeperReply : result.quickReply;
   }, [replyMode, result]);
 
   function analyze() {
-    const next = analyzeFacebookLead({ postText, targetBuyer, painKeywords, sourceUrl });
+    const analyzableText = postText.trim() === PASTE_PROMPT ? "" : postText;
+    const next = analyzeFacebookLead({ postText: analyzableText, targetBuyer, painKeywords, sourceUrl });
     setResult(next);
     setReplyMode("quick");
     setCopied(false);
@@ -87,6 +90,7 @@ export default function FacebookRadarPage() {
 
   function skipSearch(link: FacebookRadarSearchLink) {
     setSkippedSearches((current) => current.includes(link.phrase) ? current : [...current, link.phrase]);
+    setSkippedCount((value) => value + 1);
     track("Facebook Radar Skip Search", { phrase: link.phrase });
   }
 
@@ -100,13 +104,14 @@ export default function FacebookRadarPage() {
   function markBadNext(link?: FacebookRadarSearchLink) {
     if (!link) return;
     skipSearch(link);
+    setCurrentSearchIndex((value) => Math.min(value, Math.max(availableSearchLinks.length - 2, 0)));
   }
 
   function markGoodAnalyze(link?: FacebookRadarSearchLink) {
     if (!link) return;
     markSearch(link);
     setSourceUrl(link.postsUrl);
-    setPostText("");
+    setPostText(PASTE_PROMPT);
     setResult(null);
     setReplyMode("quick");
     setMode("analyze");
@@ -121,6 +126,7 @@ export default function FacebookRadarPage() {
     setCopied(false);
     setResult(null);
     setReplyMode("quick");
+    setCurrentSearchIndex(0);
   }
 
   function resetSearches() {
@@ -153,6 +159,14 @@ export default function FacebookRadarPage() {
     track("Facebook Radar Skip", { score: result?.score || "none" });
     setResult(null);
     setReplyMode("quick");
+  }
+
+  function nextSearch() {
+    setCurrentSearchIndex((value) => Math.min(value + 1, Math.max(availableSearchLinks.length - 1, 0)));
+  }
+
+  function previousSearch() {
+    setCurrentSearchIndex((value) => Math.max(value - 1, 0));
   }
 
   return (
@@ -198,15 +212,15 @@ export default function FacebookRadarPage() {
             <div className="grid gap-3 md:grid-cols-3">
               <label className="grid gap-2 text-sm font-semibold text-slate-200">
                 Target buyer
-                <input value={targetBuyer} onChange={(event) => setTargetBuyer(event.target.value)} className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/40" />
+                <textarea value={targetBuyer} onChange={(event) => setTargetBuyer(event.target.value)} rows={2} className="min-h-20 rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/40" />
               </label>
               <label className="grid gap-2 text-sm font-semibold text-slate-200">
                 Niche
-                <input value={niche} onChange={(event) => setNiche(event.target.value)} className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/40" />
+                <textarea value={niche} onChange={(event) => setNiche(event.target.value)} rows={2} className="min-h-20 rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/40" />
               </label>
               <label className="grid gap-2 text-sm font-semibold text-slate-200">
                 Pain keywords
-                <input value={painKeywords} onChange={(event) => setPainKeywords(event.target.value)} className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/40" />
+                <textarea value={painKeywords} onChange={(event) => setPainKeywords(event.target.value)} rows={2} className="min-h-20 rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/40" />
               </label>
             </div>
 
@@ -236,11 +250,11 @@ export default function FacebookRadarPage() {
             <p className="mt-2 text-2xl font-semibold text-white">{mode === "find" ? "Find" : "Analyze"}</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 text-center">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Done</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{mode === "find" ? "Good" : "Done"}</p>
             <p className="mt-2 text-2xl font-semibold text-emerald-300">{mode === "find" ? searched.length : doneCount}</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 text-center">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Skipped</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Bad / Skipped</p>
             <p className="mt-2 text-2xl font-semibold text-amber-200">{mode === "find" ? skippedSearches.length : skippedCount}</p>
           </div>
         </div>
@@ -305,11 +319,16 @@ export default function FacebookRadarPage() {
                       <CheckCircle2 className="mr-2 inline h-5 w-5" />Mark Good / Analyze
                     </button>
                   </div>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    <button onClick={() => copyText(link.phrase, "Facebook Radar Copy Search Phrase")} className="rounded-full border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold text-white hover:bg-white/15">
-                      <Copy className="mr-2 inline h-4 w-4" />Copy exact search
+                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                    <button onClick={previousSearch} disabled={currentSearchIndex <= 0} className="rounded-full border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold text-white hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50">
+                      Previous Search
                     </button>
-                    <button onClick={() => markSearch(link)} className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-4 py-3 text-sm font-semibold text-emerald-100 hover:bg-emerald-300/15"><CheckCircle2 className="mr-2 inline h-4 w-4" />Mark searched</button>
+                    <button onClick={nextSearch} disabled={currentSearchIndex >= availableSearchLinks.length - 1} className="rounded-full border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold text-white hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50">
+                      Next Search
+                    </button>
+                    <button onClick={() => copyText(link.phrase, "Facebook Radar Copy Search Phrase")} className="rounded-full border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold text-white hover:bg-white/15">
+                      <Copy className="mr-2 inline h-4 w-4" />Copy Search
+                    </button>
                   </div>
                   <p className="mt-2 text-xs font-semibold text-slate-400">Use Posts first to find conversations. Use Groups only to find places to join.</p>
                 </div>
@@ -325,15 +344,15 @@ export default function FacebookRadarPage() {
         ) : result ? (
           <article className="rounded-[2rem] border border-white/10 bg-white/[0.06] p-5 shadow-2xl shadow-black/20">
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${badgeClasses(result.score)}`}>{result.score} opportunity</span>
+              <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${badgeClasses(result.score)}`}>MarketVibe fit: {result.score}</span>
               <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${riskClasses(result.risk)}`}>{result.risk} risk</span>
               <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-semibold text-slate-100">{result.action}</span>
               <span className="rounded-full border border-white/10 bg-slate-950/45 px-3 py-1 text-xs font-semibold text-slate-200">{result.intent}</span>
             </div>
-            <p className="mt-5 text-sm leading-6 text-slate-300"><strong className="text-slate-100">Why this post:</strong> {result.reason}</p>
+            <p className="mt-5 text-sm leading-6 text-slate-300"><strong className="text-slate-100">Why this is/isn&apos;t worth replying:</strong> {result.reason}</p>
             <div className="mt-5 rounded-3xl border border-cyan-300/20 bg-cyan-300/10 p-5">
               <div className="flex items-center gap-2 text-sm font-semibold text-cyan-100">
-                <ShieldCheck className="h-4 w-4" /> Reply to paste
+                <ShieldCheck className="h-4 w-4" /> {replyMode === "quick" ? "Quick Reply" : "Deeper Reply"}
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 {(["quick", "deeper"] as ReplyMode[]).map((replyOption) => (

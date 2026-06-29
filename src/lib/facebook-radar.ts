@@ -43,6 +43,7 @@ const BAD_PATTERN = /\b(hiring|looking for web developer|need a web developer|we
 const PRIVATE_GROUP_PATTERN = /\b(private group|members only|screenshot from a private group|do not share|confidential)\b/i;
 const SEARCH_SKIP_SIGNALS = ["hiring", "jobs", "cheap web developer", "pay per website", "people selling leads", "spam offers", "DM me", "guaranteed clients"];
 const SEARCH_GOOD_SIGNALS = ["questions", "advice requests", "business owner pain", "no sales/no leads/no traffic", "outreach failure", "marketing confusion"];
+const WEAK_SEARCH_PATTERN = /\b(need clients web design|web design clients|looking for web developer|need web developer|cheap website|hire developer|buy leads|guaranteed leads|looking for leads small business|how do i sell websites)\b/i;
 
 function cleanText(value: string) {
   return value.replace(/\s+/g, " ").trim().slice(0, 1400);
@@ -86,15 +87,6 @@ function nicheVariants(value: string) {
   if (/\bshopify|ecommerce|online store|store\b/.test(text)) {
     ["Shopify", "ecommerce", "online store", "product page"].forEach(add);
   }
-  if (/\bsneaker|sneakers|shoe|reseller|reselling\b/.test(text)) {
-    ["sneaker reselling", "sneaker reseller", "selling sneakers", "reselling shoes"].forEach(add);
-  }
-  if (/\bbook|books|bookstore|author\b/.test(text)) {
-    ["book selling", "book seller", "selling books online", "used books"].forEach(add);
-  }
-  if (/\broof|roofer|roofing\b/.test(text)) {
-    ["roofing leads", "roof repair", "roofing quote", "roofer"].forEach(add);
-  }
   if (/\blocal business|local businesses\b/.test(text)) {
     ["local businesses", "local business leads", "service business"].forEach(add);
   }
@@ -126,9 +118,9 @@ function marketVibeSearchScore(phrase: string) {
   if (/\b(how do i get clients|where do i find customers|how do i get leads|looking for a tool to find leads)\b/.test(text)) score += 38;
   if (/\b(no traffic|no sales|no leads|not converting|store not converting|website gets no traffic)\b/.test(text)) score += 45;
   if (/\b(launched my business|don't know how to market|dont know how to market|how do i market|need help getting customers)\b/.test(text)) score += 30;
-  if (/\b(bookings|appointments|service business|small business|agency|web design|seo|shopify)\b/.test(text)) score += 8;
-  if (/\b(need clients web design|web design clients|how do i sell websites|looking for leads small business)\b/.test(text)) score -= 35;
-  if (BAD_PATTERN.test(text)) score -= 70;
+  if (/\b(bookings|appointments|service business|small business|agency|freelancer|founder|web design|seo|shopify)\b/.test(text)) score += 8;
+  if (WEAK_SEARCH_PATTERN.test(text)) score -= 80;
+  if (BAD_PATTERN.test(text)) score -= 90;
   return Math.max(0, Math.min(100, score));
 }
 
@@ -136,29 +128,30 @@ export function generateFacebookSearchLinks(input: FacebookRadarSearchInput): Fa
   const painTerms = splitTerms(input.painKeywords);
   const niches = nicheVariants([input.targetBuyer, input.niche, input.painKeywords].join(" "));
   const precisePains = [
-    "cold outreach not working",
     "no one replies to my outreach",
-    "prospecting is not working",
+    "cold outreach not working",
     "how do I get clients",
     "where do I find customers",
     "my website gets no traffic",
     "my business has no leads",
     "how do I get leads",
-    "how do I market my small business",
-    "launched my business don't know how to market",
     "need help getting customers",
-    "looking for a tool to find leads",
-    "outreach not working",
-    "how do I get bookings",
-    "how do I get appointments",
+    "launched my business don't know how to market",
     "my Shopify store has no sales",
     "store not converting",
+    "looking for a tool to find leads",
+    "prospecting is not working",
+    "how do I get bookings",
+    "outreach not working",
+    "how do I get appointments",
   ];
   const phrases = new Set<string>();
   const add = (phrase: string) => {
     const cleaned = cleanText(phrase).toLowerCase();
-    if (cleaned && !BAD_PATTERN.test(cleaned)) phrases.add(cleaned);
+    if (cleaned && !BAD_PATTERN.test(cleaned) && !WEAK_SEARCH_PATTERN.test(cleaned)) phrases.add(cleaned);
   };
+
+  precisePains.forEach((pain) => add(`"${pain}"`));
 
   if (/\bweb design|website|web designer\b/i.test(`${input.targetBuyer} ${input.niche}`)) {
     [
@@ -175,15 +168,6 @@ export function generateFacebookSearchLinks(input: FacebookRadarSearchInput): Fa
       addQuotedNiche("how do I get leads", "SEO"),
     ].forEach(add);
   }
-  if (/\bsneaker|resell|shoe\b/i.test(`${input.targetBuyer} ${input.niche}`)) {
-    [addQuotedNiche("no sales", "sneaker reselling"), addQuotedNiche("where do I find customers", "sneaker reseller"), addQuotedNiche("need help getting customers", "selling sneakers")].forEach(add);
-  }
-  if (/\bbook|bookstore|author\b/i.test(`${input.targetBuyer} ${input.niche}`)) {
-    [addQuotedNiche("no sales", "book selling"), addQuotedNiche("where do I find customers", "book seller"), addQuotedNiche("need help getting customers", "selling books online")].forEach(add);
-  }
-  if (/\broof|roofer|roofing\b/i.test(`${input.targetBuyer} ${input.niche}`)) {
-    [addQuotedNiche("how do I get leads", "roofing"), addQuotedNiche("my business has no leads", "roofer"), addQuotedNiche("how do I get bookings", "roofing")].forEach(add);
-  }
   if (/\bagency|local marketing|small agency\b/i.test(`${input.targetBuyer} ${input.niche}`)) {
     [addQuotedNiche("cold outreach not working", "agency"), addQuotedNiche("how do I get clients", "local marketing"), addQuotedNiche("no one replies to my outreach", "small agency")].forEach(add);
   }
@@ -194,8 +178,6 @@ export function generateFacebookSearchLinks(input: FacebookRadarSearchInput): Fa
       add(addQuotedNiche(pain, niche));
     }
   }
-
-  precisePains.slice(0, 10).forEach((pain) => add(`"${pain}"`));
 
   return Array.from(phrases)
     .map((phrase) => ({
