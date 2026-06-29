@@ -38,6 +38,7 @@ export default function FacebookRadarPage() {
   const [skippedSearches, setSkippedSearches] = useState<string[]>([]);
   const [doneCount, setDoneCount] = useState(0);
   const [skippedCount, setSkippedCount] = useState(0);
+  const [resetNotice, setResetNotice] = useState("");
 
   const searchLinks = useMemo(() => generateFacebookSearchLinks({ targetBuyer, niche, painKeywords }), [targetBuyer, niche, painKeywords]);
   const visibleSearchLinks = searchLinks.filter((link) => !searched.includes(link.phrase) && !skippedSearches.includes(link.phrase));
@@ -88,10 +89,31 @@ export default function FacebookRadarPage() {
     track("Facebook Radar Skip Search", { phrase: link.phrase });
   }
 
-  function resetSearches() {
+  function clearWorkflowState() {
     setSearched([]);
     setSkippedSearches([]);
+    setDoneCount(0);
+    setSkippedCount(0);
+    setCopied(false);
+    setResult(null);
+    setReplyMode("quick");
+  }
+
+  function resetSearches() {
+    clearWorkflowState();
+    setResetNotice("Search queue reset.");
     track("Facebook Radar Reset Searches", {});
+  }
+
+  function resetToDefaults() {
+    clearWorkflowState();
+    setTargetBuyer(DEFAULT_BUYER);
+    setNiche(DEFAULT_NICHE);
+    setPainKeywords(DEFAULT_PAIN);
+    setPostText("");
+    setSourceUrl("");
+    setResetNotice("Search queue reset.");
+    track("Facebook Radar Reset Defaults", {});
   }
 
   function markDone() {
@@ -203,8 +225,16 @@ export default function FacebookRadarPage() {
                 <p className="text-sm font-semibold text-emerald-300">Search queue</p>
                 <h2 className="mt-1 text-2xl font-semibold text-white">Facebook post and group searches</h2>
               </div>
-              <button onClick={resetSearches} className="rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">Reset</button>
+              <div className="flex flex-wrap gap-2">
+                <button onClick={resetSearches} className="rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">Reset</button>
+                <button onClick={resetToDefaults} className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-2 text-sm font-semibold text-cyan-100 hover:bg-cyan-300/15">Reset to defaults</button>
+              </div>
             </div>
+            {resetNotice && (
+              <p className="mt-4 rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-3 text-sm font-semibold text-emerald-100">
+                {resetNotice}
+              </p>
+            )}
             <div className="mt-5 grid gap-3">
               {visibleSearchLinks.map((link) => (
                 <div key={link.phrase} className="rounded-3xl border border-white/10 bg-slate-950/35 p-4">
