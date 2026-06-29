@@ -7,37 +7,44 @@
   }
 
   const STRONG_BUYER_SIGNALS = [
-    /need more clients?/i,
-    /looking for clients?/i,
     /how do i get clients?/i,
+    /where do i find customers?/i,
+    /how do i get leads?/i,
+    /need help getting customers/i,
+    /looking for (?:a )?tool to find leads/i,
     /cold outreach.*not working/i,
     /no one replies/i,
-    /need leads/i,
-    /looking for leads/i,
-    /how to find customers/i,
-    /need customers/i,
+    /prospecting.*not working/i,
+    /my website gets no traffic/i,
+    /my business has no leads/i,
+    /my shopify store has no sales/i,
+    /store not converting/i,
+    /launched my business.*(?:don't|dont|do not).*market/i,
     /first few clients/i,
     /client acquisition/i,
     /lead generation help/i,
-    /how do i grow/i,
-    /seo help/i,
-    /website help/i,
-    /shopify help/i,
-    /marketing help/i,
-    /how do i scale/i,
     /struggling to get/i,
-    /i hate cold emails/i,
+    /how do i get bookings/i,
+  ];
+
+  const SUPPORTING_BUYER_SIGNALS = [
     /any advice/i,
     /would love advice/i,
     /can someone help/i,
     /what should i do/i,
     /where do i find/i,
+    /i hate cold emails/i,
   ];
 
   const HARD_SKIP_SIGNALS = [
     /hiring/i,
     /job/i,
     /roles? open/i,
+    /looking for (?:a )?(?:web )?developer/i,
+    /need (?:a )?(?:web )?developer/i,
+    /cheap website/i,
+    /pay per website/i,
+    /\$ ?50 per website/i,
     /commission only/i,
     /commission based/i,
     /setter/i,
@@ -57,6 +64,9 @@
     /100% targeted/i,
     /dm me/i,
     /guaranteed leads/i,
+    /guaranteed clients/i,
+    /buy leads/i,
+    /sell leads/i,
     /pay per lead/i,
     /for hire/i,
     /book a call/i,
@@ -66,6 +76,7 @@
     /fiverr/i,
     /crypto/i,
     /forex/i,
+    /group directory/i,
   ];
 
   const SELLER_PHRASES = [
@@ -83,45 +94,77 @@
 
   function scorePost(text) {
     let score = 0;
-    for (const pattern of HARD_SKIP_SIGNALS) if (pattern.test(text)) return -999;
-    for (const pattern of STRONG_BUYER_SIGNALS) if (pattern.test(text)) score += 25;
-    for (const pattern of SELLER_PHRASES) if (pattern.test(text)) score -= 35;
-    if (/\?/.test(text)) score += 10;
+    let strongMatches = 0;
+
+    for (const pattern of HARD_SKIP_SIGNALS) {
+      if (pattern.test(text)) return -999;
+    }
+
+    for (const pattern of STRONG_BUYER_SIGNALS) {
+      if (pattern.test(text)) {
+        score += 25;
+        strongMatches += 1;
+      }
+    }
+
+    for (const pattern of SUPPORTING_BUYER_SIGNALS) {
+      if (pattern.test(text)) score += 8;
+    }
+
+    for (const pattern of SELLER_PHRASES) {
+      if (pattern.test(text)) score -= 35;
+    }
+
+    if (/\?/.test(text)) score += 8;
     if (/\b(i|my|we|our)\b/i.test(text) && /\b(struggling|stuck|need|looking|can't|cannot|no|help|advice)\b/i.test(text)) score += 15;
+    if (!strongMatches) score -= 28;
     if (text.length < 80) score -= 20;
+
     return score;
   }
 
-  function getBestPostUrl(node) {
-    const links = Array.from(node.querySelectorAll('a[href]'));
-    const candidates = links
-      .map((a) => {
-        const raw = a.getAttribute("href") || "";
-        let url;
-        try {
-          url = new URL(raw, location.origin);
-        } catch {
-          return null;
-        }
+  function isExactPostUrl(url) {
+    const href = clean(url);
+    if (!href) return false;
+    return /\/posts\/\d+/i.test(href) ||
+      /\/groups\/[^/?#]+\/posts\/\d+/i.test(href) ||
+      /\/groups\/[^/?#]+\/permalink\/\d+/i.test(href) ||
+      /story_fbid=\d+/i.test(href) ||
+      /\/permalink\/\d+/i.test(href);
+  }
 
-        const href = url.toString();
-        let score = 0;
-        if (href.includes("/posts/")) score += 100;
-        if (href.includes("/permalink/")) score += 95;
-        if (href.includes("story_fbid")) score += 90;
-        if (href.includes("comment_id=")) score += 80;
-        if (href.includes("/photo") || href.includes("fbid=")) score += 65;
-        if (href.match(/facebook\.com\/groups\/[^/]+\/?$/i)) score -= 200;
-        if (href.includes("/groups/") && !href.includes("/posts/") && !href.includes("comment_id=") && !href.includes("permalink")) score -= 100;
-        if (href.includes("/profile.php") || href.includes("/people/") || href.includes("/groups/")) score -= 10;
+  function isGenericFacebookUrl(url) {
+    try {
+      const parsed = new URL(url, location.origin);
+      const path = parsed.pathname.replace(/\/+$/g, "");
+      return /^\/groups\/[^/]+$/i.test(path) ||
+        /^\/pages\/[^/]+$/i.test(path) ||
+        /^\/profile\.php$/i.test(path) && !parsed.searchParams.get("story_fbid");
+    } catch {
+      return true;
+    }
+  }
 
-        return { href, score };
-      })
-      .filter(Boolean)
-      .sort((a, b) => b.score - a.score);
+  function normalizeFacebookUrl(rawUrl) {
+    try {
+      const url = new URL(rawUrl, location.origin);
+      ["__cft__", "__tn__", "comment_id", "reply_comment_id", "mibextid", "refid"].forEach((key) => url.searchParams.delete(key));
+      return url.toString();
+    } catch {
+      return location.href;
+    }
+  }
 
-    const best = candidates.find((item) => item.score > 0);
-    return best ? best.href : location.href;
+  function extractPostUrl(node) {
+    const links = Array.from(node.querySelectorAll("a[href]"))
+      .map((link) => normalizeFacebookUrl(link.getAttribute("href")))
+      .filter((url) => url.includes("facebook.com") || url.startsWith(location.origin));
+
+    const exact = links.find((url) => isExactPostUrl(url));
+    if (exact) return exact;
+
+    const nonGeneric = links.find((url) => !isGenericFacebookUrl(url) && !/\/groups\/?$|\/pages\/?$/i.test(url));
+    return nonGeneric || location.href;
   }
 
   function markFeed() {
@@ -166,7 +209,7 @@
         dateText: "",
         reactions: "",
         comments: "",
-        url: getBestPostUrl(node),
+        url: extractPostUrl(node),
       });
       if (posts.length >= 10) break;
     }

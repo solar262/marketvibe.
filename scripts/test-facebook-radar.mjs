@@ -5,6 +5,7 @@ import ts from "typescript";
 
 const source = fs.readFileSync("src/lib/facebook-radar.ts", "utf8");
 const pageSource = fs.readFileSync("src/app/facebook-radar/page.tsx", "utf8");
+const extensionSource = fs.readFileSync("browser-extension/facebook-radar-importer/content.js", "utf8");
 const transpiled = ts.transpileModule(source, {
   compilerOptions: {
     module: ts.ModuleKind.CommonJS,
@@ -114,6 +115,22 @@ assert.match(pageSource, /setPostText\(PASTE_PROMPT\)/, "Mark Good should prefil
 assert.match(pageSource, /setCurrentSearchIndex\(0\)/, "Reset should clear progress to the first search");
 assert.match(pageSource, /Previous Search/, "Previous Search button should exist");
 assert.match(pageSource, /Open Posts/, "Open Posts primary button should exist");
+
+assert.match(extensionSource, /function extractPostUrl/, "Facebook importer should extract exact post URLs");
+assert.match(extensionSource, /function isExactPostUrl/, "Facebook importer should detect exact post URLs");
+assert.match(extensionSource, /story_fbid/, "Facebook importer should preserve story_fbid post links");
+assert.ok(extensionSource.includes("/\\/groups\\/[^/?#]+\\/posts\\/\\d+/i"), "Facebook importer should support exact group post links");
+assert.ok(extensionSource.includes("/\\/groups\\/[^/?#]+\\/permalink\\/\\d+/i"), "Facebook importer should support exact group permalink links");
+assert.match(extensionSource, /function isGenericFacebookUrl/, "Facebook importer should reject generic source URLs");
+assert.ok(extensionSource.includes("/^\\/groups\\/[^/]+$/i"), "Facebook importer should reject bare group URLs");
+assert.ok(extensionSource.includes("/^\\/pages\\/[^/]+$/i"), "Facebook importer should reject bare page URLs");
+assert.doesNotMatch(extensionSource, /querySelector\('a\[href\*="\/posts\/"\], a\[href\*="\/groups\/"\]/, "Facebook importer should not use broad group links as source URLs");
+assert.match(extensionSource, /cold outreach\.\*not working/, "Facebook importer should highlight outreach pain");
+assert.match(extensionSource, /my website gets no traffic/, "Facebook importer should highlight traffic pain");
+assert.match(extensionSource, /looking for \(\?:a \)\?tool to find leads/, "Facebook importer should highlight tool-buying intent");
+assert.match(extensionSource, /cheap website/, "Facebook importer should reject cheap-work posts");
+assert.match(extensionSource, /guaranteed clients/, "Facebook importer should reject guaranteed-client spam");
+assert.match(extensionSource, /group directory/, "Facebook importer should reject directory noise");
 
 const helperSource = source.toLowerCase();
 assert.equal(helperSource.includes("fetch("), false, "Facebook Radar helper should not scrape or fetch Facebook");

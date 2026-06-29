@@ -41,7 +41,17 @@ export default function ImportedFacebookResultsPage() {
   }
 
   useEffect(() => {
-    void load();
+    let ignore = false;
+
+    void fetch("/api/facebook-radar/import", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((nextData: ImportResponse) => {
+        if (!ignore) setData(nextData);
+      });
+
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   async function copy(value: string) {
