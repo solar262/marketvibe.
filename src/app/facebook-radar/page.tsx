@@ -238,8 +238,26 @@ export default function FacebookRadarPage() {
             <div className="mt-5 grid gap-3">
               {visibleSearchLinks.map((link) => (
                 <div key={link.phrase} className="rounded-3xl border border-white/10 bg-slate-950/35 p-4">
-                  <p className="break-words text-lg font-semibold text-white">{link.phrase}</p>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <p className="min-w-0 break-words text-lg font-semibold text-white">{link.phrase}</p>
+                    <span className="rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1 text-xs font-bold text-emerald-100">
+                      MarketVibe fit {link.fitScore}/100
+                    </span>
+                  </div>
                   <p className="mt-2 text-sm leading-6 text-slate-300">{link.reason}</p>
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <div className="rounded-2xl border border-emerald-300/15 bg-emerald-300/10 p-3">
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-200">Good if results contain</p>
+                      <p className="mt-2 text-sm leading-6 text-emerald-50">{link.goodSignals.join(", ")}</p>
+                    </div>
+                    <div className="rounded-2xl border border-amber-300/15 bg-amber-300/10 p-3">
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-200">Skip if results contain</p>
+                      <p className="mt-2 text-sm leading-6 text-amber-50">{link.skipSignals.join(", ")}</p>
+                    </div>
+                  </div>
+                  <p className="mt-3 rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-2 text-sm font-semibold text-slate-200">
+                    Bad results? Try next search. If the first screen is mostly jobs, spam, or offers, mark searched/skip and move on.
+                  </p>
                   <div className="mt-4 grid gap-2 sm:grid-cols-5">
                     <a href={link.postsUrl} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-4 py-3 text-sm font-bold text-slate-950 hover:bg-slate-100 sm:col-span-2">
                       <ExternalLink className="h-4 w-4" /> Posts
@@ -248,7 +266,7 @@ export default function FacebookRadarPage() {
                       <ExternalLink className="h-4 w-4" /> Groups
                     </a>
                     <button onClick={() => copyText(link.phrase, "Facebook Radar Copy Search Phrase")} className="rounded-full border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold text-white hover:bg-white/15">
-                      <Copy className="mr-2 inline h-4 w-4" />Copy
+                      <Copy className="mr-2 inline h-4 w-4" />Copy exact search
                     </button>
                   </div>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
