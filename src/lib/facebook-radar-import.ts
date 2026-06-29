@@ -68,21 +68,26 @@ function dedupeRepeatedWords(text: string) {
   return output.join(" ");
 }
 
-function cleanImportedText(value: unknown, limit = 900) {
-  let text = clean(value, 3000)
-    .replace(/\bFacebook\b(?:\s+\bFacebook\b)+/gi, " ")
-    .replace(/\b(Search results|Filters|Most relevant|Top comments|Write a comment|Add a comment|View more comments|See more|See less)\b/gi, " ")
+function stripFacebookSpam(value: unknown, limit = 900) {
+  return dedupeRepeatedWords(clean(value, 3000)
+    .replace(/(?:Facebook){2,}/gi, " ")
+    .replace(/\bFacebook\b(?:\s*\bFacebook\b)+/gi, " ")
+    .replace(/\b(Home|Watch|Marketplace|Groups|Gaming|Notifications|Menu|Search|Filters|All|People|Reels|Pages|Events)\b/gi, " ")
+    .replace(/\b(Search results|Most relevant|Top comments|Write a comment|Add a comment|View more comments|See more|See less)\b/gi, " ")
     .replace(/\b(Like|Comment|Share|Send|Follow|Join)\b\s*/gi, " ")
     .replace(/\b\d+\s*(likes?|comments?|shares?)\b/gi, " ")
     .replace(/\s+/g, " ")
-    .trim();
+    .trim()).slice(0, limit);
+}
 
-  text = dedupeRepeatedWords(text);
+function cleanImportedText(value: unknown, limit = 900) {
+  let text = stripFacebookSpam(value, 3000);
 
   const usefulStart = text.search(/\b(hi|hello|hey|question|quick question|how do|i need|i want|i have|i built|i launched|i'm|im|my|we|one of|most early|recently|looking|cold|no leads|no sales|no traffic)\b/i);
   if (usefulStart > 0 && usefulStart < 450) text = text.slice(usefulStart);
 
-  return clean(text, limit);
+  const cleaned = clean(text, limit);
+  return cleaned && !/^facebook$/i.test(cleaned) ? cleaned : "Facebook post imported";
 }
 
 function rankFromScore(score: FacebookRadarResult["score"], action: FacebookRadarResult["action"], risk: FacebookRadarResult["risk"]) {
@@ -113,7 +118,7 @@ export function scoreImportedFacebookPosts(input: {
   return (input.posts || [])
     .map((post, index): ScoredFacebookPost | null => {
       const text = cleanImportedText(post.text);
-      if (!text || text.length < 20) return null;
+      if (!text || text.length < 20 || text === "Facebook post imported") return null;
       const signature = text.toLowerCase().slice(0, 180);
       if (seen.has(signature)) return null;
       seen.add(signature);
@@ -130,9 +135,9 @@ export function scoreImportedFacebookPosts(input: {
       return {
         id: `${Date.now()}-${index}`,
         text,
-        sourceName: clean(post.sourceName, 160),
-        author: clean(post.author, 120),
-        dateText: clean(post.dateText, 80),
+        sourceName: stripFacebookSpam(post.sourceName, 160) || "Facebook source",
+        author: stripFacebookSpam(post.author, 120) || "Unknown author",
+        dateText: stripFacebookSpam(post.dateText, 80),
         reactions: clean(post.reactions, 40),
         comments: clean(post.comments, 40),
         url: sourceUrl,

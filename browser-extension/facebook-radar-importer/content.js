@@ -10,10 +10,85 @@
     return String(value || "").replace(/\s+/g, " ").trim();
   }
 
+  function trimRepeatedWords(text) {
+    const words = clean(text).split(" ");
+    const output = [];
+    let previous = "";
+    let repeatCount = 0;
+
+    for (const word of words) {
+      const normalized = word.toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (!normalized) continue;
+      if (normalized === previous) {
+        repeatCount += 1;
+        if (repeatCount <= 1 && normalized !== "facebook") output.push(word);
+        continue;
+      }
+      previous = normalized;
+      repeatCount = 0;
+      if (normalized === "facebook") continue;
+      output.push(word);
+    }
+
+    return output.join(" ").replace(/\bFacebook\b(?:\s*\bFacebook\b)+/gi, " ").replace(/\s+/g, " ").trim();
+  }
+
+  function isVisibleElement(element) {
+    const style = window.getComputedStyle(element);
+    const rect = element.getBoundingClientRect();
+    return style.display !== "none" && style.visibility !== "hidden" && Number(style.opacity || "1") !== 0 && rect.width > 0 && rect.height > 0;
+  }
+
+  function cleanLeadText(value, limit = 700) {
+    let text = trimRepeatedWords(value)
+      .replace(/(?:Facebook){2,}/gi, " ")
+      .replace(/\b(Home|Watch|Marketplace|Groups|Gaming|Notifications|Menu|Search|Filters|All|People|Reels|Pages|Events)\b/gi, " ")
+      .replace(/\b(Like|Comment|Share|Send|Follow|Join|Write a comment|Add a comment|View more comments|See more|See less)\b/gi, " ")
+      .replace(/\b\d+\s*(likes?|comments?|shares?)\b/gi, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const usefulStart = text.search(/\b(most|how|i need|i want|i have|i own|my|we|our|looking|need|no leads|no sales|no traffic|client|customer|website|seo|ads|marketing|ecommerce|business)\b/i);
+    if (usefulStart > 0 && usefulStart < 360) text = text.slice(usefulStart);
+    return clean(text).slice(0, limit);
+  }
+
   function getPostText(node) {
     const clone = node.cloneNode(true);
-    clone.querySelectorAll(".marketvibe-intent-badge, .marketvibe-card-actions").forEach((item) => item.remove());
-    return clean(clone.innerText).slice(0, 2200);
+    clone.querySelectorAll(".marketvibe-intent-badge, .marketvibe-card-actions, [aria-hidden='true'], [role='navigation'], [role='banner'], [role='button']").forEach((item) => item.remove());
+    const candidates = Array.from(clone.querySelectorAll("[data-ad-preview='message'], [dir='auto'], span, div"))
+      .map((item) => cleanLeadText(item.textContent || "", 900))
+      .filter((text) => text.length >= 30 && !/^facebook$/i.test(text))
+      .sort((a, b) => b.length - a.length);
+    return candidates[0] || cleanLeadText(clone.textContent || "", 900) || "Facebook post imported";
+  }
+
+  function getBestVisibleText(node, selectors, fallback = "") {
+    for (const selector of selectors) {
+      const items = Array.from(node.querySelectorAll(selector));
+      for (const item of items) {
+        if (item instanceof HTMLElement && !isVisibleElement(item)) continue;
+        const text = cleanLeadText(item.textContent || item.getAttribute("aria-label") || "", 120);
+        if (text && text.length <= 120 && !/^facebook$/i.test(text)) return text;
+      }
+    }
+    return fallback;
+  }
+
+  function extractGroupName() {
+    return cleanLeadText(document.title.replace(/\| Facebook$/i, ""), 120) || "Facebook source";
+  }
+
+  function extractAuthorName(node) {
+    return getBestVisibleText(node, ["h2 strong a", "h3 strong a", "strong a[role='link']", "h2 a[role='link']", "h3 a[role='link']", "a[role='link']"], "Unknown author");
+  }
+
+  function extractTimestamp(node) {
+    const abbr = node.querySelector("abbr");
+    if (abbr) return clean(abbr.getAttribute("aria-label") || abbr.textContent || "", 80);
+    const timeLink = Array.from(node.querySelectorAll("a[role='link'], span"))
+      .map((item) => clean(item.getAttribute("aria-label") || item.textContent || "", 80))
+      .find((text) => /\b(\d+\s*(m|h|d|w)|just now|yesterday|mon|tue|wed|thu|fri|sat|sun)\b/i.test(text));
+    return timeLink || "";
   }
 
   const STRONG_BUYER_SIGNALS = [
@@ -194,9 +269,9 @@
     return {
       text,
       score,
-      sourceName: clean(document.title.replace(/\| Facebook$/i, "")),
-      author: text.split(" ").slice(0, 8).join(" "),
-      dateText: "",
+      sourceName: extractGroupName(),
+      author: extractAuthorName(node),
+      dateText: extractTimestamp(node),
       reactions: "",
       comments: "",
       url: extractPostUrl(node),
@@ -223,6 +298,8 @@
       score: post.score,
       url: post.url,
       sourceName: post.sourceName,
+      author: post.author,
+      dateText: post.dateText,
       importedAt: new Date().toISOString(),
     };
     const recent = getRecentImports().filter((item) => item.url !== nextPost.url && item.text !== nextPost.text);
@@ -256,7 +333,7 @@
       const row = document.createElement("div");
       row.style.cssText = "border-top:1px solid rgba(255,255,255,.1);padding-top:8px;margin-top:8px;";
       const title = document.createElement("div");
-      title.textContent = clean(post.text).slice(0, 92) || "Imported Facebook post";
+      title.textContent = `Group: ${post.sourceName || "Facebook source"} · Author: ${post.author || "Unknown"} · Post: ${cleanLeadText(post.text || "", 140) || "Facebook post imported"} · Score: ${post.score || 0}`;
       title.style.cssText = "line-height:1.35;color:#e5eef9;margin-bottom:7px;";
       const actions = document.createElement("div");
       actions.style.cssText = "display:flex;gap:7px;flex-wrap:wrap;";

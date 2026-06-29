@@ -8,6 +8,7 @@ type ImportCard = {
   text: string;
   sourceName?: string;
   author?: string;
+  dateText?: string;
   url?: string;
   fitRank: number;
   label: string;
@@ -91,8 +92,16 @@ export default function ImportedFacebookResultsPage() {
                 <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-bold text-slate-100">{card.analysis.score}</span>
                 <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-bold text-slate-100">{card.analysis.risk} risk</span>
               </div>
+              <div className="mt-4 grid gap-2 rounded-2xl border border-white/10 bg-slate-950/40 p-4 text-sm leading-6 text-slate-200 sm:grid-cols-2">
+                <p><strong className="text-white">Group:</strong> {card.sourceName || "Facebook source"}</p>
+                <p><strong className="text-white">Author:</strong> {card.author || "Unknown author"}</p>
+                <p><strong className="text-white">Timestamp:</strong> {card.dateText || "Not available"}</p>
+                <p><strong className="text-white">Score:</strong> {card.fitRank}</p>
+                <p><strong className="text-white">Intent:</strong> {card.analysis.intent}</p>
+                <p><strong className="text-white">Pain point:</strong> {card.analysis.intent.replace(/-/g, " ")}</p>
+              </div>
               <p className="mt-4 text-sm leading-6 text-slate-300"><strong className="text-white">Why:</strong> {card.analysis.reason}</p>
-              <p className="mt-4 rounded-2xl border border-white/10 bg-slate-950/40 p-4 leading-7 text-slate-100">{card.text}</p>
+              <p className="mt-4 rounded-2xl border border-white/10 bg-slate-950/40 p-4 leading-7 text-slate-100"><strong className="text-white">Post:</strong> {card.text || "Facebook post imported"}</p>
               <div className="mt-4 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4">
                 <p className="text-sm font-bold text-cyan-100">Quick Reply</p>
                 <p className="mt-2 leading-7 text-slate-100">{card.analysis.quickReply}</p>

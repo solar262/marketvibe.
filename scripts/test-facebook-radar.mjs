@@ -4,9 +4,18 @@ import vm from "node:vm";
 import ts from "typescript";
 
 const source = fs.readFileSync("src/lib/facebook-radar.ts", "utf8");
+const importSource = fs.readFileSync("src/lib/facebook-radar-import.ts", "utf8");
 const pageSource = fs.readFileSync("src/app/facebook-radar/page.tsx", "utf8");
+const importedPageSource = fs.readFileSync("src/app/facebook-radar/imported/page.tsx", "utf8");
 const extensionSource = fs.readFileSync("browser-extension/facebook-radar-importer/content.js", "utf8");
 const transpiled = ts.transpileModule(source, {
+  compilerOptions: {
+    module: ts.ModuleKind.CommonJS,
+    target: ts.ScriptTarget.ES2020,
+    strict: true,
+  },
+});
+const importTranspiled = ts.transpileModule(importSource, {
   compilerOptions: {
     module: ts.ModuleKind.CommonJS,
     target: ts.ScriptTarget.ES2020,
@@ -16,6 +25,8 @@ const transpiled = ts.transpileModule(source, {
 
 const sandbox = { exports: {} };
 vm.runInNewContext(transpiled.outputText, sandbox, { filename: "facebook-radar.js" });
+const importSandbox = { exports: {}, require: (id) => (id === "@/lib/facebook-radar" ? sandbox.exports : {}) };
+vm.runInNewContext(importTranspiled.outputText, importSandbox, { filename: "facebook-radar-import.js" });
 
 const {
   BUYER_INTENT_QUERY_LIBRARY,
@@ -25,6 +36,7 @@ const {
   generateFacebookSearchLinks,
   shouldSendFacebookLead,
 } = sandbox.exports;
+const { scoreImportedFacebookPosts } = importSandbox.exports;
 
 function phrasesFor(input) {
   return generateFacebookSearchLinks(input).map((link) => link.phrase).join(" | ");
@@ -186,6 +198,22 @@ assert.equal(shouldSendFacebookLead(buyerIntentPreviews[0], new Set()), true, "O
 assert.equal(shouldSendFacebookLead(badIntentPreviews[0], new Set()), false, "Rejected posts should not be sendable");
 assert.equal(shouldSendFacebookLead(duplicatePreviews[0], new Set([duplicatePreviews[0].id])), false, "Duplicate posts should not be sendable");
 
+const cleanedImports = scoreImportedFacebookPosts({
+  posts: [{
+    text: "FacebookFacebookFacebook Home Watch Groups Most freelancers don't have a skill problem. They have a client acquisition problem. Like Comment Share",
+    sourceName: "FacebookFacebookFacebook Web Design and Development | Facebook",
+    author: "FacebookFacebookFacebook Muhammad Adnan",
+    dateText: "2 h",
+    url: "https://www.facebook.com/groups/webdev/posts/123",
+  }],
+  searchPhrase: "client acquisition problem",
+});
+assert.equal(cleanedImports.length, 1, "Importer should keep real post content after cleaning Facebook spam");
+assert.doesNotMatch(cleanedImports[0].text, /FacebookFacebook|Home Watch Groups|Like Comment Share/i, "Imported post text should remove repeated Facebook navigation text");
+assert.match(cleanedImports[0].text, /client acquisition problem/i, "Imported post text should preserve the actual post");
+assert.equal(cleanedImports[0].sourceName, "Web Design and Development |", "Importer should clean group/page names");
+assert.equal(cleanedImports[0].author, "Muhammad Adnan", "Importer should clean author names");
+
 assert.match(pageSource, /activeSearchLink = availableSearchLinks/, "One-card workflow state should use one active search card");
 assert.match(pageSource, /MAIN_TABS/, "Facebook Radar should expose main workflow tabs");
 assert.match(pageSource, /Presets/, "Facebook Radar should include a Presets tab");
@@ -202,6 +230,16 @@ assert.match(pageSource, /Previous Search/, "Previous Search button should exist
 assert.match(pageSource, /Open Posts/, "Open Posts primary button should exist");
 
 assert.match(extensionSource, /function extractPostUrl/, "Facebook importer should extract exact post URLs");
+assert.match(extensionSource, /function cleanLeadText/, "Extension should clean imported lead text");
+assert.match(extensionSource, /function trimRepeatedWords/, "Extension should trim repeated words");
+assert.match(extensionSource, /function extractAuthorName/, "Extension should extract author name");
+assert.match(extensionSource, /function extractGroupName/, "Extension should extract group or page name");
+assert.match(extensionSource, /function extractTimestamp/, "Extension should extract timestamp when available");
+assert.match(extensionSource, /Facebook post imported/, "Extension should use a clear fallback when post text is unavailable");
+assert.match(extensionSource, /Group: \$\{post\.sourceName/, "Recent imports popup should show group name");
+assert.match(extensionSource, /Author: \$\{post\.author/, "Recent imports popup should show author name");
+assert.match(extensionSource, /Post: \$\{cleanLeadText/, "Recent imports popup should show clean post snippet");
+assert.match(extensionSource, /Score: \$\{post\.score/, "Recent imports popup should show score");
 assert.match(extensionSource, /function isExactPostUrl/, "Facebook importer should detect exact post URLs");
 assert.match(extensionSource, /function scoreFacebookUrl/, "Facebook importer should rank exact source URLs");
 assert.match(extensionSource, /story_fbid/, "Facebook importer should preserve story_fbid post links");
@@ -242,6 +280,11 @@ assert.match(extensionSource, /getRecentImports\(\)\.slice\(0, 3\)/, "Recent imp
 assert.match(extensionSource, /function createReply/, "Cached posts should have a copyable reply");
 assert.match(extensionSource, /MarketVibe helps spot public business signals/, "Copy reply should mention MarketVibe");
 assert.match(extensionSource, /https:\/\/www\.marketvibe1\.com/, "Copy reply should include the MarketVibe URL");
+
+assert.match(importedPageSource, /<strong className="text-white">Group:<\/strong>/, "Imported page should show group name");
+assert.match(importedPageSource, /<strong className="text-white">Author:<\/strong>/, "Imported page should show author name");
+assert.match(importedPageSource, /<strong className="text-white">Post:<\/strong>/, "Imported page should show clean post text");
+assert.match(importedPageSource, /<strong className="text-white">Score:<\/strong>/, "Imported page should show score");
 
 const helperSource = source.toLowerCase();
 assert.equal(helperSource.includes("fetch("), false, "Facebook Radar helper should not scrape or fetch Facebook");
