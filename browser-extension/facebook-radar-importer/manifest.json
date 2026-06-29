@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "MarketVibe Facebook Radar Importer",
+  "version": "0.1.0",
+  "description": "Internal helper that sends visible Facebook posts to MarketVibe for scoring.",
+  "permissions": ["activeTab"],
+  "host_permissions": [
+    "https://www.facebook.com/*",
+    "https://m.facebook.com/*",
+    "https://www.marketvibe1.com/*",
+    "https://marketvibe1.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://www.facebook.com/*", "https://m.facebook.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
