@@ -83,48 +83,60 @@
 
   function scorePost(text) {
     let score = 0;
-
-    for (const pattern of HARD_SKIP_SIGNALS) {
-      if (pattern.test(text)) return -999;
-    }
-
-    for (const pattern of STRONG_BUYER_SIGNALS) {
-      if (pattern.test(text)) score += 25;
-    }
-
-    for (const pattern of SELLER_PHRASES) {
-      if (pattern.test(text)) score -= 35;
-    }
-
+    for (const pattern of HARD_SKIP_SIGNALS) if (pattern.test(text)) return -999;
+    for (const pattern of STRONG_BUYER_SIGNALS) if (pattern.test(text)) score += 25;
+    for (const pattern of SELLER_PHRASES) if (pattern.test(text)) score -= 35;
     if (/\?/.test(text)) score += 10;
-
-    if (/\b(i|my|we|our)\b/i.test(text) && /\b(struggling|stuck|need|looking|can't|cannot|no|help|advice)\b/i.test(text)) {
-      score += 15;
-    }
-
+    if (/\b(i|my|we|our)\b/i.test(text) && /\b(struggling|stuck|need|looking|can't|cannot|no|help|advice)\b/i.test(text)) score += 15;
     if (text.length < 80) score -= 20;
-
     return score;
+  }
+
+  function getBestPostUrl(node) {
+    const links = Array.from(node.querySelectorAll('a[href]'));
+    const candidates = links
+      .map((a) => {
+        const raw = a.getAttribute("href") || "";
+        let url;
+        try {
+          url = new URL(raw, location.origin);
+        } catch {
+          return null;
+        }
+
+        const href = url.toString();
+        let score = 0;
+        if (href.includes("/posts/")) score += 100;
+        if (href.includes("/permalink/")) score += 95;
+        if (href.includes("story_fbid")) score += 90;
+        if (href.includes("comment_id=")) score += 80;
+        if (href.includes("/photo") || href.includes("fbid=")) score += 65;
+        if (href.match(/facebook\.com\/groups\/[^/]+\/?$/i)) score -= 200;
+        if (href.includes("/groups/") && !href.includes("/posts/") && !href.includes("comment_id=") && !href.includes("permalink")) score -= 100;
+        if (href.includes("/profile.php") || href.includes("/people/") || href.includes("/groups/")) score -= 10;
+
+        return { href, score };
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.score - a.score);
+
+    const best = candidates.find((item) => item.score > 0);
+    return best ? best.href : location.href;
   }
 
   function markFeed() {
     const nodes = Array.from(document.querySelectorAll('[role="article"], div[aria-posinset]'));
-
     for (const node of nodes) {
       if (node.dataset.marketvibeProcessed === "1") continue;
       node.dataset.marketvibeProcessed = "1";
-
       const text = clean(node.innerText).slice(0, 2200);
       const score = scorePost(text);
-
       if (score >= 25) {
         node.style.outline = "3px solid #10b981";
         node.style.background = "rgba(16,185,129,0.06)";
-
         const badge = document.createElement("div");
         badge.textContent = `MarketVibe Buyer Intent ${score}`;
         badge.style.cssText = "position:sticky;top:0;z-index:9999;background:#10b981;color:#041018;font:700 12px Arial;padding:6px 10px;border-radius:8px;margin:6px;display:inline-block;";
-
         node.prepend(badge);
       } else {
         node.style.opacity = "0.12";
@@ -137,23 +149,15 @@
     const nodes = Array.from(document.querySelectorAll('[role="article"], div[aria-posinset]'));
     const seen = new Set();
     const posts = [];
-
     for (const node of nodes) {
       const box = node.getBoundingClientRect();
       if (box.bottom < 0 || box.top > window.innerHeight * 2) continue;
-
       const text = clean(node.innerText).slice(0, 2200);
       const score = scorePost(text);
-
       if (score < 25) continue;
-
       const key = text.toLowerCase().slice(0, 180);
       if (seen.has(key)) continue;
       seen.add(key);
-
-      const link = node.querySelector('a[href*="/posts/"], a[href*="/groups/"], a[href*="story_fbid"], a[href*="permalink"]');
-      const url = link ? new URL(link.getAttribute("href"), location.origin).toString() : location.href;
-
       posts.push({
         text,
         score,
@@ -162,53 +166,41 @@
         dateText: "",
         reactions: "",
         comments: "",
-        url,
+        url: getBestPostUrl(node),
       });
-
       if (posts.length >= 10) break;
     }
-
     return posts.sort((a, b) => b.score - a.score);
   }
 
   function showStatus(message) {
     let box = document.getElementById("marketvibe-import-status");
-
     if (!box) {
       box = document.createElement("div");
       box.id = "marketvibe-import-status";
       box.style.cssText = "position:fixed;right:16px;bottom:82px;z-index:2147483647;max-width:360px;border-radius:14px;background:#07111f;color:white;border:1px solid rgba(103,232,249,.45);box-shadow:0 14px 40px rgba(0,0,0,.35);padding:12px 14px;font:13px Arial,sans-serif;";
       document.body.appendChild(box);
     }
-
     box.textContent = message;
     window.setTimeout(() => box.remove(), 4500);
   }
 
   async function sendVisible() {
     const posts = collectVisibleCards();
-
     if (!posts.length) {
       showStatus("No strong buyer-intent posts detected on screen.");
       return;
     }
-
     button.disabled = true;
     button.textContent = "Sending to MarketVibe...";
-
     try {
       const response = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          posts,
-          searchPhrase: new URLSearchParams(location.search).get("q") || "",
-        }),
+        body: JSON.stringify({ posts, searchPhrase: new URLSearchParams(location.search).get("q") || "" }),
       });
-
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
-
       showStatus(`Imported ${posts.length} buyer-intent posts. Good: ${data.counts?.good || 0}.`);
     } catch (error) {
       showStatus(`MarketVibe import failed: ${error && error.message ? error.message : "unknown error"}`);
@@ -225,7 +217,6 @@
   button.style.cssText = "position:fixed;right:18px;bottom:24px;z-index:2147483647;border:0;border-radius:999px;background:linear-gradient(90deg,#10b981,#67e8f9);color:#03131f;font:800 14px Arial,sans-serif;padding:13px 17px;box-shadow:0 12px 34px rgba(0,0,0,.32);cursor:pointer;";
   button.addEventListener("click", sendVisible);
   document.body.appendChild(button);
-
   markFeed();
   setInterval(markFeed, 2500);
 })();
