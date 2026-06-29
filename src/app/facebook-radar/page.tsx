@@ -261,21 +261,18 @@ export default function FacebookRadarPage() {
                   <p className="mt-3 rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-2 text-sm font-semibold text-slate-200">
                     Bad results? Try next search. If the first screen is mostly jobs, spam, or offers, mark searched/skip and move on.
                   </p>
-                  <div className="mt-4 grid gap-2 sm:grid-cols-6">
+                  <div className="mt-4 grid gap-2 sm:grid-cols-5">
                     <a href={link.postsUrl} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-4 py-3 text-sm font-bold text-slate-950 hover:bg-slate-100 sm:col-span-2">
-                      <ExternalLink className="h-4 w-4" /> Posts
+                      <ExternalLink className="h-4 w-4" /> Open Posts Search
                     </a>
-                    <a href={link.mobileSearchUrl} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-300/10 px-4 py-3 text-sm font-semibold text-emerald-100 hover:bg-emerald-300/15 sm:col-span-2">
-                      <ExternalLink className="h-4 w-4" /> Open Mobile Search
-                    </a>
-                    <a href={link.groupsUrl} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-full border border-cyan-300/30 bg-cyan-300/10 px-4 py-3 text-sm font-semibold text-cyan-100 hover:bg-cyan-300/15">
-                      <ExternalLink className="h-4 w-4" /> Groups
+                    <a href={link.groupsUrl} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-full border border-cyan-300/30 bg-cyan-300/10 px-4 py-3 text-sm font-semibold text-cyan-100 hover:bg-cyan-300/15 sm:col-span-2">
+                      <ExternalLink className="h-4 w-4" /> Open Groups Search
                     </a>
                     <button onClick={() => copyText(link.phrase, "Facebook Radar Copy Search Phrase")} className="rounded-full border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold text-white hover:bg-white/15">
                       <Copy className="mr-2 inline h-4 w-4" />Copy exact search
                     </button>
                   </div>
-                  <p className="mt-2 text-xs font-semibold text-slate-400">If Facebook opens Recent instead of results, tap Open Mobile Search.</p>
+                  <p className="mt-2 text-xs font-semibold text-slate-400">Use Posts first to find conversations. Use Groups only to find places to join.</p>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
                     <button onClick={() => markSearch(link)} className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-4 py-3 text-sm font-semibold text-emerald-100 hover:bg-emerald-300/15"><CheckCircle2 className="mr-2 inline h-4 w-4" />Mark searched</button>
                     <button onClick={() => skipSearch(link)} className="rounded-full border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold text-white hover:bg-white/15"><SkipForward className="mr-2 inline h-4 w-4" />Skip</button>
