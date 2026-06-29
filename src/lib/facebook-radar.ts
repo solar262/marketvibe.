@@ -1,0 +1,140 @@
+export type FacebookRadarAction = "ManualOnly" | "Skip";
+export type FacebookRadarScore = "High" | "Medium" | "Low";
+export type FacebookRadarRisk = "Low" | "Medium" | "High";
+
+export type FacebookRadarInput = {
+  postText: string;
+  targetBuyer: string;
+  painKeywords: string;
+  sourceUrl: string;
+};
+
+export type FacebookRadarResult = {
+  action: FacebookRadarAction;
+  score: FacebookRadarScore;
+  risk: FacebookRadarRisk;
+  intent: string;
+  reason: string;
+  quickReply: string;
+  deeperReply: string;
+  manualNote: string;
+  searchUrl: string;
+};
+
+const BUYER_PATTERN = /\b(web designer|web designers|seo freelancer|seo freelancers|seo consultant|seo agency|local marketer|digital marketer|lead generation freelancer|lead gen|small agency|agency|freelancer|sell websites|selling websites|website redesign|local business services|automation service|client acquisition)\b/i;
+const PAIN_PATTERN = /\b(need clients|how do i get clients|get clients|looking for leads|find local businesses|sell websites|get seo clients|local lead generation|cold outreach not working|no replies|prospecting help|businesses without websites|how do i prospect|agency clients|lead generation|outreach|prospecting|local business prospects|website clients|seo clients)\b/i;
+const BAD_PATTERN = /\b(hiring|apply now|remote developer|salary|full-time|part-time|job opening|vacancy|course launch|buy my|dm me for|limited offer|promo code|giveaway|i built this)\b/i;
+const PRIVATE_GROUP_PATTERN = /\b(private group|members only|screenshot from a private group|do not share|confidential)\b/i;
+
+function cleanText(value: string) {
+  return value.replace(/\s+/g, " ").trim().slice(0, 1400);
+}
+
+function hasAny(text: string, pattern: RegExp) {
+  return pattern.test(text);
+}
+
+function buildFacebookSearchUrl(targetBuyer: string, painKeywords: string) {
+  const query = cleanText([targetBuyer, painKeywords].filter(Boolean).join(" "));
+  return query ? `https://www.facebook.com/search/posts/?q=${encodeURIComponent(query)}` : "https://www.facebook.com/search/posts/";
+}
+
+function detectIntent(text: string) {
+  if (/\b(cold outreach|no replies|outreach)\b/i.test(text)) return "outreach";
+  if (/\b(seo clients|seo freelancer|seo services|rankings|local seo)\b/i.test(text)) return "seo-clients";
+  if (/\b(web design|sell websites|website clients|website redesign|businesses without websites)\b/i.test(text)) return "web-design-clients";
+  if (/\b(lead generation|local leads|agency clients|prospecting|local business prospects)\b/i.test(text)) return "lead-generation";
+  if (/\b(automation|automations)\b/i.test(text)) return "automation-services";
+  return "client-acquisition";
+}
+
+function scorePost(text: string, targetBuyer: string, painKeywords: string) {
+  let score = 0;
+  if (hasAny(text, BUYER_PATTERN)) score += 28;
+  if (hasAny(text, PAIN_PATTERN)) score += 42;
+  if (/\?/.test(text)) score += 8;
+  if (/\b(help|advice|struggling|stuck|not working|where do i find|how do i)\b/i.test(text)) score += 10;
+  if (targetBuyer && text.toLowerCase().includes(targetBuyer.toLowerCase().split(/\s+/)[0] || "")) score += 4;
+  for (const keyword of painKeywords.toLowerCase().split(/[,;\n]/).map((item) => item.trim()).filter(Boolean)) {
+    if (keyword.length > 2 && text.toLowerCase().includes(keyword)) score += 4;
+  }
+  if (BAD_PATTERN.test(text)) score -= 55;
+  if (PRIVATE_GROUP_PATTERN.test(text)) score -= 35;
+  return Math.max(0, Math.min(100, score));
+}
+
+function replyForIntent(intent: string) {
+  if (intent === "outreach") {
+    return {
+      quickReply: "I'd tighten the reason for reaching out before changing platforms. Replies usually improve when the message points to one visible problem, not a broad service pitch.",
+      deeperReply: "I'd start by narrowing the prospect list and the reason for outreach. Local businesses are easier to approach when you can point to one clear issue, like weak Google visibility, no clear CTA, an outdated website, or a missing service page. Then keep the first message short and about that specific problem.",
+    };
+  }
+
+  if (intent === "seo-clients") {
+    return {
+      quickReply: "I'd look for businesses where the SEO gap is visible before pitching. Missing service pages, weak titles, thin local pages, or poor Google visibility give you a more natural reason to start a conversation.",
+      deeperReply: "For SEO clients, I'd avoid starting with a generic audit pitch. Find a visible local search gap first: missing service pages, weak page titles, thin location content, poor Google visibility, or competitors clearly outranking them. Then lead with the specific thing you noticed.",
+    };
+  }
+
+  if (intent === "web-design-clients") {
+    return {
+      quickReply: "I'd start with businesses where the website problem is obvious. Outdated design, unclear CTA, weak mobile layout, or missing trust signals makes the outreach feel less random.",
+      deeperReply: "For web design, I'd build a list around visible problems instead of just business categories. Look for outdated sites, unclear CTAs, slow mobile pages, missing booking/contact paths, weak trust signals, or messy service pages. Then mention one problem in plain language rather than pitching a full redesign immediately.",
+    };
+  }
+
+  if (intent === "lead-generation") {
+    return {
+      quickReply: "I'd separate the niche from the trigger. The best prospects are local businesses where you can see a reason they might need help, not just businesses in a list.",
+      deeperReply: "I'd look for a clear trigger before outreach. For local lead gen, that might be weak Google visibility, poor website conversion, unclear contact paths, bad review signals, or a competitor looking much stronger. A visible problem gives you a better opener than just saying you generate leads.",
+    };
+  }
+
+  return {
+    quickReply: "I'd start by narrowing the offer before chasing more platforms. Local businesses are easier to prospect when you can spot one clear problem, like weak Google visibility, no clear CTA, or an outdated website.",
+    deeperReply: "I'd focus on the specific prospecting trigger first. Pick one buyer type, then look for visible problems: outdated websites, unclear CTAs, missing service pages, weak Google visibility, poor trust signals, or no easy contact path. That gives you a useful reason to start a conversation without sounding like a pitch.",
+  };
+}
+
+export function analyzeFacebookLead(input: FacebookRadarInput): FacebookRadarResult {
+  const postText = cleanText(input.postText);
+  const combined = cleanText([postText, input.targetBuyer, input.painKeywords].filter(Boolean).join(" "));
+  const rawScore = postText ? scorePost(combined, input.targetBuyer, input.painKeywords) : 0;
+  const blocked = !postText || BAD_PATTERN.test(postText);
+  const privateRisk = PRIVATE_GROUP_PATTERN.test(postText);
+  const action: FacebookRadarAction = blocked || rawScore < 35 ? "Skip" : "ManualOnly";
+  const score: FacebookRadarScore = rawScore >= 75 ? "High" : rawScore >= 50 ? "Medium" : "Low";
+  const risk: FacebookRadarRisk = blocked || privateRisk ? "High" : rawScore >= 70 ? "Low" : "Medium";
+  const intent = detectIntent(combined);
+  const replies = replyForIntent(intent);
+
+  if (action === "Skip") {
+    return {
+      action,
+      score,
+      risk,
+      intent: blocked ? "blocked-or-empty" : intent,
+      reason: blocked ? "Skip: empty, job-like, promotional, or not suitable for manual engagement." : "Skip: not enough buyer pain or MarketVibe-fit intent.",
+      quickReply: "SKIP THIS ONE.",
+      deeperReply: "Not recommended",
+      manualNote: "Do not post a normal reply. Look for posts where someone is asking for clients, leads, prospecting, web design, SEO, or local business outreach help.",
+      searchUrl: input.sourceUrl || buildFacebookSearchUrl(input.targetBuyer, input.painKeywords),
+    };
+  }
+
+  return {
+    action,
+    score,
+    risk,
+    intent,
+    reason: `Detected ${intent.replace(/-/g, " ")} pain with a ${rawScore}/100 fit score. Manual engagement only.`,
+    quickReply: replies.quickReply,
+    deeperReply: replies.deeperReply,
+    manualNote: privateRisk
+      ? "Edit before posting. Do not copy content from private groups outside Facebook, and only reply manually where you are allowed to participate."
+      : "Edit before posting. Be helpful first, avoid links, and let profile visits or later conversation do the selling.",
+    searchUrl: input.sourceUrl || buildFacebookSearchUrl(input.targetBuyer, input.painKeywords),
+  };
+}
