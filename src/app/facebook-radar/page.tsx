@@ -3,15 +3,29 @@
 import { useMemo, useState } from "react";
 import { track } from "@vercel/analytics";
 import { AlertTriangle, CheckCircle2, Copy, ExternalLink, Radar, Search, ShieldCheck, SkipForward } from "lucide-react";
-import { analyzeFacebookLead, generateFacebookSearchLinks, type FacebookRadarResult, type FacebookRadarSearchLink } from "@/lib/facebook-radar";
+import {
+  BUYER_INTENT_QUERY_LIBRARY,
+  analyzeFacebookLead,
+  createDefaultFacebookFilters,
+  filterAndRankFacebookLeads,
+  generateFacebookSearchLinks,
+  shouldSendFacebookLead,
+  type FacebookLeadPreview,
+  type FacebookRadarFilters,
+  type FacebookRadarResult,
+  type FacebookRadarSchedule,
+  type FacebookRadarSearchLink,
+} from "@/lib/facebook-radar";
 
 type ReplyMode = "quick" | "deeper";
 type ToolMode = "find" | "analyze";
+type MainTab = "Search" | "Presets" | "Results" | "Sent Leads" | "Logs" | "Settings";
 
 const DEFAULT_BUYER = "web designers, SEO freelancers, local marketers, small agencies";
 const DEFAULT_NICHE = "web design, SEO, local marketing agencies";
 const DEFAULT_PAIN = "need clients, looking for leads, cold outreach not working, no customers";
 const PASTE_PROMPT = "Paste the Facebook post text here.";
+const MAIN_TABS: MainTab[] = ["Search", "Presets", "Results", "Sent Leads", "Logs", "Settings"];
 
 function badgeClasses(value: string) {
   if (value === "High") return "border-emerald-300/30 bg-emerald-300/15 text-emerald-100";
@@ -26,6 +40,7 @@ function riskClasses(value: string) {
 }
 
 export default function FacebookRadarPage() {
+  const [activeTab, setActiveTab] = useState<MainTab>("Search");
   const [mode, setMode] = useState<ToolMode>("find");
   const [targetBuyer, setTargetBuyer] = useState(DEFAULT_BUYER);
   const [niche, setNiche] = useState(DEFAULT_NICHE);
@@ -41,14 +56,46 @@ export default function FacebookRadarPage() {
   const [skippedCount, setSkippedCount] = useState(0);
   const [resetNotice, setResetNotice] = useState("");
   const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
+  const [customQueries, setCustomQueries] = useState<string[]>([]);
+  const [queryDraft, setQueryDraft] = useState("");
+  const [filters, setFilters] = useState<FacebookRadarFilters>(() => createDefaultFacebookFilters());
+  const [savedPresets, setSavedPresets] = useState<{ name: string; queries: string[] }[]>([]);
+  const [schedules, setSchedules] = useState<FacebookRadarSchedule[]>([]);
+  const [logs, setLogs] = useState<string[]>([]);
+  const [sentLeads, setSentLeads] = useState<FacebookLeadPreview[]>([]);
 
-  const searchLinks = useMemo(() => generateFacebookSearchLinks({ targetBuyer, niche, painKeywords }), [targetBuyer, niche, painKeywords]);
+  const allQueries = useMemo(() => [...BUYER_INTENT_QUERY_LIBRARY, ...customQueries], [customQueries]);
+  const searchLinks = useMemo(() => generateFacebookSearchLinks({ targetBuyer, niche, painKeywords: [painKeywords, ...allQueries].join(", ") }), [targetBuyer, niche, painKeywords, allQueries]);
   const availableSearchLinks = searchLinks.filter((link) => !searched.includes(link.phrase) && !skippedSearches.includes(link.phrase));
   const activeSearchLink = availableSearchLinks[Math.min(currentSearchIndex, Math.max(availableSearchLinks.length - 1, 0))];
+  const sentSignatures = useMemo(() => new Set(sentLeads.map((lead) => lead.id)), [sentLeads]);
+  const previewLeads = useMemo(() => {
+    const text = postText.trim() === PASTE_PROMPT ? "" : postText.trim();
+    if (!text) return [];
+    return filterAndRankFacebookLeads([
+      {
+        text,
+        url: sourceUrl,
+        groupName: sourceUrl ? "Manual Facebook source" : "Manual paste",
+        groupMembers: filters.minimumMembers,
+        groupPostsPerDay: filters.minimumPostsPerDay,
+        comments: filters.minimumEngagement,
+        reactions: 0,
+        language: filters.language,
+        location: filters.location,
+        isPublicGroup: true,
+      },
+    ], filters, sentSignatures);
+  }, [filters, postText, sentSignatures, sourceUrl]);
   const selectedReply = useMemo(() => {
     if (!result) return "";
     return replyMode === "deeper" && result.deeperReply ? result.deeperReply : result.quickReply;
   }, [replyMode, result]);
+
+  function addLog(message: string) {
+    const stamped = `${new Date().toLocaleString()} - ${message}`;
+    setLogs((current) => [stamped, ...current].slice(0, 80));
+  }
 
   function analyze() {
     const analyzableText = postText.trim() === PASTE_PROMPT ? "" : postText;
@@ -56,6 +103,7 @@ export default function FacebookRadarPage() {
     setResult(next);
     setReplyMode("quick");
     setCopied(false);
+    addLog(`Manual post analyzed: ${next.score} intent, ${next.action}.`);
     track("Facebook Radar Analyze", { action: next.action, score: next.score, risk: next.risk, intent: next.intent });
   }
 
@@ -85,17 +133,20 @@ export default function FacebookRadarPage() {
 
   function markSearch(link: FacebookRadarSearchLink) {
     setSearched((current) => current.includes(link.phrase) ? current : [...current, link.phrase]);
+    addLog(`Search marked good: ${link.phrase}`);
     track("Facebook Radar Mark Search", { phrase: link.phrase });
   }
 
   function skipSearch(link: FacebookRadarSearchLink) {
     setSkippedSearches((current) => current.includes(link.phrase) ? current : [...current, link.phrase]);
     setSkippedCount((value) => value + 1);
+    addLog(`Search skipped: ${link.phrase}`);
     track("Facebook Radar Skip Search", { phrase: link.phrase });
   }
 
   function openSearch(link: FacebookRadarSearchLink, url: string, searchType: "posts" | "groups") {
     void navigator.clipboard.writeText(link.phrase).then(() => setCopied(true)).catch(() => setCopied(false));
+    addLog(`Opened ${searchType} search: ${link.phrase}`);
     track("Facebook Radar Open Search", { phrase: link.phrase, search_type: searchType });
     window.location.assign(url);
     window.setTimeout(() => setCopied(false), 1600);
@@ -132,6 +183,7 @@ export default function FacebookRadarPage() {
   function resetSearches() {
     clearWorkflowState();
     setResetNotice("Search queue reset.");
+    addLog("Search queue reset.");
     track("Facebook Radar Reset Searches", {});
   }
 
@@ -143,6 +195,7 @@ export default function FacebookRadarPage() {
     setPostText("");
     setSourceUrl("");
     setResetNotice("Search queue reset.");
+    addLog("Search queue reset to default inputs.");
     track("Facebook Radar Reset Defaults", {});
   }
 
@@ -152,6 +205,7 @@ export default function FacebookRadarPage() {
     setPostText("");
     setResult(null);
     setReplyMode("quick");
+    addLog("Manual reply marked done.");
   }
 
   function skip() {
@@ -159,6 +213,78 @@ export default function FacebookRadarPage() {
     track("Facebook Radar Skip", { score: result?.score || "none" });
     setResult(null);
     setReplyMode("quick");
+    addLog("Manual result skipped.");
+  }
+
+  function addCustomQuery() {
+    const query = queryDraft.trim();
+    if (!query || allQueries.map((item) => item.toLowerCase()).includes(query.toLowerCase())) return;
+    setCustomQueries((current) => [...current, query]);
+    setQueryDraft("");
+    addLog(`Custom query added: ${query}`);
+  }
+
+  function deleteCustomQuery(query: string) {
+    setCustomQueries((current) => current.filter((item) => item !== query));
+    addLog(`Custom query deleted: ${query}`);
+  }
+
+  function saveSearchPreset() {
+    const name = `Preset ${savedPresets.length + 1}`;
+    setSavedPresets((current) => [{ name, queries: allQueries.slice(0, 12) }, ...current]);
+    addLog(`${name} saved with ${Math.min(allQueries.length, 12)} queries.`);
+  }
+
+  function addSchedule(cadence: FacebookRadarSchedule["cadence"]) {
+    const nextSchedule: FacebookRadarSchedule = {
+      id: `${cadence}-${schedules.length + 1}`,
+      name: `${cadence} Facebook buyer-intent search`,
+      cadence,
+      paused: false,
+      queries: allQueries.slice(0, 10),
+    };
+    setSchedules((current) => [nextSchedule, ...current]);
+    addLog(`Schedule created: ${cadence}. Runs require Facebook API permissions or manual extension use.`);
+  }
+
+  function toggleSchedule(id: string) {
+    setSchedules((current) => current.map((schedule) => schedule.id === id ? { ...schedule, paused: !schedule.paused } : schedule));
+    addLog("Schedule pause/resume changed.");
+  }
+
+  function deleteSchedule(id: string) {
+    setSchedules((current) => current.filter((schedule) => schedule.id !== id));
+    addLog("Schedule deleted.");
+  }
+
+  async function sendHighIntentPreviews() {
+    const sendable = previewLeads.filter((lead) => shouldSendFacebookLead(lead, sentSignatures));
+    if (!sendable.length) {
+      addLog("No High Intent preview leads passed filters for sending.");
+      return;
+    }
+
+    const response = await fetch("/api/facebook-radar/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        posts: sendable.map((lead) => ({
+          text: lead.snippet,
+          sourceName: lead.groupName,
+          comments: lead.intentRank,
+          url: lead.url,
+        })),
+        searchPhrase: "manual high-intent preview",
+      }),
+    });
+
+    if (!response.ok) {
+      addLog(`Send failed: API returned ${response.status}.`);
+      return;
+    }
+
+    setSentLeads((current) => [...sendable, ...current].filter((lead, index, array) => array.findIndex((item) => item.id === lead.id) === index));
+    addLog(`Sent ${sendable.length} High Intent lead(s) to MarketVibe.`);
   }
 
   function nextSearch() {
@@ -259,7 +385,185 @@ export default function FacebookRadarPage() {
           </div>
         </div>
 
-        {mode === "find" ? (
+        <div className="mb-5 flex gap-2 overflow-x-auto rounded-2xl border border-white/10 bg-white/[0.05] p-2">
+          {MAIN_TABS.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`shrink-0 rounded-full px-4 py-2 text-sm font-bold transition ${
+                activeTab === tab ? "bg-cyan-200 text-slate-950" : "text-slate-200 hover:bg-white/10"
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === "Presets" && (
+          <div className="rounded-[2rem] border border-white/10 bg-white/[0.06] p-5 shadow-2xl shadow-black/20">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-emerald-300">Buyer Intent Query Library</p>
+                <h2 className="mt-1 text-2xl font-semibold text-white">Search presets</h2>
+              </div>
+              <button onClick={saveSearchPreset} className="rounded-full bg-white px-5 py-3 text-sm font-bold text-slate-950">Save current preset</button>
+            </div>
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              <div className="rounded-3xl border border-white/10 bg-slate-950/35 p-4">
+                <p className="text-sm font-bold text-cyan-100">Built-in buyer-intent queries</p>
+                <div className="mt-3 grid gap-2">
+                  {BUYER_INTENT_QUERY_LIBRARY.map((query) => (
+                    <div key={query} className="rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-2 text-sm text-slate-100">{query}</div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-3xl border border-white/10 bg-slate-950/35 p-4">
+                <p className="text-sm font-bold text-cyan-100">Custom queries</p>
+                <div className="mt-3 flex gap-2">
+                  <input value={queryDraft} onChange={(event) => setQueryDraft(event.target.value)} placeholder="Add a buyer-intent query" className="min-w-0 flex-1 rounded-full border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500" />
+                  <button onClick={addCustomQuery} className="rounded-full bg-emerald-300 px-4 py-3 text-sm font-bold text-slate-950">Add</button>
+                </div>
+                <div className="mt-3 grid gap-2">
+                  {customQueries.length ? customQueries.map((query) => (
+                    <div key={query} className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-2 text-sm text-slate-100">
+                      <span className="min-w-0 break-words">{query}</span>
+                      <button onClick={() => deleteCustomQuery(query)} className="shrink-0 rounded-full border border-white/15 px-3 py-1 text-xs font-bold text-white">Delete</button>
+                    </div>
+                  )) : <p className="text-sm text-slate-400">No custom queries yet.</p>}
+                </div>
+                <div className="mt-5 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4">
+                  <p className="text-sm font-bold text-cyan-100">Saved presets</p>
+                  {savedPresets.length ? savedPresets.map((preset) => (
+                    <p key={preset.name} className="mt-2 text-sm text-slate-200">{preset.name}: {preset.queries.length} queries</p>
+                  )) : <p className="mt-2 text-sm text-slate-400">Save a preset when this query mix performs well.</p>}
+                </div>
+                <div className="mt-5 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4">
+                  <p className="text-sm font-bold text-amber-100">Scheduled searches</p>
+                  <p className="mt-2 text-sm leading-6 text-amber-50">Schedules are automation-ready. Actual background Facebook API searches require approved Facebook permissions; otherwise use the extension/manual workflow.</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {(["every 3h", "every 6h", "every 12h", "daily"] as FacebookRadarSchedule["cadence"][]).map((cadence) => (
+                      <button key={cadence} onClick={() => addSchedule(cadence)} className="rounded-full border border-amber-300/25 bg-amber-300/10 px-3 py-2 text-xs font-bold text-amber-50">{cadence}</button>
+                    ))}
+                  </div>
+                  <div className="mt-3 grid gap-2">
+                    {schedules.map((schedule) => (
+                      <div key={schedule.id} className="rounded-2xl border border-white/10 bg-slate-950/35 p-3 text-sm text-slate-100">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span>{schedule.name} · {schedule.paused ? "Paused" : "Active"}</span>
+                          <span className="flex gap-2">
+                            <button onClick={() => toggleSchedule(schedule.id)} className="rounded-full border border-white/15 px-3 py-1 text-xs font-bold">{schedule.paused ? "Resume" : "Pause"}</button>
+                            <button onClick={() => deleteSchedule(schedule.id)} className="rounded-full border border-white/15 px-3 py-1 text-xs font-bold">Delete</button>
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "Results" && (
+          <div className="rounded-[2rem] border border-white/10 bg-white/[0.06] p-5 shadow-2xl shadow-black/20">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-emerald-300">Preview before sending</p>
+                <h2 className="mt-1 text-2xl font-semibold text-white">Filtered High Intent Leads</h2>
+              </div>
+              <button onClick={sendHighIntentPreviews} className="rounded-full bg-white px-5 py-3 text-sm font-bold text-slate-950">Send Visible High-Intent Posts to MarketVibe</button>
+            </div>
+            <p className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm leading-6 text-amber-50">Facebook data may be unavailable because of permissions, group privacy, region restrictions, or rate limits. This tool does not bypass those limits.</p>
+            <div className="mt-5 grid gap-3">
+              {previewLeads.length ? previewLeads.map((lead) => (
+                <article key={lead.id} className="rounded-3xl border border-white/10 bg-slate-950/35 p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`rounded-full border px-3 py-1 text-xs font-bold ${badgeClasses(lead.intentScore)}`}>{lead.intentScore} Intent · {lead.intentRank}/100</span>
+                    <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-bold text-slate-100">{lead.painPoint}</span>
+                    {!lead.passedFilters && <span className="rounded-full border border-amber-300/25 bg-amber-300/10 px-3 py-1 text-xs font-bold text-amber-100">Filtered</span>}
+                  </div>
+                  <p className="mt-3 text-sm text-slate-300"><strong className="text-white">Group:</strong> {lead.groupName} · {lead.groupSizeActivity}</p>
+                  <p className="mt-2 text-sm text-slate-300"><strong className="text-white">Author:</strong> {lead.authorType} · <strong className="text-white">Category:</strong> {lead.businessCategory} · <strong className="text-white">Location:</strong> {lead.location}</p>
+                  <p className="mt-3 rounded-2xl border border-white/10 bg-white/[0.06] p-3 text-sm leading-6 text-slate-100">{lead.snippet}</p>
+                  <p className="mt-3 text-sm leading-6 text-slate-300"><strong className="text-white">Why it matched:</strong> {lead.reason}</p>
+                  <p className="mt-2 text-sm text-amber-100">{lead.duplicateWarning}</p>
+                  <p className="mt-3 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-3 text-sm leading-6 text-cyan-50"><strong>Suggested reply:</strong> {lead.suggestedReply}</p>
+                </article>
+              )) : (
+                <div className="rounded-3xl border border-white/10 bg-slate-950/35 p-8 text-center text-slate-300">No results yet. Paste a Facebook post in Search → Analyze Pasted Post, or import visible posts with the browser extension.</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "Sent Leads" && (
+          <div className="rounded-[2rem] border border-white/10 bg-white/[0.06] p-5 shadow-2xl shadow-black/20">
+            <h2 className="text-2xl font-semibold text-white">Sent Leads</h2>
+            <div className="mt-5 grid gap-3">
+              {sentLeads.length ? sentLeads.map((lead) => (
+                <a key={lead.id} href={lead.url} target="_blank" rel="noreferrer" className="rounded-2xl border border-white/10 bg-slate-950/35 p-4 text-sm text-slate-100 hover:bg-white/10">
+                  {lead.intentScore} · {lead.painPoint} · {lead.snippet}
+                </a>
+              )) : <p className="rounded-2xl border border-white/10 bg-slate-950/35 p-6 text-slate-300">No sent leads in this browser session yet.</p>}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "Logs" && (
+          <div className="rounded-[2rem] border border-white/10 bg-white/[0.06] p-5 shadow-2xl shadow-black/20">
+            <h2 className="text-2xl font-semibold text-white">Logs and Analytics</h2>
+            <div className="mt-5 grid gap-3 sm:grid-cols-5">
+              {[["Searches run", searched.length + skippedSearches.length], ["Posts found", previewLeads.length], ["High intent", previewLeads.filter((lead) => lead.intentScore === "High").length], ["Sent", sentLeads.length], ["Top pain", previewLeads[0]?.painPoint || "None"]].map(([label, value]) => (
+                <div key={label} className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">{label}</p>
+                  <p className="mt-2 text-lg font-bold text-white">{value}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-5 grid gap-2">
+              {logs.length ? logs.map((log) => <p key={log} className="rounded-2xl border border-white/10 bg-slate-950/35 px-4 py-3 text-sm text-slate-200">{log}</p>) : <p className="text-slate-400">No logs yet. Searches, skips, sends, and API limits will appear here.</p>}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "Settings" && (
+          <div className="rounded-[2rem] border border-white/10 bg-white/[0.06] p-5 shadow-2xl shadow-black/20">
+            <h2 className="text-2xl font-semibold text-white">Filters and Safety</h2>
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <label className="grid gap-2 text-sm font-semibold text-slate-200">Posted within
+                <select value={filters.postedWithin} onChange={(event) => setFilters((current) => ({ ...current, postedWithin: event.target.value as FacebookRadarFilters["postedWithin"] }))} className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-white">
+                  {(["24h", "72h", "7d", "30d"] as FacebookRadarFilters["postedWithin"][]).map((value) => <option key={value}>{value}</option>)}
+                </select>
+              </label>
+              <label className="grid gap-2 text-sm font-semibold text-slate-200">Language
+                <input value={filters.language} onChange={(event) => setFilters((current) => ({ ...current, language: event.target.value }))} className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-white" />
+              </label>
+              <label className="grid gap-2 text-sm font-semibold text-slate-200">Country/city/local filter
+                <input value={filters.location} onChange={(event) => setFilters((current) => ({ ...current, location: event.target.value }))} placeholder="Optional city or country" className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-white placeholder:text-slate-500" />
+              </label>
+              <label className="grid gap-2 text-sm font-semibold text-slate-200">Minimum members
+                <input type="number" value={filters.minimumMembers} onChange={(event) => setFilters((current) => ({ ...current, minimumMembers: Number(event.target.value) }))} className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-white" />
+              </label>
+              <label className="grid gap-2 text-sm font-semibold text-slate-200">Minimum posts per day
+                <input type="number" value={filters.minimumPostsPerDay} onChange={(event) => setFilters((current) => ({ ...current, minimumPostsPerDay: Number(event.target.value) }))} className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-white" />
+              </label>
+              <label className="grid gap-2 text-sm font-semibold text-slate-200">Minimum reactions/comments
+                <input type="number" value={filters.minimumEngagement} onChange={(event) => setFilters((current) => ({ ...current, minimumEngagement: Number(event.target.value) }))} className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-white" />
+              </label>
+            </div>
+            <label className="mt-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/35 p-4 text-sm font-semibold text-slate-100">
+              <input type="checkbox" checked={filters.publicGroupsOnly} onChange={(event) => setFilters((current) => ({ ...current, publicGroupsOnly: event.target.checked }))} />
+              Public groups only
+            </label>
+            <label className="mt-4 grid gap-2 text-sm font-semibold text-slate-200">Exclude keywords
+              <textarea value={filters.excludeKeywords.join(", ")} onChange={(event) => setFilters((current) => ({ ...current, excludeKeywords: event.target.value.split(",").map((item) => item.trim()).filter(Boolean) }))} rows={3} className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-white" />
+            </label>
+            <p className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm leading-6 text-amber-50">Read-only discovery only. No auto-posting, no auto-messaging, no cookies/password/session collection, and no private group bypassing.</p>
+          </div>
+        )}
+
+        {activeTab === "Search" && (mode === "find" ? (
           <div className="rounded-[2rem] border border-white/10 bg-white/[0.06] p-5 shadow-2xl shadow-black/20">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -392,7 +696,7 @@ export default function FacebookRadarPage() {
             <h2 className="mt-4 text-3xl font-semibold text-white">Paste a Facebook post to analyze</h2>
             <p className="mx-auto mt-3 max-w-2xl text-slate-300">Facebook Lead Radar does not scrape groups or auto-post. It helps you decide whether a permitted post is worth a manual, helpful reply.</p>
           </div>
-        )}
+        ))}
 
         {copied && <p className="mt-4 text-center text-sm font-semibold text-emerald-300">Copied.</p>}
       </section>

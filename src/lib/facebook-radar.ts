@@ -37,9 +37,99 @@ export type FacebookRadarSearchLink = {
   groupsUrl: string;
 };
 
-const BUYER_PATTERN = /\b(web designer|web designers|seo freelancer|seo freelancers|seo consultant|seo agency|local marketer|digital marketer|lead generation freelancer|lead gen|small agency|agency|freelancer|sell websites|selling websites|website redesign|local business services|automation service|client acquisition)\b/i;
-const PAIN_PATTERN = /\b(need clients|how do i get clients|get clients|looking for leads|find local businesses|get seo clients|local lead generation|cold outreach not working|outreach not working|no one replies|no replies|prospecting help|businesses without websites|how do i prospect|agency clients|lead generation|outreach|prospecting|local business prospects|website clients|seo clients|where do i find customers|no traffic|no sales|no leads|not converting|bookings|appointments|don't know how to market|dont know how to market)\b/i;
-const BAD_PATTERN = /\b(hiring|looking for web developer|need a web developer|web developer needed|pay per website|\$50 per website|remote developer|salary|full-time|part-time|job opening|job post|vacancy|apply now|course launch|buy my|dm me for|limited offer|promo code|giveaway|i built this|we provide leads|guaranteed clients|guaranteed leads|buy leads|sell leads|cheap website)\b/i;
+export type FacebookRadarFilters = {
+  recentOnly: boolean;
+  postedWithin: "24h" | "72h" | "7d" | "30d";
+  publicGroupsOnly: boolean;
+  minimumMembers: number;
+  minimumPostsPerDay: number;
+  minimumEngagement: number;
+  language: string;
+  location: string;
+  includeCategories: string[];
+  excludeCategories: string[];
+  excludeKeywords: string[];
+};
+
+export type FacebookLeadCandidate = {
+  text: string;
+  url?: string;
+  groupName?: string;
+  groupMembers?: number;
+  groupPostsPerDay?: number;
+  reactions?: number;
+  comments?: number;
+  language?: string;
+  location?: string;
+  isPublicGroup?: boolean;
+  source?: string;
+};
+
+export type FacebookLeadPreview = {
+  id: string;
+  groupName: string;
+  groupSizeActivity: string;
+  snippet: string;
+  authorType: string;
+  intentScore: FacebookRadarScore;
+  intentRank: number;
+  painPoint: string;
+  businessCategory: string;
+  location: string;
+  reason: string;
+  duplicateWarning: string;
+  passedFilters: boolean;
+  skipReasons: string[];
+  url: string;
+  suggestedReply: string;
+};
+
+export type FacebookRadarSchedule = {
+  id: string;
+  name: string;
+  cadence: "every 3h" | "every 6h" | "every 12h" | "daily";
+  paused: boolean;
+  queries: string[];
+};
+
+export const BUYER_INTENT_QUERY_LIBRARY = [
+  "I need a website for my business",
+  "looking for someone to build website",
+  "need help getting clients",
+  "how do I get more customers",
+  "need more leads for my business",
+  "looking for marketing help",
+  "recommend marketing agency",
+  "need someone to run ads",
+  "need SEO help",
+  "my website is not getting customers",
+  "who to increase sales online",
+  "need help with ecommerce store",
+  "looking for social media manager",
+  "best way to get more clients",
+  "need email marketing help",
+  "looking for branding help",
+  "need content for my business",
+  "need help with Google Ads",
+  "my business is slow need help",
+];
+
+export const DEFAULT_FACEBOOK_EXCLUDE_KEYWORDS = [
+  "job",
+  "hire me",
+  "freelancer",
+  "looking for work",
+  "crypto",
+  "MLM",
+  "affiliate",
+  "dropshipping",
+  "reseller",
+  "spam",
+];
+
+const BUYER_PATTERN = /\b(my business|our business|business owner|small business|local business|restaurant|clinic|salon|contractor|roofer|plumber|law firm|ecommerce store|online store|shopify store|startup|founder|coach|consultant|service business|need a website|marketing agency|google ads|seo help|social media manager|branding help|email marketing|content for my business)\b/i;
+const PAIN_PATTERN = /\b(need clients|how do i get clients|get clients|get more customers|more customers|looking for leads|need more leads|need leads|lead generation|cold outreach not working|outreach not working|no one replies|no replies|where do i find customers|no traffic|no sales|increase sales online|not converting|bookings|appointments|don't know how to market|dont know how to market|marketing help|website is not getting customers|business is slow|need someone to run ads|need seo help|ecommerce store|recommend marketing agency|looking for someone to build website)\b/i;
+const BAD_PATTERN = /\b(hiring|hire me|looking for work|looking for web developer|need a web developer|web developer needed|pay per website|\$50 per website|remote developer|salary|full-time|part-time|job opening|job post|vacancy|apply now|course launch|buy my|dm me for|limited offer|promo code|giveaway|i built this|i build websites|i can build|i offer|we provide leads|guaranteed clients|guaranteed leads|buy leads|sell leads|cheap website|crypto|forex|mlm|multi level|affiliate|dropshipping|drop shipping|reseller|wholesale|telegram)\b/i;
 const PRIVATE_GROUP_PATTERN = /\b(private group|members only|screenshot from a private group|do not share|confidential)\b/i;
 const SEARCH_SKIP_SIGNALS = ["hiring", "jobs", "cheap web developer", "pay per website", "people selling leads", "spam offers", "DM me", "guaranteed clients"];
 const SEARCH_GOOD_SIGNALS = ["questions", "advice requests", "business owner pain", "no sales/no leads/no traffic", "outreach failure", "marketing confusion"];
@@ -124,6 +214,22 @@ function marketVibeSearchScore(phrase: string) {
   return Math.max(0, Math.min(100, score));
 }
 
+export function createDefaultFacebookFilters(): FacebookRadarFilters {
+  return {
+    recentOnly: true,
+    postedWithin: "7d",
+    publicGroupsOnly: true,
+    minimumMembers: 500,
+    minimumPostsPerDay: 3,
+    minimumEngagement: 1,
+    language: "English",
+    location: "",
+    includeCategories: [],
+    excludeCategories: ["jobs", "crypto", "mlm", "reseller", "dropshipping"],
+    excludeKeywords: DEFAULT_FACEBOOK_EXCLUDE_KEYWORDS,
+  };
+}
+
 export function generateFacebookSearchLinks(input: FacebookRadarSearchInput): FacebookRadarSearchLink[] {
   const painTerms = splitTerms(input.painKeywords);
   const niches = nicheVariants([input.targetBuyer, input.niche, input.painKeywords].join(" "));
@@ -144,6 +250,7 @@ export function generateFacebookSearchLinks(input: FacebookRadarSearchInput): Fa
     "how do I get bookings",
     "outreach not working",
     "how do I get appointments",
+    ...BUYER_INTENT_QUERY_LIBRARY,
   ];
   const phrases = new Set<string>();
   const add = (phrase: string) => {
@@ -196,6 +303,113 @@ export function generateFacebookSearchLinks(input: FacebookRadarSearchInput): Fa
       postsUrl: facebookPostsUrl(phrase),
       groupsUrl: facebookGroupsUrl(phrase),
     }));
+}
+
+function detectPainPoint(text: string) {
+  if (/\b(website|site|web design|build website)\b/i.test(text)) return "website help";
+  if (/\b(seo|rank|google visibility)\b/i.test(text)) return "SEO help";
+  if (/\b(ads|google ads|facebook ads|run ads)\b/i.test(text)) return "ads help";
+  if (/\b(ecommerce|shopify|online store|store not converting)\b/i.test(text)) return "ecommerce growth";
+  if (/\b(no sales|increase sales|business is slow)\b/i.test(text)) return "sales growth";
+  if (/\b(leads|clients|customers|bookings|appointments)\b/i.test(text)) return "customer acquisition";
+  if (/\b(marketing|social media|branding|content|email marketing)\b/i.test(text)) return "marketing help";
+  return "buyer problem";
+}
+
+function detectBusinessCategory(text: string) {
+  if (/\b(ecommerce|shopify|online store)\b/i.test(text)) return "ecommerce";
+  if (/\b(restaurant|cafe|salon|clinic|contractor|roofer|plumber|law firm|gym|dentist)\b/i.test(text)) return "local business";
+  if (/\b(coach|consultant|service business|agency)\b/i.test(text)) return "service business";
+  if (/\b(startup|founder|saas|app)\b/i.test(text)) return "startup";
+  return "business owner";
+}
+
+function detectLocation(text: string, fallback = "") {
+  if (fallback) return fallback;
+  const match = text.match(/\b(?:in|near|around)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\b/);
+  return match?.[1] || "Not detected";
+}
+
+function scoreLabel(score: number): FacebookRadarScore {
+  if (score >= 75) return "High";
+  if (score >= 50) return "Medium";
+  return "Low";
+}
+
+export function normalizeFacebookLeadSignature(value: { text?: string; url?: string }) {
+  const url = cleanText(value.url || "").toLowerCase();
+  if (url && !/facebook\.com\/?$/.test(url)) return url;
+  return cleanText(value.text || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").slice(0, 220);
+}
+
+export function scoreFacebookLeadPreview(candidate: FacebookLeadCandidate, filters: FacebookRadarFilters = createDefaultFacebookFilters(), seen = new Set<string>()): FacebookLeadPreview {
+  const text = cleanText(candidate.text || "");
+  const combined = cleanText([text, candidate.groupName, candidate.location].filter(Boolean).join(" "));
+  let rank = scorePost(combined, "business owners", filters.includeCategories.join(", "));
+  const skipReasons: string[] = [];
+  const signature = normalizeFacebookLeadSignature({ text, url: candidate.url });
+
+  if (!text || text.length < 35) skipReasons.push("post has too little useful text");
+  if (seen.has(signature)) skipReasons.push("duplicate post");
+  if (BAD_PATTERN.test(combined)) skipReasons.push("seller, job, spam, crypto, MLM, reseller, or low-quality intent");
+  if (filters.publicGroupsOnly && candidate.isPublicGroup === false) skipReasons.push("not confirmed public");
+  if ((candidate.groupMembers || 0) < filters.minimumMembers) skipReasons.push("group below minimum members");
+  if ((candidate.groupPostsPerDay || 0) < filters.minimumPostsPerDay) skipReasons.push("group below minimum daily activity");
+  if (((candidate.reactions || 0) + (candidate.comments || 0)) < filters.minimumEngagement) skipReasons.push("below minimum reactions/comments");
+  if (filters.language && candidate.language && candidate.language.toLowerCase() !== filters.language.toLowerCase()) skipReasons.push("language mismatch");
+  if (filters.location && !combined.toLowerCase().includes(filters.location.toLowerCase())) skipReasons.push("location mismatch");
+
+  for (const keyword of filters.excludeKeywords) {
+    if (keyword && combined.toLowerCase().includes(keyword.toLowerCase())) skipReasons.push(`excluded keyword: ${keyword}`);
+  }
+
+  const category = detectBusinessCategory(combined);
+  if (filters.includeCategories.length && !filters.includeCategories.some((item) => category.includes(item.toLowerCase()) || combined.toLowerCase().includes(item.toLowerCase()))) {
+    skipReasons.push("does not match included business categories");
+  }
+  if (filters.excludeCategories.some((item) => category.includes(item.toLowerCase()) || combined.toLowerCase().includes(item.toLowerCase()))) {
+    skipReasons.push("matches excluded business category");
+  }
+
+  if (skipReasons.length) rank = Math.min(rank, 45);
+  const painPoint = detectPainPoint(combined);
+  const passedFilters = skipReasons.length === 0 && rank >= 50;
+
+  return {
+    id: signature || `${Date.now()}`,
+    groupName: candidate.groupName || "Facebook source",
+    groupSizeActivity: `${candidate.groupMembers || 0} members · ${candidate.groupPostsPerDay || 0} posts/day`,
+    snippet: text.slice(0, 260),
+    authorType: /\b(my business|our business|i own|we own|founder)\b/i.test(text) ? "Likely business owner" : "Unknown",
+    intentScore: scoreLabel(rank),
+    intentRank: rank,
+    painPoint,
+    businessCategory: category,
+    location: detectLocation(combined, candidate.location),
+    reason: passedFilters
+      ? `Matched ${painPoint} with buyer-style language and passed activity/safety filters.`
+      : `Skipped or downgraded: ${skipReasons.join("; ") || "not enough buyer intent"}.`,
+    duplicateWarning: seen.has(signature) ? "Duplicate: already seen or sent." : "No duplicate detected.",
+    passedFilters,
+    skipReasons,
+    url: candidate.url || "https://www.facebook.com",
+    suggestedReply: replyForIntent(detectIntent(combined)).quickReply,
+  };
+}
+
+export function filterAndRankFacebookLeads(candidates: FacebookLeadCandidate[], filters: FacebookRadarFilters = createDefaultFacebookFilters(), previouslySent = new Set<string>()) {
+  const seen = new Set(previouslySent);
+  return candidates
+    .map((candidate) => {
+      const preview = scoreFacebookLeadPreview(candidate, filters, seen);
+      seen.add(preview.id);
+      return preview;
+    })
+    .sort((a, b) => b.intentRank - a.intentRank);
+}
+
+export function shouldSendFacebookLead(preview: FacebookLeadPreview, sent = new Set<string>()) {
+  return preview.passedFilters && preview.intentScore === "High" && !sent.has(preview.id);
 }
 
 function detectIntent(text: string) {

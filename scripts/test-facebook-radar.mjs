@@ -17,7 +17,14 @@ const transpiled = ts.transpileModule(source, {
 const sandbox = { exports: {} };
 vm.runInNewContext(transpiled.outputText, sandbox, { filename: "facebook-radar.js" });
 
-const { analyzeFacebookLead, generateFacebookSearchLinks } = sandbox.exports;
+const {
+  BUYER_INTENT_QUERY_LIBRARY,
+  analyzeFacebookLead,
+  createDefaultFacebookFilters,
+  filterAndRankFacebookLeads,
+  generateFacebookSearchLinks,
+  shouldSendFacebookLead,
+} = sandbox.exports;
 
 function phrasesFor(input) {
   return generateFacebookSearchLinks(input).map((link) => link.phrase).join(" | ");
@@ -107,7 +114,85 @@ const guaranteedLeads = analyzeFacebookLead({
 });
 assert.equal(guaranteedLeads.action, "Skip", "Guaranteed lead offer posts should be Skip / bad fit");
 
+assert.ok(BUYER_INTENT_QUERY_LIBRARY.includes("I need a website for my business"), "Buyer intent query library should include website buyer queries");
+assert.ok(BUYER_INTENT_QUERY_LIBRARY.includes("my business is slow need help"), "Buyer intent query library should include business slowdown queries");
+
+const defaultFilters = createDefaultFacebookFilters();
+const buyerIntentPreviews = filterAndRankFacebookLeads([
+  {
+    text: "I own a local cleaning business and my website is not getting customers. Need more leads for my business. Any advice?",
+    url: "https://www.facebook.com/groups/local/posts/123",
+    groupName: "Local Business Owners",
+    groupMembers: 4200,
+    groupPostsPerDay: 18,
+    comments: 4,
+    reactions: 7,
+    language: "English",
+    isPublicGroup: true,
+  },
+], defaultFilters);
+assert.equal(buyerIntentPreviews[0].intentScore, "High", "Business-owner buyer intent should score High");
+assert.equal(buyerIntentPreviews[0].passedFilters, true, "Business-owner buyer intent should pass filters");
+
+const badIntentPreviews = filterAndRankFacebookLeads([
+  {
+    text: "Hire me. I am a freelancer looking for work and I build cheap websites. DM me for crypto affiliate offers.",
+    url: "https://www.facebook.com/groups/spam/posts/456",
+    groupName: "Freelancer Jobs",
+    groupMembers: 8000,
+    groupPostsPerDay: 20,
+    comments: 5,
+    reactions: 5,
+    language: "English",
+    isPublicGroup: true,
+  },
+], defaultFilters);
+assert.equal(badIntentPreviews[0].passedFilters, false, "Freelancer/job/spam posts should be rejected");
+assert.match(badIntentPreviews[0].reason, /seller|job|spam|crypto|excluded keyword/i, "Rejected posts should explain why");
+
+const lowActivityPreviews = filterAndRankFacebookLeads([
+  {
+    text: "I own a salon and need help getting more customers from my website.",
+    url: "https://www.facebook.com/groups/small/posts/789",
+    groupName: "Tiny Group",
+    groupMembers: 12,
+    groupPostsPerDay: 0,
+    comments: 0,
+    reactions: 0,
+    language: "English",
+    isPublicGroup: true,
+  },
+], defaultFilters);
+assert.equal(lowActivityPreviews[0].passedFilters, false, "Low activity groups should be filtered");
+assert.match(lowActivityPreviews[0].reason, /minimum members|daily activity|minimum reactions/i, "Low activity filtering should explain skipped reasons");
+
+const duplicatePreviews = filterAndRankFacebookLeads([
+  {
+    text: "My business has no leads and I need marketing help.",
+    url: "https://www.facebook.com/groups/local/posts/999",
+    groupName: "Business Owners",
+    groupMembers: 5000,
+    groupPostsPerDay: 15,
+    comments: 3,
+    reactions: 3,
+    language: "English",
+    isPublicGroup: true,
+  },
+], defaultFilters, new Set(["https://www.facebook.com/groups/local/posts/999"]));
+assert.equal(duplicatePreviews[0].passedFilters, false, "Duplicate posts should be blocked");
+assert.match(duplicatePreviews[0].duplicateWarning, /Duplicate/i, "Duplicate posts should show a warning");
+
+assert.equal(shouldSendFacebookLead(buyerIntentPreviews[0], new Set()), true, "Only filtered High Intent posts should be sendable");
+assert.equal(shouldSendFacebookLead(badIntentPreviews[0], new Set()), false, "Rejected posts should not be sendable");
+assert.equal(shouldSendFacebookLead(duplicatePreviews[0], new Set([duplicatePreviews[0].id])), false, "Duplicate posts should not be sendable");
+
 assert.match(pageSource, /activeSearchLink = availableSearchLinks/, "One-card workflow state should use one active search card");
+assert.match(pageSource, /MAIN_TABS/, "Facebook Radar should expose main workflow tabs");
+assert.match(pageSource, /Presets/, "Facebook Radar should include a Presets tab");
+assert.match(pageSource, /Sent Leads/, "Facebook Radar should include a Sent Leads tab");
+assert.match(pageSource, /Logs and Analytics/, "Facebook Radar should include logs and analytics");
+assert.match(pageSource, /Send Visible High-Intent Posts to MarketVibe/, "Facebook Radar should include filtered high-intent send action");
+assert.match(pageSource, /Facebook API permissions/, "Facebook Radar should warn about API permission limits");
 assert.match(pageSource, /function markBadNext/, "Mark Bad / Next workflow should exist");
 assert.match(pageSource, /skipSearch\(link\)/, "Mark Bad should move the current card into skipped searches");
 assert.match(pageSource, /setMode\("analyze"\)/, "Mark Good should switch to Analyze mode");
