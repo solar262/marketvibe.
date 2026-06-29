@@ -118,7 +118,11 @@ assert.match(pageSource, /Open Posts/, "Open Posts primary button should exist")
 
 assert.match(extensionSource, /function extractPostUrl/, "Facebook importer should extract exact post URLs");
 assert.match(extensionSource, /function isExactPostUrl/, "Facebook importer should detect exact post URLs");
+assert.match(extensionSource, /function scoreFacebookUrl/, "Facebook importer should rank exact source URLs");
 assert.match(extensionSource, /story_fbid/, "Facebook importer should preserve story_fbid post links");
+assert.match(extensionSource, /comment_id=\\d\+/, "Facebook importer should prefer comment links over generic group URLs");
+assert.match(extensionSource, /\/photo/, "Facebook importer should support photo source URLs");
+assert.match(extensionSource, /fbid=\\d\+/, "Facebook importer should support fbid source URLs");
 assert.ok(extensionSource.includes("/\\/groups\\/[^/?#]+\\/posts\\/\\d+/i"), "Facebook importer should support exact group post links");
 assert.ok(extensionSource.includes("/\\/groups\\/[^/?#]+\\/permalink\\/\\d+/i"), "Facebook importer should support exact group permalink links");
 assert.match(extensionSource, /function isGenericFacebookUrl/, "Facebook importer should reject generic source URLs");
@@ -131,6 +135,20 @@ assert.match(extensionSource, /looking for \(\?:a \)\?tool to find leads/, "Face
 assert.match(extensionSource, /cheap website/, "Facebook importer should reject cheap-work posts");
 assert.match(extensionSource, /guaranteed clients/, "Facebook importer should reject guaranteed-client spam");
 assert.match(extensionSource, /group directory/, "Facebook importer should reject directory noise");
+assert.match(extensionSource, /Send this post to MarketVibe/, "Highlighted posts should get a one-post import button");
+assert.match(extensionSource, /function sendSinglePost/, "Per-post import workflow should exist");
+assert.match(extensionSource, /sendPosts\(\[post\]\)/, "Per-post import should send only one post");
+assert.match(extensionSource, /function sendVisible/, "Bulk visible import should remain as backup");
+assert.match(extensionSource, /setInterval\(markFeed, 1500\)/, "Extension should rescan Facebook cards every 1.5 seconds");
+assert.match(extensionSource, /marketvibe-intent-badge/, "Extension should avoid duplicate buyer-intent badges");
+assert.match(extensionSource, /marketvibe-card-actions/, "Extension should avoid duplicate one-post buttons");
+assert.match(extensionSource, /const MAX_RECENT_IMPORTS = 20/, "Local import cache should keep a max of 20 posts");
+assert.match(extensionSource, /\.slice\(0, MAX_RECENT_IMPORTS\)/, "Local import cache should trim to max 20");
+assert.match(extensionSource, /Recent MarketVibe imports/, "Recent imports panel should exist");
+assert.match(extensionSource, /getRecentImports\(\)\.slice\(0, 3\)/, "Recent imports panel should show the last 3 posts");
+assert.match(extensionSource, /function createReply/, "Cached posts should have a copyable reply");
+assert.match(extensionSource, /MarketVibe helps spot public business signals/, "Copy reply should mention MarketVibe");
+assert.match(extensionSource, /https:\/\/www\.marketvibe1\.com/, "Copy reply should include the MarketVibe URL");
 
 const helperSource = source.toLowerCase();
 assert.equal(helperSource.includes("fetch("), false, "Facebook Radar helper should not scrape or fetch Facebook");
