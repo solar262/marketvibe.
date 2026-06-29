@@ -7,6 +7,8 @@
   const HANDLED_KEY = "marketvibe_facebook_handled_posts";
   const MAX_HANDLED_POSTS = 500;
   const LEAD_HUNT_KEY = "marketvibe_lead_hunt_autopilot";
+  const MAX_SCROLL_ATTEMPTS = 4;
+  const OUTREACH_MODES = ["off", "draft-only", "manual-approval", "allowed-adapters"];
   const LEAD_HUNT_PRESETS = [
     "I need leads",
     "how do I get clients",
@@ -281,6 +283,8 @@
 
   function buildPostFromNode(node, score, meta = {}) {
     const text = getPostText(node);
+    const painPoint = meta.painPoint || detectPainPoint(text);
+    const draft = createContextualReply({ text, painPoint, score });
     return {
       text,
       score,
@@ -292,7 +296,9 @@
       url: extractPostUrl(node),
       queryUsed: meta.queryUsed || "",
       sourceUsed: meta.sourceUsed || "",
-      painPoint: meta.painPoint || detectPainPoint(text),
+      painPoint,
+      replyDraft: meta.outreachMode === "off" ? "" : draft,
+      outreachMode: meta.outreachMode || "draft-only",
     };
   }
 
@@ -309,6 +315,38 @@
   function createReply(post) {
     const opening = post.text.length > 130 ? `${post.text.slice(0, 130)}...` : post.text;
     return `This looks like a useful MarketVibe lead to review: "${opening}"\n\nMarketVibe helps spot public business signals and lead opportunities without scraping private data: https://www.marketvibe1.com`;
+  }
+
+  function createContextualReply(post) {
+    const text = clean(post.text || "");
+    const pain = clean(post.painPoint || detectPainPoint(text));
+    const variants = {
+      "outreach not working": [
+        "I would tighten the reason for reaching out before changing channels. Replies usually improve when the first message points to one specific visible problem instead of a broad service pitch.",
+        "If outreach is not getting replies, I would check the targeting and opener first. A short note about one real issue you noticed usually lands better than a general offer.",
+      ],
+      "customer acquisition": [
+        "I would start by narrowing the buyer and the trigger. It is easier to find leads when you look for businesses showing one clear problem, like weak visibility, no clear CTA, or poor follow-up.",
+        "This sounds like a positioning and prospecting issue before a tools issue. Pick one customer type, then look for visible signs they may need help.",
+      ],
+      "website help": [
+        "I would look at the basics first: mobile layout, clear CTA, trust signals, and whether visitors can quickly understand what to do next.",
+        "For a website issue, I would start with the conversion path. If the offer, CTA, or contact path is fuzzy, more traffic may not fix it.",
+      ],
+      "SEO help": [
+        "I would check whether the local/service pages match what people actually search for. Missing service pages and weak titles can make good businesses hard to find.",
+        "For SEO, I would begin with the obvious visibility gaps: page titles, service pages, local terms, and whether competitors explain the offer more clearly.",
+      ],
+      "ecommerce or sales growth": [
+        "I would separate traffic from conversion. If people are visiting but not buying, product page trust, offer clarity, checkout friction, and abandoned carts are worth checking first.",
+        "For store growth, I would look at the product page and trust signals before adding more ads. Traffic helps only if the page makes the next step obvious.",
+      ],
+    };
+    const options = variants[pain] || [
+      "I would start by finding the clearest visible problem, then build outreach or marketing around that. It keeps the conversation specific instead of sounding like a pitch.",
+      "This is easier to solve when you narrow the audience and the trigger. Look for people already showing the problem you help with, then reply to that specific context.",
+    ];
+    return options[simpleHash(text || pain) % options.length];
   }
 
   function getRecentImports() {
@@ -486,6 +524,10 @@
         maxImportedLeads: 10,
         delayMs: 3500,
       },
+      outreach: {
+        mode: OUTREACH_MODES[1],
+        adapters: [],
+      },
     };
   }
 
@@ -563,7 +605,7 @@
   }
 
   function navigateWithDelay(url, state, reason) {
-    const nextState = { ...state, status: reason, nextActionAt: Date.now() + leadHuntDelay(state) };
+    const nextState = { ...state, status: reason, currentUrl: url, nextActionAt: Date.now() + leadHuntDelay(state) };
     saveLeadHuntState(nextState);
     window.setTimeout(() => {
       const latest = getLeadHuntState();
@@ -582,11 +624,17 @@
       importedCount: 0,
       skippedCount: 0,
       duplicateCount: 0,
+      failedCount: 0,
       resultNumber: 0,
       caps: config.caps || defaultLeadHuntConfig().caps,
+      outreach: config.outreach || defaultLeadHuntConfig().outreach,
       searches,
       seen: getHandledPosts(),
       errors: [],
+      startedAt: Date.now(),
+      currentUrl: location.href,
+      scrollAttempts: 0,
+      visitedUrls: [],
       status: "Lead Hunt starting.",
     };
     saveLeadHuntState(state);
@@ -640,6 +688,8 @@
       currentResultIndex: 0,
       currentResultUrls: [],
       resultNumber: 0,
+      scrollAttempts: 0,
+      visitedUrls: [],
       status: reason,
     };
     const search = currentLeadHuntSearch(nextState);
@@ -666,12 +716,51 @@
   function collectAutopilotPosts(state, search) {
     return getQualifiedNodes(false)
       .filter((item) => item.score >= 55)
-      .map((item) => ({ item, post: buildPostFromNode(item.node, item.score, { queryUsed: search?.query || "", sourceUsed: search?.source || "" }) }))
+      .map((item) => ({ item, post: buildPostFromNode(item.node, item.score, { queryUsed: search?.query || "", sourceUsed: search?.source || "", outreachMode: state.outreach?.mode || "draft-only" }) }))
       .filter(({ post }) => {
         const key = getPostKey(post);
         return key && !isHandledPostKey(key) && !(state.seen || []).includes(key);
       })
       .slice(0, Math.max(0, Number(state.caps?.maxImportedLeads || 10) - Number(state.importedCount || 0)));
+  }
+
+  function countAutopilotDuplicates(state) {
+    return getQualifiedNodes(true).filter((item) => isHandledPostKey(item.key) || (state.seen || []).includes(item.key)).length;
+  }
+
+  function scrollAndRescan(state, message) {
+    const attempts = Number(state.scrollAttempts || 0) + 1;
+    if (attempts > MAX_SCROLL_ATTEMPTS) return false;
+    window.scrollBy({ top: Math.round(window.innerHeight * 0.9), behavior: "smooth" });
+    saveLeadHuntState({
+      ...state,
+      scrollAttempts: attempts,
+      status: `${message} Scrolling visible results (${attempts}/${MAX_SCROLL_ATTEMPTS}).`,
+      nextActionAt: Date.now() + leadHuntDelay(state),
+    });
+    return true;
+  }
+
+  function advanceAfterFacebookPage(state, reason) {
+    const urls = state.currentResultUrls || [];
+    const nextResultIndex = Number(state.currentResultIndex || 0) + 1;
+    if (urls[nextResultIndex]) {
+      navigateWithDelay(urls[nextResultIndex], {
+        ...state,
+        currentResultIndex: nextResultIndex,
+        resultNumber: nextResultIndex + 1,
+        scrollAttempts: 0,
+        skippedCount: (state.skippedCount || 0) + 1,
+        visitedUrls: Array.from(new Set([...(state.visitedUrls || []), location.href])).slice(-50),
+      }, `${reason} Opening result ${nextResultIndex + 1}.`);
+      return;
+    }
+    nextLeadHuntSearch({
+      ...state,
+      scrollAttempts: 0,
+      skippedCount: (state.skippedCount || 0) + 1,
+      visitedUrls: Array.from(new Set([...(state.visitedUrls || []), location.href])).slice(-50),
+    }, reason);
   }
 
   async function runLeadHuntTick() {
@@ -693,16 +782,18 @@
       if (/google\.com|bing\.com/i.test(location.hostname)) {
         const resultUrls = collectIndexedFacebookResultUrls();
         if (!resultUrls.length) {
+          if (scrollAndRescan(state, "No indexed Facebook results found yet.")) return;
           nextLeadHuntSearch({ ...state, skippedCount: (state.skippedCount || 0) + 1 }, "No indexed Facebook results found.");
           return;
         }
-        const nextState = { ...state, currentResultUrls: resultUrls, currentResultIndex: 0, resultNumber: 1 };
+        const nextState = { ...state, currentResultUrls: resultUrls, currentResultIndex: 0, resultNumber: 1, scrollAttempts: 0 };
         navigateWithDelay(resultUrls[0], nextState, `Opening indexed Facebook result 1 of ${resultUrls.length}.`);
         return;
       }
 
       if (/facebook\.com/i.test(location.hostname)) {
         markFeed();
+        const duplicateCount = Math.max(Number(state.duplicateCount || 0), countAutopilotDuplicates(state));
         const posts = collectAutopilotPosts(state, search);
         if (posts.length) {
           const sentPosts = posts.map(({ post }) => post);
@@ -716,7 +807,10 @@
           saveLeadHuntState({
             ...state,
             importedCount,
+            duplicateCount,
             seen,
+            scrollAttempts: 0,
+            importedLeads: [...sentPosts, ...(state.importedLeads || [])].slice(0, 30),
             status: `Imported ${sentPosts.length} high-intent lead(s). Good: ${data.counts?.good || 0}.`,
             nextActionAt: Date.now() + leadHuntDelay(state),
           });
@@ -726,22 +820,24 @@
           return;
         }
 
-        const urls = state.currentResultUrls || [];
-        const nextResultIndex = Number(state.currentResultIndex || 0) + 1;
-        if (urls[nextResultIndex]) {
-          navigateWithDelay(urls[nextResultIndex], { ...state, currentResultIndex: nextResultIndex, resultNumber: nextResultIndex + 1, skippedCount: (state.skippedCount || 0) + 1 }, `No high-intent match here. Opening result ${nextResultIndex + 1}.`);
-          return;
-        }
-        nextLeadHuntSearch({ ...state, skippedCount: (state.skippedCount || 0) + 1 }, "No high-intent match on this result.");
+        const stateWithDuplicates = { ...state, duplicateCount };
+        if (scrollAndRescan(stateWithDuplicates, "No high-intent match on loaded posts yet.")) return;
+        advanceAfterFacebookPage(stateWithDuplicates, "No high-intent match after scanning visible page.");
       }
     } catch (error) {
-      saveLeadHuntState({
+      const failedCount = Number(state.failedCount || 0) + 1;
+      const failedState = {
         ...state,
         errors: [`${new Date().toLocaleTimeString()} ${error && error.message ? error.message : "Unknown Lead Hunt error"}`, ...(state.errors || [])].slice(0, 8),
-        skippedCount: (state.skippedCount || 0) + 1,
+        failedCount,
         status: "Recovered from a blocked, blank, or unavailable page.",
         nextActionAt: Date.now() + leadHuntDelay(state),
-      });
+      };
+      if (failedCount >= 3) {
+        advanceAfterFacebookPage(failedState, "Repeated failures on this page.");
+        return;
+      }
+      saveLeadHuntState(failedState);
     }
   }
 
@@ -757,16 +853,25 @@
     const search = state ? currentLeadHuntSearch(state) : null;
     panel.innerHTML = `
       <div style="font-weight:900;color:#a7f3d0;margin-bottom:6px;">MarketVibe Lead Hunt</div>
-      <div style="line-height:1.45;color:#e5eef9;margin-bottom:8px;">${state?.status || "Ready. Public/read-only discovery only. No auto-DM or auto-comment."}</div>
+      <div style="line-height:1.45;color:#e5eef9;margin-bottom:8px;">${state?.status || "Ready. Automated public-source discovery. No auto-DM or auto-comment."}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;color:#cbd5e1;">
         <div>Query: ${search?.query || "not started"}</div>
         <div>Source: ${search?.source || "none"}</div>
+        <div>Current URL: ${clean(state?.currentUrl || location.href).slice(0, 72)}</div>
+        <div>Runtime: ${state?.startedAt ? Math.round((Date.now() - state.startedAt) / 1000) : 0}s</div>
         <div>Result: ${state?.resultNumber || 0}</div>
         <div>Imported: ${state?.importedCount || 0}</div>
         <div>Skipped: ${state?.skippedCount || 0}</div>
         <div>Duplicates: ${state?.duplicateCount || 0}</div>
+        <div>Failed: ${state?.failedCount || 0}</div>
       </div>
     `;
+    if (state?.errors?.length) {
+      const errors = document.createElement("div");
+      errors.style.cssText = "border-top:1px solid rgba(255,255,255,.12);padding-top:7px;margin-bottom:8px;color:#fecaca;line-height:1.35;";
+      errors.textContent = `Errors: ${state.errors.slice(0, 2).join(" | ")}`;
+      panel.appendChild(errors);
+    }
     const controls = document.createElement("div");
     controls.style.cssText = "display:flex;gap:7px;flex-wrap:wrap;";
     const start = document.createElement("button");

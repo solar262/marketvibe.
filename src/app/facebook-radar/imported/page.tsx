@@ -13,6 +13,8 @@ type ImportCard = {
   queryUsed?: string;
   sourceUsed?: string;
   painPoint?: string;
+  replyDraft?: string;
+  outreachMode?: string;
   fitRank: number;
   label: string;
   analysis: {
@@ -104,9 +106,13 @@ export default function ImportedFacebookResultsPage() {
                 <p><strong className="text-white">Pain point:</strong> {card.painPoint || card.analysis.intent.replace(/-/g, " ")}</p>
                 {card.queryUsed && <p><strong className="text-white">Query:</strong> {card.queryUsed}</p>}
                 {card.sourceUsed && <p><strong className="text-white">Source:</strong> {card.sourceUsed}</p>}
+                {card.outreachMode && <p><strong className="text-white">Outreach:</strong> {card.outreachMode}</p>}
               </div>
               <p className="mt-4 text-sm leading-6 text-slate-300"><strong className="text-white">Why:</strong> {card.analysis.reason}</p>
               <p className="mt-4 rounded-2xl border border-white/10 bg-slate-950/40 p-4 leading-7 text-slate-100"><strong className="text-white">Post:</strong> {card.text || "Facebook post imported"}</p>
+              {card.replyDraft && (
+                <p className="mt-4 rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-4 leading-7 text-emerald-50"><strong>Reply draft:</strong> {card.replyDraft}</p>
+              )}
               <div className="mt-4 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4">
                 <p className="text-sm font-bold text-cyan-100">Quick Reply</p>
                 <p className="mt-2 leading-7 text-slate-100">{card.analysis.quickReply}</p>

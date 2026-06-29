@@ -241,6 +241,14 @@ assert.match(leadHuntPageSource, /Delay between actions/, "Lead Hunt Autopilot s
 assert.match(leadHuntPageSource, /marketvibeLeadHunt/, "Lead Hunt Autopilot should launch extension mode with encoded settings");
 assert.match(leadHuntPageSource, /Final imported leads/, "Lead Hunt Autopilot should show final imported leads only");
 assert.match(leadHuntPageSource, /No auto-DM, no auto-comment, no private data/, "Lead Hunt Autopilot should show safety guardrails");
+assert.match(leadHuntPageSource, /Live query/, "Lead Hunt Autopilot should show live query");
+assert.match(leadHuntPageSource, /Live source/, "Lead Hunt Autopilot should show live source");
+assert.match(leadHuntPageSource, /Current URL/, "Lead Hunt Autopilot should show current URL");
+assert.match(leadHuntPageSource, /Runtime/, "Lead Hunt Autopilot should show runtime");
+assert.match(leadHuntPageSource, /Duplicates/, "Lead Hunt Autopilot should show duplicate count");
+assert.match(leadHuntPageSource, /Failed/, "Lead Hunt Autopilot should show failed count");
+assert.match(leadHuntPageSource, /Outreach engine mode/, "Lead Hunt Autopilot should include outreach mode architecture");
+assert.match(leadHuntPageSource, /Autopilot for allowed adapters only/, "Lead Hunt Autopilot should include allowed-adapter outreach mode");
 
 assert.match(extensionSource, /function extractPostUrl/, "Facebook importer should extract exact post URLs");
 assert.match(extensionSource, /function cleanLeadText/, "Extension should clean imported lead text");
@@ -297,6 +305,10 @@ assert.match(extensionManifest, /www\.google\.com/, "Extension should be allowed
 assert.match(extensionManifest, /www\.bing\.com/, "Extension should be allowed to inspect Bing result pages");
 assert.match(extensionSource, /LEAD_HUNT_PRESETS/, "Extension should include Lead Hunt query presets");
 assert.match(extensionSource, /function startLeadHunt/, "Extension should include Start Lead Hunt mode");
+assert.match(extensionSource, /const MAX_SCROLL_ATTEMPTS = 4/, "Autopilot should have a bounded scroll/rescan loop");
+assert.match(extensionSource, /function scrollAndRescan/, "Autopilot should scroll and rescan without manual buttons");
+assert.match(extensionSource, /function advanceAfterFacebookPage/, "Autopilot should advance to next result or query by itself");
+assert.match(extensionSource, /setInterval\(runLeadHuntTick, SCAN_INTERVAL_MS\)/, "Autopilot should run continuously without manual Send/Next/Skip");
 assert.match(extensionSource, /function withLeadHuntStateHash/, "Autopilot should preserve queue state while moving across Facebook, Google, and Bing");
 assert.match(extensionSource, /marketvibeLeadHuntState/, "Autopilot should restore cross-domain queue state from URL hash");
 assert.match(extensionSource, /function pauseLeadHunt/, "Extension should include Pause Lead Hunt control");
@@ -304,12 +316,18 @@ assert.match(extensionSource, /function resumeLeadHunt/, "Extension should inclu
 assert.match(extensionSource, /function stopLeadHunt/, "Extension should include Stop Lead Hunt control");
 assert.match(extensionSource, /function collectIndexedFacebookResultUrls/, "Extension should collect indexed public Facebook result URLs");
 assert.match(extensionSource, /function collectAutopilotPosts/, "Extension should scan visible posts for autopilot");
+assert.match(extensionSource, /function countAutopilotDuplicates/, "Autopilot should count duplicate/handled posts");
 assert.match(extensionSource, /item\.score >= 55/, "Autopilot should only import higher-intent matches by default");
 assert.match(extensionSource, /isHandledPostKey/, "Autopilot should skip duplicate or handled posts");
 assert.match(extensionSource, /maxImportedLeads/, "Autopilot should stop at imported lead cap");
 assert.match(extensionSource, /maxSearches/, "Autopilot should stop at search cap");
 assert.match(extensionSource, /No auto-DM or auto-comment/, "Extension panel should show no messaging/commenting safety");
 assert.match(extensionSource, /Recovered from a blocked, blank, or unavailable page/, "Autopilot should recover from blocked or blank pages");
+assert.match(extensionSource, /Repeated failures on this page/, "Autopilot should advance after repeated failures");
+assert.match(extensionSource, /OUTREACH_MODES/, "Extension should include outreach mode architecture");
+assert.match(extensionSource, /function createContextualReply/, "Extension should generate contextual reply drafts");
+assert.match(extensionSource, /replyDraft/, "Autopilot should save reply draft with imported leads");
+assert.match(extensionSource, /outreachMode/, "Autopilot should save outreach mode with imported leads");
 
 assert.match(importedPageSource, /<strong className="text-white">Group:<\/strong>/, "Imported page should show group name");
 assert.match(importedPageSource, /<strong className="text-white">Author:<\/strong>/, "Imported page should show author name");
@@ -317,6 +335,7 @@ assert.match(importedPageSource, /<strong className="text-white">Post:<\/strong>
 assert.match(importedPageSource, /<strong className="text-white">Score:<\/strong>/, "Imported page should show score");
 assert.match(importedPageSource, /card\.queryUsed/, "Imported page should show query used when available");
 assert.match(importedPageSource, /card\.sourceUsed/, "Imported page should show source used when available");
+assert.match(importedPageSource, /card\.replyDraft/, "Imported page should show reply draft when available");
 
 const helperSource = source.toLowerCase();
 assert.equal(helperSource.includes("fetch("), false, "Facebook Radar helper should not scrape or fetch Facebook");

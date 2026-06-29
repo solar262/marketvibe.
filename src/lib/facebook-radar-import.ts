@@ -11,6 +11,8 @@ export type ImportedFacebookPost = {
   queryUsed?: string;
   sourceUsed?: string;
   painPoint?: string;
+  replyDraft?: string;
+  outreachMode?: string;
 };
 
 export type ScoredFacebookPost = ImportedFacebookPost & {
@@ -147,6 +149,8 @@ export function scoreImportedFacebookPosts(input: {
         queryUsed: clean(post.queryUsed, 160),
         sourceUsed: clean(post.sourceUsed, 120),
         painPoint: clean(post.painPoint || analysis.intent.replace(/-/g, " "), 120),
+        replyDraft: clean(post.replyDraft, 600),
+        outreachMode: clean(post.outreachMode, 80),
         analysis,
         fitRank,
         label: classify(analysis, fitRank),

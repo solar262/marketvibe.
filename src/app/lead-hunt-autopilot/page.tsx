@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ExternalLink, Pause, Play, RefreshCw, Square } from "lucide-react";
 
 type SourceKey = "facebook" | "google" | "bing";
+type OutreachMode = "off" | "draft-only" | "manual-approval" | "allowed-adapters";
 
 type ImportedLead = {
   id: string;
@@ -15,6 +16,8 @@ type ImportedLead = {
   queryUsed?: string;
   sourceUsed?: string;
   painPoint?: string;
+  replyDraft?: string;
+  outreachMode?: string;
   fitRank: number;
   analysis: { score: string; intent: string; reason: string };
 };
@@ -43,8 +46,20 @@ export default function LeadHuntAutopilotPage() {
   const [maxSearches, setMaxSearches] = useState(10);
   const [maxImportedLeads, setMaxImportedLeads] = useState(10);
   const [delayMs, setDelayMs] = useState(3500);
+  const [outreachMode, setOutreachMode] = useState<OutreachMode>("draft-only");
   const [status, setStatus] = useState("Ready. Click Run Lead Hunt to launch the browser extension workflow.");
   const [importData, setImportData] = useState<ImportResponse | null>(null);
+  const [runtimeSeconds, setRuntimeSeconds] = useState(0);
+  const [liveProgress, setLiveProgress] = useState({
+    query: "Not started",
+    source: "Not started",
+    currentUrl: "",
+    imported: 0,
+    skipped: 0,
+    duplicates: 0,
+    failed: 0,
+    errors: [] as string[],
+  });
 
   const enabledSourceLabels = useMemo(() => {
     const labels: string[] = [];
@@ -82,11 +97,26 @@ export default function LeadHuntAutopilotPage() {
         maxImportedLeads,
         delayMs,
       },
+      outreach: {
+        mode: outreachMode,
+        adapters: [] as string[],
+      },
     };
     return `https://www.facebook.com/search/posts/?q=${encodeURIComponent(LEAD_HUNT_QUERIES[0])}#marketvibeLeadHunt=${encodeURIComponent(JSON.stringify(config))}`;
   }
 
   function runLeadHunt() {
+    setRuntimeSeconds(0);
+    setLiveProgress({
+      query: LEAD_HUNT_QUERIES[0],
+      source: enabledSourceLabels[0] || "No source enabled",
+      currentUrl: buildLaunchUrl(),
+      imported: 0,
+      skipped: 0,
+      duplicates: 0,
+      failed: 0,
+      errors: [],
+    });
     setStatus("Lead Hunt launched. The extension will open searches, scan visible public pages, import High Intent matches, and stop at your caps.");
     window.open(buildLaunchUrl(), "_blank", "noopener,noreferrer");
   }
@@ -95,6 +125,12 @@ export default function LeadHuntAutopilotPage() {
     setStatus(`${label} is controlled from the floating extension panel on Facebook/Google/Bing so you can stop immediately while pages are opening.`);
   }
 
+  useEffect(() => {
+    if (!status.includes("launched")) return;
+    const timer = window.setInterval(() => setRuntimeSeconds((value) => value + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [status]);
+
   return (
     <main className="min-h-screen bg-[#050b16] px-4 py-8 text-white sm:px-6 lg:px-8">
       <section className="mx-auto max-w-6xl">
@@ -102,7 +138,7 @@ export default function LeadHuntAutopilotPage() {
           <p className="text-sm font-bold uppercase tracking-[0.18em] text-emerald-300">Internal Growth Tool</p>
           <h1 className="mt-3 text-4xl font-semibold tracking-tight">Lead Hunt Autopilot</h1>
           <p className="mt-3 max-w-3xl text-slate-300">
-            One button launches a public, read-only buyer-intent hunt. No auto-DM, no auto-comment, no private data, and no spam actions.
+            One button launches an automated public-source buyer-intent hunt. No auto-DM, no auto-comment, no private data, and no spam actions.
           </p>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-4">
@@ -121,6 +157,18 @@ export default function LeadHuntAutopilotPage() {
           </div>
 
           <p className="mt-4 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4 text-sm font-semibold text-cyan-50">{status}</p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-4">
+            <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4"><p className="text-xs uppercase tracking-[0.16em] text-slate-400">Live query</p><p className="mt-2 min-w-0 break-words text-sm font-bold text-white">{liveProgress.query}</p></div>
+            <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4"><p className="text-xs uppercase tracking-[0.16em] text-slate-400">Live source</p><p className="mt-2 text-sm font-bold text-white">{liveProgress.source}</p></div>
+            <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4"><p className="text-xs uppercase tracking-[0.16em] text-slate-400">Runtime</p><p className="mt-2 text-sm font-bold text-white">{Math.floor(runtimeSeconds / 60)}m {runtimeSeconds % 60}s</p></div>
+            <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4"><p className="text-xs uppercase tracking-[0.16em] text-slate-400">Current URL</p><p className="mt-2 min-w-0 break-all text-xs font-bold text-cyan-100">{liveProgress.currentUrl || "Extension panel updates while running"}</p></div>
+          </div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-4">
+            <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-4"><p className="text-xs uppercase tracking-[0.16em] text-emerald-200">Imported</p><p className="mt-2 text-2xl font-black text-emerald-100">{importData?.counts.good || liveProgress.imported}</p></div>
+            <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4"><p className="text-xs uppercase tracking-[0.16em] text-amber-200">Skipped</p><p className="mt-2 text-2xl font-black text-amber-100">{liveProgress.skipped}</p></div>
+            <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4"><p className="text-xs uppercase tracking-[0.16em] text-slate-400">Duplicates</p><p className="mt-2 text-2xl font-black text-white">{liveProgress.duplicates}</p></div>
+            <div className="rounded-2xl border border-rose-300/20 bg-rose-300/10 p-4"><p className="text-xs uppercase tracking-[0.16em] text-rose-200">Failed</p><p className="mt-2 text-2xl font-black text-rose-100">{liveProgress.failed}</p></div>
+          </div>
         </div>
 
         <div className="mt-6 grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
@@ -153,6 +201,15 @@ export default function LeadHuntAutopilotPage() {
                 <input type="number" min={1500} step={500} value={delayMs} onChange={(event) => setDelayMs(Number(event.target.value))} className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white" />
               </label>
             </div>
+            <label className="mt-5 grid gap-2 text-sm font-bold text-slate-200">
+              Outreach engine mode
+              <select value={outreachMode} onChange={(event) => setOutreachMode(event.target.value as OutreachMode)} className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white">
+                <option value="off">OFF</option>
+                <option value="draft-only">Draft only</option>
+                <option value="manual-approval">Manual approval</option>
+                <option value="allowed-adapters">Autopilot for allowed adapters only</option>
+              </select>
+            </label>
 
             <div className="mt-5 rounded-2xl border border-white/10 bg-slate-950/40 p-4">
               <p className="text-sm font-bold text-emerald-200">Queue system</p>
@@ -196,8 +253,10 @@ export default function LeadHuntAutopilotPage() {
                 </div>
                 <p className="mt-3 text-sm text-slate-300"><strong className="text-white">Group/Page:</strong> {lead.sourceName || "Facebook source"} · <strong className="text-white">Author:</strong> {lead.author || "Unknown"} · <strong className="text-white">Timestamp:</strong> {lead.dateText || "Not available"}</p>
                 <p className="mt-3 rounded-2xl border border-white/10 bg-white/[0.06] p-4 leading-7 text-slate-100">{lead.text}</p>
+                {lead.replyDraft && <p className="mt-3 rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-4 leading-7 text-emerald-50"><strong>Reply draft:</strong> {lead.replyDraft}</p>}
                 <div className="mt-3 flex flex-wrap gap-2">
                   {lead.queryUsed && <span className="rounded-full border border-white/10 px-3 py-1 text-xs font-bold text-slate-300">Query: {lead.queryUsed}</span>}
+                  {lead.outreachMode && <span className="rounded-full border border-emerald-300/20 px-3 py-1 text-xs font-bold text-emerald-100">Outreach: {lead.outreachMode}</span>}
                   <a href={lead.url || "https://www.facebook.com"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-2 text-sm font-bold text-cyan-100">
                     <ExternalLink className="h-4 w-4" /> Open
                   </a>
