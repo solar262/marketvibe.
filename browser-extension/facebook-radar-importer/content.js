@@ -26,7 +26,7 @@
   if (document.getElementById("marketvibe-import-button")) return;
 
   function logLeadHunt(event, details = {}) {
-    console.log("[MarketVibe Lead Hunt]", event, details);
+    console.log(`[MarketVibe Lead Hunt] ${event}`, details);
   }
 
   function clean(value) {
@@ -416,6 +416,28 @@
     return Boolean(key && getHandledPosts().includes(key));
   }
 
+  function getVisibleCandidateNodes() {
+    const selectors = [
+      '[role="article"]',
+      "div[aria-posinset]",
+      "div[data-pagelet*='FeedUnit']",
+      "div[data-pagelet*='SearchResults'] div[role='article']",
+      "div[aria-describedby]",
+      "article",
+    ];
+    const seen = new Set();
+    return selectors
+      .flatMap((selector) => Array.from(document.querySelectorAll(selector)))
+      .filter((node) => {
+        if (!(node instanceof HTMLElement)) return false;
+        if (seen.has(node)) return false;
+        seen.add(node);
+        const box = node.getBoundingClientRect();
+        const text = getPostText(node);
+        return box.bottom >= -80 && box.top <= window.innerHeight + 700 && text.length >= 35;
+      });
+  }
+
   function markNodeHandled(node, score) {
     const key = getNodeKey(node, score);
     saveHandledPostKey(key);
@@ -426,7 +448,7 @@
   }
 
   function getQualifiedNodes(includeHandled = false) {
-    const nodes = Array.from(document.querySelectorAll('[role="article"], div[aria-posinset]'));
+    const nodes = getVisibleCandidateNodes();
     const seen = new Set();
     const qualified = [];
     for (const node of nodes) {
@@ -661,7 +683,7 @@
       status: "Lead Hunt starting.",
     };
     saveLeadHuntState(state);
-    logLeadHunt("hunt started", { searches: searches.length, caps: state.caps });
+    logLeadHunt("LEAD_HUNT_START", { searches: searches.length, caps: state.caps });
     ensureLeadHuntRunner("hunt started");
     const first = currentLeadHuntSearch(state);
     if (first && location.href !== first.url) navigateWithDelay(first.url, { ...state, nextActionAt: Date.now() + 250 }, "Opening first buyer-intent search.");
@@ -724,7 +746,10 @@
       status: reason,
     };
     const search = currentLeadHuntSearch(nextState);
-    if (search) navigateWithDelay(search.url, nextState, `Opening next search: ${search.query}`);
+    if (search) {
+      logLeadHunt("LEAD_HUNT_NEXT_QUERY", { query: search.query, source: search.source, index: nextIndex });
+      navigateWithDelay(search.url, nextState, `Opening next search: ${search.query}`);
+    }
   }
 
   function collectIndexedFacebookResultUrls() {
@@ -744,19 +769,42 @@
     return Array.from(new Set(urls)).slice(0, 12);
   }
 
-  function collectAutopilotPosts(state, search) {
-    return getQualifiedNodes(false)
-      .filter((item) => item.score >= 55)
-      .map((item) => ({ item, post: buildPostFromNode(item.node, item.score, { queryUsed: search?.query || "", sourceUsed: search?.source || "", outreachMode: state.outreach?.mode || "draft-only" }) }))
-      .filter(({ post }) => {
-        const key = getPostKey(post);
-        return key && !isHandledPostKey(key) && !(state.seen || []).includes(key);
-      })
-      .slice(0, Math.max(0, Number(state.caps?.maxImportedLeads || 10) - Number(state.importedCount || 0)));
-  }
+  function scanVisibleLeadHuntCards(state, search) {
+    const decisions = {
+      importItems: [],
+      skipped: 0,
+      duplicates: 0,
+      scanned: 0,
+    };
+    const seenThisTick = new Set();
 
-  function countAutopilotDuplicates(state) {
-    return getQualifiedNodes(true).filter((item) => isHandledPostKey(item.key) || (state.seen || []).includes(item.key)).length;
+    for (const node of getVisibleCandidateNodes()) {
+      const text = getPostText(node);
+      const score = scorePost(text);
+      const post = buildPostFromNode(node, score, { queryUsed: search?.query || "", sourceUsed: search?.source || "", outreachMode: state.outreach?.mode || "draft-only" });
+      const key = getPostKey(post);
+      if (!key || seenThisTick.has(key)) continue;
+      seenThisTick.add(key);
+      decisions.scanned += 1;
+
+      if (isHandledPostKey(key) || (state.seen || []).includes(key)) {
+        decisions.duplicates += 1;
+        logLeadHunt("LEAD_HUNT_SKIP", { reason: "duplicate", score, key });
+        continue;
+      }
+
+      if (score >= 55) {
+        decisions.importItems.push({ node, score, post, key });
+        logLeadHunt("score decision", { decision: "import", score, text: text.slice(0, 80) });
+        continue;
+      }
+
+      decisions.skipped += 1;
+      saveHandledPostKey(key);
+      logLeadHunt("LEAD_HUNT_SKIP", { reason: "low-intent", score, text: text.slice(0, 80) });
+    }
+
+    return decisions;
   }
 
   function scrollAndRescan(state, message) {
@@ -804,7 +852,7 @@
 
     const search = currentLeadHuntSearch(state);
     try {
-      logLeadHunt("scan tick", {
+      logLeadHunt("LEAD_HUNT_SCAN_TICK", {
         trigger,
         href: location.href,
         searchIndex: state.currentSearchIndex || 0,
@@ -836,15 +884,17 @@
 
       if (/facebook\.com/i.test(location.hostname)) {
         markFeed();
-        const duplicateCount = Math.max(Number(state.duplicateCount || 0), countAutopilotDuplicates(state));
-        const posts = collectAutopilotPosts(state, search);
-        logLeadHunt("score decision", { source: search.source, query: search.query, matches: posts.length, duplicateCount });
-        if (posts.length) {
-          const sentPosts = posts.map(({ post }) => post);
+        const decisions = scanVisibleLeadHuntCards(state, search);
+        const duplicateCount = Number(state.duplicateCount || 0) + decisions.duplicates;
+        const skippedCount = Number(state.skippedCount || 0) + decisions.skipped;
+        logLeadHunt("score decision", { source: search.source, query: search.query, scanned: decisions.scanned, matches: decisions.importItems.length, skipped: decisions.skipped, duplicateCount });
+        if (decisions.importItems.length) {
+          const sentPosts = decisions.importItems.map(({ post }) => post);
           const data = await sendPosts(sentPosts, search.query);
-          sentPosts.forEach((post) => {
+          decisions.importItems.forEach(({ node, score, post }) => {
             saveRecentImport(post);
             saveHandledPostKey(getPostKey(post));
+            markNodeHandled(node, score);
           });
           const importedCount = Number(state.importedCount || 0) + sentPosts.length;
           const seen = Array.from(new Set([...(state.seen || []), ...sentPosts.map(getPostKey)]));
@@ -852,20 +902,21 @@
             ...state,
             importedCount,
             duplicateCount,
+            skippedCount,
             seen,
             scrollAttempts: 0,
             importedLeads: [...sentPosts, ...(state.importedLeads || [])].slice(0, 30),
             status: `Imported ${sentPosts.length} high-intent lead(s). Good: ${data.counts?.good || 0}.`,
-            nextActionAt: Date.now() + leadHuntDelay(state),
+            nextActionAt: Date.now() + Math.min(900, leadHuntDelay(state)),
           });
-          logLeadHunt("import success", { count: sentPosts.length, importedCount, query: search.query });
+          logLeadHunt("LEAD_HUNT_IMPORT", { count: sentPosts.length, importedCount, query: search.query });
           if (importedCount >= Number(state.caps?.maxImportedLeads || 10)) {
             stopLeadHunt(`Daily import cap reached. Imported ${importedCount} lead(s).`);
           }
           return;
         }
 
-        const stateWithDuplicates = { ...state, duplicateCount };
+        const stateWithDuplicates = { ...state, duplicateCount, skippedCount };
         if (scrollAndRescan(stateWithDuplicates, "No high-intent match on loaded posts yet.")) return;
         logLeadHunt("next match", { reason: "no match after scroll attempts" });
         advanceAfterFacebookPage(stateWithDuplicates, "No high-intent match after scanning visible page.");
@@ -1206,10 +1257,12 @@
   button.addEventListener("click", sendVisible);
   document.body.appendChild(button);
   parseLeadHuntLaunch();
+  if (getLeadHuntState()?.active) {
+    ensureLeadHuntRunner("active state detected");
+  }
   renderRecentImports();
   renderQueueControls();
   renderLeadHuntPanel();
   markFeed();
   setInterval(markFeed, SCAN_INTERVAL_MS);
-  setInterval(runLeadHuntTick, SCAN_INTERVAL_MS);
 })();
