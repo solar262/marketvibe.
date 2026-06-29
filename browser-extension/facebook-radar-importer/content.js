@@ -27,19 +27,38 @@
     /how do i scale/i,
     /struggling to get/i,
     /i hate cold emails/i,
+    /any advice/i,
+    /would love advice/i,
+    /can someone help/i,
+    /what should i do/i,
+    /where do i find/i,
   ];
 
-  const BAD_SIGNALS = [
+  const HARD_SKIP_SIGNALS = [
     /hiring/i,
     /job/i,
+    /roles? open/i,
     /commission only/i,
+    /commission based/i,
+    /setter/i,
+    /closer/i,
+    /proposal writer/i,
+    /we are expanding/i,
+    /we operate across/i,
+    /professional web developer/i,
+    /i help businesses/i,
+    /my services/i,
+    /we provide/i,
+    /our agency/i,
+    /lead generation service/i,
+    /need more clients for your business/i,
+    /stop wasting time searching/i,
+    /verified leads/i,
+    /100% targeted/i,
     /dm me/i,
     /guaranteed leads/i,
     /pay per lead/i,
     /for hire/i,
-    /we provide/i,
-    /our agency/i,
-    /lead generation service/i,
     /book a call/i,
     /appointment setter/i,
     /vacancy/i,
@@ -49,17 +68,36 @@
     /forex/i,
   ];
 
+  const SELLER_PHRASES = [
+    /i build/i,
+    /i can help/i,
+    /i offer/i,
+    /we offer/i,
+    /i provide/i,
+    /we provide/i,
+    /grow your business/i,
+    /convert visitors into customers/i,
+    /my services/i,
+    /7 days free/i,
+  ];
+
   function scorePost(text) {
     let score = 0;
 
-    for (const pattern of STRONG_BUYER_SIGNALS) {
-      if (pattern.test(text)) score += 20;
+    for (const pattern of HARD_SKIP_SIGNALS) {
+      if (pattern.test(text)) return -999;
     }
 
-    for (const pattern of BAD_SIGNALS) {
+    for (const pattern of STRONG_BUYER_SIGNALS) {
+      if (pattern.test(text)) score += 25;
+    }
+
+    for (const pattern of SELLER_PHRASES) {
       if (pattern.test(text)) score -= 35;
     }
 
+    if (/\?/.test(text)) score += 10;
+    if (/\b(i|my|we|our)\b/i.test(text) && /\b(struggling|stuck|need|looking|can't|cannot|no|help|advice)\b/i.test(text)) score += 15;
     if (text.length < 80) score -= 20;
 
     return score;
@@ -77,7 +115,7 @@
       const text = clean(node.innerText).slice(0, 2200);
       const score = scorePost(text);
 
-      if (score < 20) continue;
+      if (score < 25) continue;
 
       const key = text.toLowerCase().slice(0, 180);
       if (seen.has(key)) continue;
