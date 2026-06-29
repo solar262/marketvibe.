@@ -8,7 +8,6 @@ const links = [
   ["Home", "/"],
   ["Free Leads", "/free-leads"],
   ["Lead Search", "/lead-search"],
-  ["Reddit Radar", "/reddit-radar"],
   ["Pricing", "/pricing"],
   ["Contact", "/contact"],
 ];

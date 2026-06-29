@@ -174,8 +174,6 @@ export default function Home() {
               <p className="text-sm font-semibold text-emerald-300">How MarketVibe Works</p>
               <h2 className="mt-2 text-3xl font-semibold tracking-tight text-white">A focused workflow for finding better opportunities.</h2>
             </div>
-            <Link href="/reddit-radar" className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-white/10">
-              Open Conversation Radar <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
