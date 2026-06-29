@@ -23,16 +23,19 @@ const {
   expandRedditRadarQueries,
   expandRedditRadarSubreddits,
   hasAiIntent,
+  hasClearLeadIntent,
   hasCustomerProblemSignal,
   hasMarketVibeBuyerIntent,
   hasRedditRadarProblemIntent,
   hasUsablePostSignal,
   isBlockedJobPost,
+  isGenericBusinessNoise,
   isLowIntelPost,
   isObviousRssJunk,
   isRejectedNonBuyerIntent,
   lowIntelIntel,
   rankRedditRadarPosts,
+  scoreRedditRadarPost,
 } = sandbox.exports;
 
 assert.equal(hasAiIntent("Vail Daily needs a new tourism website"), false, "Vail Daily should not trigger AI intent");
@@ -45,6 +48,13 @@ assert.equal(hasMarketVibeBuyerIntent("How do I find web design clients?", "I ne
 assert.equal(isRejectedNonBuyerIntent("New to Shopify. Need setup help through Claude.", "I need help fixing my own store."), true, "Shopify setup help should be rejected as non-buyer intent");
 assert.equal(hasRedditRadarProblemIntent("Where to sell sneakers?", "My stock is not moving."), false, "Generic seller marketplace pain should not be the main Reddit Radar intent");
 assert.equal(hasRedditRadarProblemIntent("How do I get more customers?", "I launched a business but have no leads or traffic."), true, "Customer acquisition pain should count as Reddit Radar problem intent");
+assert.equal(hasClearLeadIntent("How do I get customers for my app?", "I launched but nobody is signing up."), true, "App customer acquisition question should be clear lead intent");
+assert.equal(hasClearLeadIntent("My site gets traffic but no sales", "I need to understand what is not converting."), true, "Traffic but no sales should be clear lead intent");
+assert.equal(hasClearLeadIntent("I need a way to find leads", "Cold outreach is not working."), true, "Lead-finding need should be clear lead intent");
+assert.equal(hasClearLeadIntent("How can I promote without ads?", "Organic marketing is confusing."), true, "Promote without ads should be clear lead intent");
+assert.equal(hasClearLeadIntent("I'm struggling to get clients", "Where should I look first?"), true, "Struggling to get clients should be clear lead intent");
+assert.equal(isGenericBusinessNoise("What is your favorite productivity quote?", "Motivation Monday"), true, "Vague motivational posts should be noise");
+assert.equal(isGenericBusinessNoise("Selling handmade products online", "Here is my journey and what I learned."), true, "Generic seller/story posts should be noise without clear pain");
 
 const acquisitionQueries = expandRedditRadarQueries("MarketVibe", "founders and freelancers", "customer discovery lead generation");
 assert.ok(acquisitionQueries.includes("how do i get more customers"), "Query should expand into customer acquisition search");
@@ -226,10 +236,35 @@ const deduped = dedupeRedditRadarPosts([
 assert.equal(deduped.length, 2, "Duplicate posts should be removed by permalink");
 
 const ranked = rankRedditRadarPosts([
-  { title: "Favorite sneaker colorway?", body: "Just chatter", subreddit: "r/Sneakers", permalink: "https://reddit.com/generic", comments: 10, ups: 20 },
-  { title: "Sneaker reselling stuck, no sales", body: "Where to sell sneakers? My stock is not moving.", subreddit: "r/Flipping", permalink: "https://reddit.com/pain", comments: 3, ups: 2 },
-], "sneaker resellers");
-assert.equal(ranked[0].permalink, "https://reddit.com/pain", "Pain/problem posts should rank above generic chatter");
+  { title: "Favorite startup quote?", body: "Just motivation and generic chatter", subreddit: "r/startups", permalink: "https://reddit.com/generic", comments: 10, ups: 20 },
+  { title: "How do I get customers for my app?", body: "I launched but have no users and need a way to find people with this problem.", subreddit: "r/SaaS", permalink: "https://reddit.com/pain", comments: 3, ups: 2 },
+], "customer acquisition");
+assert.equal(ranked[0].permalink, "https://reddit.com/pain", "Clear problem/need posts should rank above generic chatter");
+
+assert.ok(scoreRedditRadarPost({
+  title: "How do I get customers for my app?",
+  body: "I launched but have no users and need a way to find people with this problem.",
+  subreddit: "r/SaaS",
+  permalink: "https://reddit.com/high-intent",
+  comments: 6,
+  ups: 8,
+}, "customer acquisition") >= 70, "Clear customer acquisition post should score high");
+assert.ok(scoreRedditRadarPost({
+  title: "Generic business advice thread",
+  body: "Drop your favorite motivation tips and business mindset quotes.",
+  subreddit: "r/Entrepreneur",
+  permalink: "https://reddit.com/noise",
+  comments: 30,
+  ups: 80,
+}, "customer acquisition") <= 0, "Generic advice or motivational posts should be rejected");
+assert.ok(scoreRedditRadarPost({
+  title: "Check out my new product",
+  body: "DM me for a limited offer and use my code.",
+  subreddit: "r/startups",
+  permalink: "https://reddit.com/promo",
+  comments: 5,
+  ups: 10,
+}, "customer acquisition") < 0, "Promotional seller posts should be rejected");
 
 const redditMarketingReply = buildSuggestedReply({
   title: "How do I market on Reddit without getting ignored?",

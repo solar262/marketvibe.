@@ -7,11 +7,13 @@ import {
   expandRedditRadarQueries,
   expandRedditRadarSubreddits,
   hasCustomerProblemSignal,
+  hasClearLeadIntent,
   hasRedditRadarProblemIntent,
   hasUsablePostSignal,
   hasAiIntent,
   hasAnyTerm as hasAny,
   isBlockedJobPost,
+  isGenericBusinessNoise,
   isLowIntelPost as hasLowIntel,
   isObviousRssJunk,
   isSpamOrPromotion,
@@ -144,7 +146,7 @@ function isHostileThread(text: string) {
 
 function recommendedAction(title: string, body: string, comments = 0, ups = 0): Action {
   const text = `${title} ${body}`.toLowerCase();
-  if (isBlockedJobPost(title, body) || isRejectedNonBuyerIntent(title, body) || isSpamOrPromotion(title, body)) return "Skip";
+  if (isBlockedJobPost(title, body) || isRejectedNonBuyerIntent(title, body) || isSpamOrPromotion(title, body) || isGenericBusinessNoise(title, body)) return "Skip";
   if (!hasRedditRadarProblemIntent(title, body)) return "Skip";
   if (hasLowIntel(body, comments, ups) && !hasUsablePostSignal(title, body, comments, ups)) return "Skip";
   if (isSensitiveThread(text) || isHostileThread(text)) return "Skip";
@@ -154,10 +156,12 @@ function recommendedAction(title: string, body: string, comments = 0, ups = 0): 
 function opportunityScore(title: string, body: string, ups: number, comments: number, action: Action): "High" | "Medium" | "Low" {
   if (action === "Skip") return "Low";
   const hasProblem = hasCustomerProblemSignal(title, body) && hasRedditRadarProblemIntent(title, body);
+  const hasClearIntent = hasClearLeadIntent(title, body);
   const hasQuestion = title.includes("?") || body.includes("?");
   const hasActiveComments = comments > 0;
-  if (hasProblem && hasQuestion && hasActiveComments) return "High";
-  if (hasProblem || hasQuestion) return "Medium";
+  const numericScore = conversionIntentScore({ title, body, comments, ups, subreddit: "", permalink: "" });
+  if (hasClearIntent && hasProblem && (hasQuestion || hasActiveComments) && numericScore >= 70) return "High";
+  if (hasProblem || hasQuestion || hasClearIntent) return "Medium";
   return "Low";
 }
 
@@ -206,20 +210,30 @@ function makeReason(title: string, body: string, comments: number, ups: number, 
   const pain = extractPain(title, body);
   const context = body.trim() ? `Context: "${pain}"` : "Only title/body-light context available.";
   const intentScore = conversionIntentScore({ title, body, comments, ups, subreddit, permalink: "" });
+  const clearIntent = hasClearLeadIntent(title, body);
+  const scoreReason = clearIntent
+    ? "Score reason: clear problem/research intent plus relevant acquisition, traffic, sales, or lead-generation language."
+    : "Score reason: relevant problem language exists, but the post is missing a strong explicit buying, research, or help-seeking signal.";
 
   if (intent === "low-intel") {
-    return `Skip reason: low engagement / not enough context. ${context} Engagement: ${comments} comments and ${ups} upvotes. Intent score: ${intentScore}. Source: ${sourceName}.`;
+    return `Why this is a lead: it is not one yet. Skip reason: low engagement / not enough context. Pain point detected: "${pain}". ${context} Engagement: ${comments} comments and ${ups} upvotes. Intent score: ${intentScore}. ${scoreReason} Source: ${sourceName}.`;
   }
 
   if (action === "Skip") {
-    return `Skip reason: high-risk or sensitive thread (${intent}). ${context} Engagement: ${comments} comments and ${ups} upvotes. Intent score: ${intentScore}. Source: ${sourceName}.`;
+    return `Why this is a lead: it is not strong enough to engage. Skip reason: high-risk, promotional, generic, or sensitive thread (${intent}). Pain point detected: "${pain}". ${context} Engagement: ${comments} comments and ${ups} upvotes. Intent score: ${intentScore}. ${scoreReason} Source: ${sourceName}.`;
   }
 
   if (action === "ManualOnly") {
-    return `Intel: ${subreddit} thread is useful but sensitive (${intent}). ${context} Engagement: ${comments} comments and ${ups} upvotes. Intent score: ${intentScore}. Recommended action: only reply if you can add a quick useful take. Source: ${sourceName}.`;
+    return `Why this is a lead: someone is discussing a real ${intent.replace(/-/g, " ")} problem or need. Pain point detected: "${pain}". ${context} Engagement: ${comments} comments and ${ups} upvotes. Intent score: ${intentScore}. ${scoreReason} Recommended action: reply manually with a useful take and no links. Source: ${sourceName}.`;
   }
 
-  return `Intel: ${subreddit} thread appears to be about ${intent}. ${context} Engagement: ${comments} comments and ${ups} upvotes. Intent score: ${intentScore}. Recommended action: safe to reply, keep it short, no links. Source: ${sourceName}.`;
+  return `Why this is a lead: ${subreddit} thread appears to be about ${intent}. Pain point detected: "${pain}". ${context} Engagement: ${comments} comments and ${ups} upvotes. Intent score: ${intentScore}. ${scoreReason} Recommended action: safe to reply, keep it short, no links. Source: ${sourceName}.`;
+}
+
+function scoreExplanation(title: string, body: string, comments: number, ups: number) {
+  const intentScore = conversionIntentScore({ title, body, comments, ups, subreddit: "", permalink: "" });
+  if (hasClearLeadIntent(title, body)) return `Intent score ${intentScore}: clear problem, need, complaint, or tool/research intent was detected.`;
+  return `Intent score ${intentScore}: downgraded because the post lacks a clear problem, need, complaint, or buying/research signal.`;
 }
 
 async function fetchWithTimeout(url: string, userAgent: string, timeoutMs = REQUEST_TIMEOUT_MS) {
@@ -315,7 +329,7 @@ function conversionIntentScore(post: RawPost) {
 }
 
 function isActionablePost(post: RawPost) {
-  if (isBlockedJobPost(post.title, post.body) || isRejectedNonBuyerIntent(post.title, post.body) || isSpamOrPromotion(post.title, post.body)) return false;
+  if (isBlockedJobPost(post.title, post.body) || isRejectedNonBuyerIntent(post.title, post.body) || isSpamOrPromotion(post.title, post.body) || isGenericBusinessNoise(post.title, post.body)) return false;
   if (isObviousRssJunk(post.title, post.body)) return false;
   if (!hasRedditRadarProblemIntent(post.title, post.body)) return false;
   if (hasLowIntel(post.body, post.comments, post.ups) && !hasUsablePostSignal(post.title, post.body, post.comments, post.ups)) return true;
@@ -330,7 +344,7 @@ function relevanceScore(post: RawPost, queryText: string) {
   let score = 0;
 
   if (SUBREDDIT_BLOCKLIST.some((blocked) => blocked.toLowerCase() === subreddit)) return -100;
-  if (isBlockedJobPost(post.title, post.body) || isRejectedNonBuyerIntent(post.title, post.body) || isSpamOrPromotion(post.title, post.body) || isObviousRssJunk(post.title, post.body)) return -100;
+  if (isBlockedJobPost(post.title, post.body) || isRejectedNonBuyerIntent(post.title, post.body) || isSpamOrPromotion(post.title, post.body) || isGenericBusinessNoise(post.title, post.body) || isObviousRssJunk(post.title, post.body)) return -100;
   if (!hasRedditRadarProblemIntent(post.title, post.body)) return 0;
   if (DEFAULT_BUSINESS_SUBS.map((sub) => sub.toLowerCase()).includes(subreddit)) score += 8;
 
@@ -466,6 +480,7 @@ export async function GET(request: Request) {
         painPoint: extractPain(post.title, post.body),
         detectedPainPoint: extractPain(post.title, post.body),
         intentScore: Math.max(0, Math.min(100, conversionIntentScore(post))),
+        scoreExplanation: scoreExplanation(post.title, post.body, post.comments, post.ups),
         problemType: problemTypeForPost(post.title, post.body),
         audienceType: audienceTypeForPost(post.title, post.body, target),
         createdUtc: post.createdUtc || null,

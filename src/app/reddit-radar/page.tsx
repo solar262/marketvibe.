@@ -24,6 +24,7 @@ type Opportunity = {
   painPoint?: string;
   detectedPainPoint?: string;
   intentScore?: number;
+  scoreExplanation?: string;
   problemType?: string;
   audienceType?: string;
   createdUtc?: number | null;
@@ -526,6 +527,9 @@ export default function RedditRadarPage() {
               <a href={currentItem.url} target="_blank" rel="noreferrer" className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-cyan-100 hover:bg-cyan-300/15">Open source link</a>
             </div>
             <p className="mt-3 text-sm leading-6 text-slate-300"><strong className="text-slate-100">Why it is relevant:</strong> {currentItem.reason}</p>
+            <p className="mt-2 rounded-2xl border border-white/10 bg-slate-950/35 px-4 py-3 text-sm leading-6 text-slate-300">
+              <strong className="text-slate-100">Why it got this intent score:</strong> {currentItem.scoreExplanation || "The score is based on visible pain language, question intent, relevance to the search, and engagement."}
+            </p>
 
             <div className="mt-5 rounded-3xl border border-cyan-300/20 bg-cyan-300/10 p-5">
               <div className="flex items-center gap-2 text-sm font-semibold text-cyan-100">

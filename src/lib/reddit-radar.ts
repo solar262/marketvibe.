@@ -40,7 +40,9 @@ const RSS_METADATA_PATTERN = /\bsubmitted by\b|\/u\/|\[comments\]|\bcomments lin
 const MARKETVIBE_BUYER_INTENT_PATTERN = /\b(how do i find web design clients|how do i get seo clients|where to find local business leads|how to sell websites to local businesses|how to get clients as a freelancer|cold outreach for web design|local businesses that need websites|website redesign leads|lead generation for agencies|finding businesses with bad websites|prospecting for web design|selling seo services|agency lead generation|client acquisition for web designers|web design clients|seo clients|local business leads|sell websites to local businesses|get clients as a freelancer|client acquisition|cold outreach|website redesign|redesign leads|bad websites|prospecting|businesses to pitch|find clients|find leads|get clients|get leads|lead generation|local leads|agency leads|outreach help|how do i get more customers|where can i find clients|how do i promote my business without ads|what tool can help me with organic marketing|struggling to get sales|how do i grow my saas|how do i grow my app|how do i grow my store|need help finding leads|my business has no leads|my website gets no traffic)\b/i;
 const NON_BUYER_INTENT_PATTERN = /\b(shopify setup|new to shopify|claude setup|store automation|automating the setup|dropshipping|dropshipping beginners|fixing my website|fix my website|technical help|general business advice|business advice|setup help)\b/i;
 const BROAD_PROBLEM_INTENT_PATTERN = /\b(need help|struggling|problem|no sales|no traffic|no leads|no customers|no clients|not converting|customers|leads|clients|how do i|how can i|any advice|looking for tool|recommend|stuck|customer problem|not selling|abandoned cart|product page|organic marketing|without ads|promote my business|find customers|find clients|find leads|bookings|appointments|visibility|growth)\b/i;
-const SPAM_PROMO_PATTERN = /\b(check out my|use my code|promo code|limited offer|dm me|buy now|launching my|i built this|my app|my course|subscribe|newsletter)\b/i;
+const SPAM_PROMO_PATTERN = /\b(check out my|use my code|promo code|limited offer|dm me|buy now|launching my|i built this|my course|subscribe|newsletter)\b/i;
+const CLEAR_LEAD_INTENT_PATTERN = /\b(how do i get (?:more )?(?:customers|clients|leads|users|sales|bookings|appointments)|how can i get (?:more )?(?:customers|clients|leads|users|sales|bookings|appointments)|where (?:can|do) i find (?:customers|clients|leads|prospects)|need (?:a way|help) to find leads|looking for (?:a )?tool to find leads|my (?:site|website|store|business|app|saas) (?:gets )?(?:has )?(?:no traffic|no sales|no leads|no customers)|traffic but no sales|not converting|struggling to get (?:clients|customers|leads|sales|users)|cold outreach (?:is )?not working|no one replies to my outreach|promote (?:my )?business without ads|organic marketing|grow my (?:saas|app|store|business))\b/i;
+const GENERIC_NOISE_PATTERN = /\b(motivation|motivational|mindset|inspiration|success story|what i learned|my journey|thoughts on|hot take|favorite|showcase|roast my|rate my|i built|launching|here is my|business ideas|side hustle ideas|generic advice|general advice)\b/i;
 
 export function compactRedditText(value: string) {
   return value.replace(/\s+/g, " ").trim().slice(0, 900);
@@ -109,6 +111,16 @@ export function hasRedditRadarProblemIntent(title: string, body: string) {
 
 export function isSpamOrPromotion(title: string, body: string) {
   return SPAM_PROMO_PATTERN.test(`${title} ${body}`);
+}
+
+export function hasClearLeadIntent(title: string, body: string) {
+  return CLEAR_LEAD_INTENT_PATTERN.test(`${title} ${body}`);
+}
+
+export function isGenericBusinessNoise(title: string, body: string) {
+  const text = `${title} ${body}`;
+  if (hasClearLeadIntent(title, body)) return false;
+  return GENERIC_NOISE_PATTERN.test(text) || /\b(sell|selling|seller|product|products)\b/i.test(text) && !BROAD_PROBLEM_INTENT_PATTERN.test(text);
 }
 
 export function usefulBodyLength(body: string) {
@@ -238,20 +250,21 @@ export function dedupeRedditRadarPosts<T extends { title: string; permalink: str
 
 export function scoreRedditRadarPost(post: RedditRadarRankablePost, queryText = "") {
   const text = `${post.title} ${post.body}`.toLowerCase();
-  if (isBlockedJobPost(post.title, post.body) || isRejectedNonBuyerIntent(post.title, post.body) || isObviousRssJunk(post.title, post.body) || isSpamOrPromotion(post.title, post.body)) return -100;
+  if (isBlockedJobPost(post.title, post.body) || isRejectedNonBuyerIntent(post.title, post.body) || isObviousRssJunk(post.title, post.body) || isSpamOrPromotion(post.title, post.body) || isGenericBusinessNoise(post.title, post.body)) return -100;
   if (!hasRedditRadarProblemIntent(post.title, post.body)) return 0;
 
-  let score = 35;
-  if (BROAD_PROBLEM_INTENT_PATTERN.test(text)) score += 24;
-  if (hasMarketVibeBuyerIntent(post.title, post.body)) score += 14;
-  if (text.includes("?")) score += 8;
-  if (/\b(no sales|no traffic|not converting|stuck|struggling|where to sell|need help|problem|any advice|recommend|looking for tool)\b/i.test(text)) score += 16;
-  if (/\b(customers|leads|prospects|buyers|clients)\b/i.test(text)) score += 8;
+  let score = hasClearLeadIntent(post.title, post.body) ? 52 : 24;
+  if (BROAD_PROBLEM_INTENT_PATTERN.test(text)) score += 14;
+  if (hasMarketVibeBuyerIntent(post.title, post.body)) score += 12;
+  if (text.includes("?")) score += 7;
+  if (/\b(no sales|no traffic|no leads|no customers|no clients|traffic but no sales|not converting|stuck|struggling|need help|problem|looking for tool)\b/i.test(text)) score += 16;
+  if (/\b(customers|leads|prospects|clients|users|bookings|appointments)\b/i.test(text)) score += 7;
   if (queryText && queryText.toLowerCase().split(/\s+/).some((word) => word.length > 4 && text.includes(word))) score += 6;
   score += Math.min(post.comments, 20) * 0.8;
   score += Math.min(post.ups, 40) * 0.2;
-  if (/\b(thoughts on|hot take|favorite|showcase|i built|launching)\b/i.test(text)) score -= 18;
-  return Math.round(score);
+  if (/\b(thoughts on|hot take|favorite|showcase|i built|launching|general advice|motivation)\b/i.test(text)) score -= 25;
+  if (!hasClearLeadIntent(post.title, post.body)) score = Math.min(score, 68);
+  return Math.max(0, Math.round(score));
 }
 
 export function rankRedditRadarPosts<T extends RedditRadarRankablePost>(posts: T[], queryText = "") {
