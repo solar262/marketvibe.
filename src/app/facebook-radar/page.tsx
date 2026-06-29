@@ -93,7 +93,7 @@ export default function FacebookRadarPage() {
   function openSearch(link: FacebookRadarSearchLink, url: string, searchType: "posts" | "groups") {
     void navigator.clipboard.writeText(link.phrase).then(() => setCopied(true)).catch(() => setCopied(false));
     track("Facebook Radar Open Search", { phrase: link.phrase, search_type: searchType });
-    window.location.href = url;
+    window.location.assign(url);
     window.setTimeout(() => setCopied(false), 1600);
   }
 

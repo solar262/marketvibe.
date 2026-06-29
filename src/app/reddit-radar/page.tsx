@@ -16,9 +16,17 @@ import {
 } from "lucide-react";
 
 type Opportunity = {
+  platform?: string;
   subreddit: string;
   title: string;
   url: string;
+  snippet?: string;
+  painPoint?: string;
+  detectedPainPoint?: string;
+  intentScore?: number;
+  problemType?: string;
+  audienceType?: string;
+  createdUtc?: number | null;
   niche: string;
   target: string;
   score: "High" | "Medium" | "Low";
@@ -38,7 +46,7 @@ const WAIT_SECONDS = 180;
 const SEEN_POSTS_KEY = "marketvibe-reddit-radar-seen-posts";
 const MAX_SEEN_POSTS = 250;
 const EMPTY_SEARCH_MESSAGE =
-  "No strong Reddit opportunities found. Try adding a pain term like no sales, need help, struggling, where to sell, no traffic, or looking for tool.";
+  "No high-intent conversations found yet. Try adding a pain term like no leads, no traffic, struggling to get sales, how do I get customers, organic marketing, or looking for tool.";
 const SEARCH_STEPS = [
   "Searching Reddit...",
   "Checking source 1 of 5",
@@ -119,9 +127,15 @@ function humanizeReply(reply: string) {
 }
 
 export default function RedditRadarPage() {
-  const [niche, setNiche] = useState("AI tools for ecommerce");
-  const [customer, setCustomer] = useState("Shopify owners, agencies, freelancers");
-  const [keywords, setKeywords] = useState("customers, Reddit marketing, Shopify traffic, automation");
+  const [niche, setNiche] = useState("MarketVibe customer discovery");
+  const [customer, setCustomer] = useState("founders, freelancers, agencies, local businesses");
+  const [keywords, setKeywords] = useState("how do I get customers, no leads, no traffic, organic marketing, looking for tool");
+  const [platformFilter, setPlatformFilter] = useState("All");
+  const [minIntentScore, setMinIntentScore] = useState("0");
+  const [recentOnly, setRecentOnly] = useState(false);
+  const [recentCutoff, setRecentCutoff] = useState(0);
+  const [audienceFilter, setAudienceFilter] = useState("All");
+  const [problemFilter, setProblemFilter] = useState("All");
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [source, setSource] = useState<SourceState>("idle");
   const [loading, setLoading] = useState(false);
@@ -211,9 +225,22 @@ export default function RedditRadarPage() {
     return () => window.clearInterval(timer);
   }, [waitSeconds]);
 
+  const filteredOpportunities = useMemo(() => {
+    const minScore = Number(minIntentScore || 0);
+    return opportunities.filter((item) => {
+      const platform = item.platform || "Reddit";
+      if (platformFilter !== "All" && platform !== platformFilter) return false;
+      if ((item.intentScore || 0) < minScore) return false;
+      if (recentOnly && (!item.createdUtc || item.createdUtc < recentCutoff)) return false;
+      if (audienceFilter !== "All" && item.audienceType !== audienceFilter) return false;
+      if (problemFilter !== "All" && item.problemType !== problemFilter) return false;
+      return true;
+    });
+  }, [audienceFilter, minIntentScore, opportunities, platformFilter, problemFilter, recentCutoff, recentOnly]);
+
   const activeQueue = useMemo(() => {
-    return opportunities.filter((item) => !postedTitles.includes(item.title) && !skippedTitles.includes(item.title));
-  }, [opportunities, postedTitles, skippedTitles]);
+    return filteredOpportunities.filter((item) => !postedTitles.includes(item.title) && !skippedTitles.includes(item.title));
+  }, [filteredOpportunities, postedTitles, skippedTitles]);
 
   const currentItem = activeQueue[Math.min(currentIndex, Math.max(activeQueue.length - 1, 0))];
   const replyMode = currentItem && replySelection?.url === currentItem.url ? replySelection.mode : "quick";
@@ -221,7 +248,11 @@ export default function RedditRadarPage() {
   const deeperReply = currentItem ? humanizeReply(currentItem.deeperReply || "") : "";
   const selectedReply = replyMode === "deeper" && deeperReply ? deeperReply : quickReply;
   const totalDone = postedTitles.length + skippedTitles.length;
-  const totalCount = opportunities.length;
+  const totalCount = filteredOpportunities.length;
+  const platformOptions = useMemo(() => Array.from(new Set(opportunities.map((item) => item.platform || "Reddit"))), [opportunities]);
+  const audienceOptions = useMemo(() => Array.from(new Set(opportunities.map((item) => item.audienceType).filter(Boolean))) as string[], [opportunities]);
+  const problemOptions = useMemo(() => Array.from(new Set(opportunities.map((item) => item.problemType).filter(Boolean))) as string[], [opportunities]);
+  const highIntentCount = filteredOpportunities.filter((item) => item.score === "High").length;
 
   function rememberPost(item: Opportunity) {
     const key = postKey(item);
@@ -312,31 +343,31 @@ export default function RedditRadarPage() {
         <div className="relative mx-auto max-w-5xl">
           <div className="text-center">
             <p className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-white/8 px-3 py-1 text-xs font-semibold text-cyan-100 shadow-lg shadow-cyan-950/20 backdrop-blur">
-              <Radar className="h-4 w-4 text-emerald-300" /> Simple Reddit Radar
+              <Radar className="h-4 w-4 text-emerald-300" /> High Intent Conversation Radar
             </p>
-            <h1 className="mt-5 text-4xl font-semibold tracking-tight text-white sm:text-5xl">One post at a time.</h1>
+            <h1 className="mt-5 text-4xl font-semibold tracking-tight text-white sm:text-5xl">Find people already talking about the problems your business solves.</h1>
             <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-300">
-              Search Reddit, copy the reply, open the post, mark it done, then move to the next one.
+              Enter your business, target audience, and problem keywords. MarketVibe scans public conversations for customer acquisition, organic marketing, lead generation, no-sales, no-traffic, and growth questions.
             </p>
           </div>
 
           <div className="mt-8 rounded-[2rem] border border-white/15 bg-slate-950/85 p-4 shadow-2xl shadow-black/35 ring-1 ring-white/10 backdrop-blur">
             <div className="grid gap-3 md:grid-cols-3">
               <label className="grid gap-2 text-sm font-semibold text-slate-200">
-                Niche
+                Business / tool / product
                 <input value={niche} onChange={(event) => setNiche(event.target.value)} className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/40" />
               </label>
               <label className="grid gap-2 text-sm font-semibold text-slate-200">
-                Customer
+                Target audience
                 <input value={customer} onChange={(event) => setCustomer(event.target.value)} className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/40" />
               </label>
               <label className="grid gap-2 text-sm font-semibold text-slate-200">
-                Keywords
+                Problem / keywords
                 <input value={keywords} onChange={(event) => setKeywords(event.target.value)} className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/40" />
               </label>
             </div>
             <button onClick={loadOpportunities} disabled={loading} className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-emerald-400 to-cyan-300 px-6 py-4 text-base font-bold text-slate-950 shadow-xl shadow-emerald-950/30 transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60">
-              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />} Search Live Posts
+              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />} Search High Intent Conversations
             </button>
             <div className="mt-4 min-h-[82px] rounded-2xl border border-white/10 bg-slate-950/55 p-4 text-sm text-slate-300">
               <div className="flex items-center justify-between gap-3">
@@ -358,6 +389,73 @@ export default function RedditRadarPage() {
       </section>
 
       <section className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mb-5 rounded-[2rem] border border-emerald-300/20 bg-emerald-300/10 p-5 shadow-2xl shadow-black/20">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-emerald-300">High Intent Leads</p>
+              <h2 className="mt-1 text-2xl font-semibold text-white">Conversation-mined customer discovery</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">Rank public conversations by intent, then join naturally with a helpful reply. No spam links, no auto-posting.</p>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-2xl border border-white/10 bg-slate-950/35 px-4 py-3">
+                <p className="text-xs uppercase tracking-[0.16em] text-slate-400">High</p>
+                <p className="mt-1 text-xl font-bold text-emerald-300">{highIntentCount}</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-slate-950/35 px-4 py-3">
+                <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Shown</p>
+                <p className="mt-1 text-xl font-bold text-white">{filteredOpportunities.length}</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-slate-950/35 px-4 py-3">
+                <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Total</p>
+                <p className="mt-1 text-xl font-bold text-cyan-200">{opportunities.length}</p>
+              </div>
+            </div>
+          </div>
+          <div className="mt-5 grid gap-3 md:grid-cols-5">
+            <label className="grid gap-2 text-sm font-semibold text-slate-200">
+              Platform
+              <select value={platformFilter} onChange={(event) => setPlatformFilter(event.target.value)} className="rounded-2xl border border-white/10 bg-slate-950 px-3 py-3 text-sm text-white outline-none focus:border-cyan-300/40">
+                <option>All</option>
+                {platformOptions.map((item) => <option key={item}>{item}</option>)}
+              </select>
+            </label>
+            <label className="grid gap-2 text-sm font-semibold text-slate-200">
+              Intent score
+              <select value={minIntentScore} onChange={(event) => setMinIntentScore(event.target.value)} className="rounded-2xl border border-white/10 bg-slate-950 px-3 py-3 text-sm text-white outline-none focus:border-cyan-300/40">
+                <option value="0">All scores</option>
+                <option value="70">70+</option>
+                <option value="50">50+</option>
+              </select>
+            </label>
+            <label className="grid gap-2 text-sm font-semibold text-slate-200">
+              Audience type
+              <select value={audienceFilter} onChange={(event) => setAudienceFilter(event.target.value)} className="rounded-2xl border border-white/10 bg-slate-950 px-3 py-3 text-sm text-white outline-none focus:border-cyan-300/40">
+                <option>All</option>
+                {audienceOptions.map((item) => <option key={item}>{item}</option>)}
+              </select>
+            </label>
+            <label className="grid gap-2 text-sm font-semibold text-slate-200">
+              Problem type
+              <select value={problemFilter} onChange={(event) => setProblemFilter(event.target.value)} className="rounded-2xl border border-white/10 bg-slate-950 px-3 py-3 text-sm text-white outline-none focus:border-cyan-300/40">
+                <option>All</option>
+                {problemOptions.map((item) => <option key={item}>{item}</option>)}
+              </select>
+            </label>
+            <label className="flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/35 px-4 py-3 text-sm font-semibold text-slate-200">
+              <input
+                type="checkbox"
+                checked={recentOnly}
+                onChange={(event) => {
+                  setRecentOnly(event.target.checked);
+                  if (event.target.checked) setRecentCutoff(Math.floor(Date.now() / 1000) - 60 * 60 * 24 * 30);
+                }}
+                className="h-4 w-4 accent-emerald-300"
+              />
+              Recent only
+            </label>
+          </div>
+        </div>
+
         <div className="mb-5 grid gap-3 sm:grid-cols-3">
           <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 text-center">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Progress</p>
@@ -403,18 +501,35 @@ export default function RedditRadarPage() {
         ) : currentItem ? (
           <article className="rounded-[2rem] border border-white/10 bg-white/[0.06] p-5 shadow-2xl shadow-black/20">
             <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-semibold text-cyan-100">{currentItem.platform || "Reddit"}</span>
               <span className="rounded-full border border-white/10 bg-slate-950/45 px-3 py-1 text-xs font-semibold text-slate-200">{currentItem.subreddit}</span>
-              <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${badgeClasses(currentItem.score)}`}>{currentItem.score} opportunity</span>
+              <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${badgeClasses(currentItem.score)}`}>{currentItem.score} Intent</span>
+              <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-100">Intent score {currentItem.intentScore ?? "n/a"}</span>
               <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${riskClasses(currentItem.risk)}`}>{currentItem.risk} risk</span>
               {currentItem.action && <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-semibold text-slate-100">{currentItem.action}</span>}
             </div>
 
             <h2 className="mt-5 text-3xl font-semibold tracking-tight text-white">{currentItem.title}</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-300"><strong className="text-slate-100">Why this post:</strong> {currentItem.reason}</p>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Snippet</p>
+                <p className="mt-2 text-sm leading-6 text-slate-200">{currentItem.snippet || "No body snippet available. Use the post title and thread context."}</p>
+              </div>
+              <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-200">Detected pain point</p>
+                <p className="mt-2 text-sm leading-6 text-emerald-50">{currentItem.detectedPainPoint || currentItem.painPoint || "Customer acquisition or growth problem"}</p>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-slate-200">
+              {currentItem.problemType && <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1">{currentItem.problemType}</span>}
+              {currentItem.audienceType && <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1">{currentItem.audienceType}</span>}
+              <a href={currentItem.url} target="_blank" rel="noreferrer" className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-cyan-100 hover:bg-cyan-300/15">Open source link</a>
+            </div>
+            <p className="mt-3 text-sm leading-6 text-slate-300"><strong className="text-slate-100">Why it is relevant:</strong> {currentItem.reason}</p>
 
             <div className="mt-5 rounded-3xl border border-cyan-300/20 bg-cyan-300/10 p-5">
               <div className="flex items-center gap-2 text-sm font-semibold text-cyan-100">
-                <ShieldCheck className="h-4 w-4" /> Reply to paste
+                <ShieldCheck className="h-4 w-4" /> Suggested reply
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 {(["quick", "deeper"] as ReplyMode[]).map((mode) => (

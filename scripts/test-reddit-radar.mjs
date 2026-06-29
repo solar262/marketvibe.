@@ -43,32 +43,33 @@ assert.equal(isBlockedJobPost("Hiring remote developer", "Full-time role, apply 
 assert.equal(isBlockedJobPost("My Shopify store has no traffic, what should I do?", ""), false, "Shopify pain post should not be blocked as a job");
 assert.equal(hasMarketVibeBuyerIntent("How do I find web design clients?", "I need better local business leads."), true, "Web design client post should have MarketVibe buyer intent");
 assert.equal(isRejectedNonBuyerIntent("New to Shopify. Need setup help through Claude.", "I need help fixing my own store."), true, "Shopify setup help should be rejected as non-buyer intent");
-assert.equal(hasRedditRadarProblemIntent("Where to sell sneakers?", "My stock is not moving."), true, "Broad niche pain should count as Reddit Radar problem intent");
+assert.equal(hasRedditRadarProblemIntent("Where to sell sneakers?", "My stock is not moving."), false, "Generic seller marketplace pain should not be the main Reddit Radar intent");
+assert.equal(hasRedditRadarProblemIntent("How do I get more customers?", "I launched a business but have no leads or traffic."), true, "Customer acquisition pain should count as Reddit Radar problem intent");
 
-const sneakerQueries = expandRedditRadarQueries("sneaker resellers", "resellers", "sneakers");
-assert.ok(sneakerQueries.includes("sneakers no sales"), "Sneaker query should expand into no-sales search");
-assert.ok(sneakerQueries.includes("reselling sneakers stuck"), "Sneaker query should expand into stuck reseller search");
-assert.ok(sneakerQueries.includes("sneaker inventory problem"), "Sneaker query should expand into inventory problem search");
+const acquisitionQueries = expandRedditRadarQueries("MarketVibe", "founders and freelancers", "customer discovery lead generation");
+assert.ok(acquisitionQueries.includes("how do i get more customers"), "Query should expand into customer acquisition search");
+assert.ok(acquisitionQueries.includes("need help finding leads"), "Query should expand into lead generation search");
+assert.ok(acquisitionQueries.includes("what tool can help me with organic marketing"), "Query should expand into organic marketing tool search");
 
-const bookQueries = expandRedditRadarQueries("book sellers", "used book resellers", "books online");
-assert.ok(bookQueries.includes("book selling no sales"), "Book seller query should expand into no-sales search");
-assert.ok(bookQueries.includes("where to sell books online"), "Book seller query should expand into marketplace search");
-assert.ok(bookQueries.includes("used books inventory problem"), "Book seller query should expand into inventory search");
+const founderQueries = expandRedditRadarQueries("SaaS app", "startup founders", "growth");
+assert.ok(founderQueries.includes("how do i grow my saas"), "SaaS query should expand into founder growth search");
+assert.ok(founderQueries.includes("startup no customers"), "Founder query should expand into no-customers search");
+assert.ok(founderQueries.includes("organic marketing for saas"), "Founder query should expand into organic marketing search");
 
-const roofingQueries = expandRedditRadarQueries("roofers", "homeowners", "roofing");
-assert.ok(roofingQueries.includes("roof leak help"), "Roofing query should expand into leak help search");
-assert.ok(roofingQueries.includes("roofing quote problem"), "Roofing query should expand into quote problem search");
-assert.ok(roofingQueries.includes("roofing leads"), "Roofing query should expand into lead search");
+const localQueries = expandRedditRadarQueries("booking software", "local service businesses", "visibility");
+assert.ok(localQueries.includes("local business no leads"), "Local business query should expand into no-leads search");
+assert.ok(localQueries.includes("how do i get bookings"), "Local business query should expand into booking search");
+assert.ok(localQueries.includes("local business visibility problem"), "Local business query should expand into visibility search");
 
 const ecommerceQueries = expandRedditRadarQueries("ecommerce", "store owners", "shopify");
-assert.ok(ecommerceQueries.includes("shopify no traffic"), "Ecommerce query should expand into Shopify no-traffic search");
 assert.ok(ecommerceQueries.includes("ecommerce no sales"), "Ecommerce query should expand into ecommerce no-sales search");
+assert.ok(ecommerceQueries.includes("online store no traffic"), "Ecommerce query should expand into online store no-traffic search");
 assert.ok(ecommerceQueries.includes("product page not converting"), "Ecommerce query should expand into product page conversion search");
 
-const sneakerSubs = expandRedditRadarSubreddits("sneaker reselling problem");
-assert.ok(sneakerSubs.includes("Flipping") && sneakerSubs.includes("Sneakers"), "Sneaker query should add reselling subreddits");
-const roofingSubs = expandRedditRadarSubreddits("roof leak quote problem");
-assert.ok(roofingSubs.includes("HomeImprovement") && roofingSubs.includes("Roofing"), "Roofing query should add local service subreddits");
+const founderSubs = expandRedditRadarSubreddits("saas founder customer acquisition problem");
+assert.ok(founderSubs.includes("SaaS") && founderSubs.includes("startups"), "Founder query should search startup/SaaS communities");
+const agencySubs = expandRedditRadarSubreddits("freelancer client acquisition problem");
+assert.ok(agencySubs.includes("freelance") && agencySubs.includes("agency"), "Freelancer query should search client acquisition communities");
 
 const rssJunk = cleanRssBody(`
   submitted by /u/example to /r/marketing

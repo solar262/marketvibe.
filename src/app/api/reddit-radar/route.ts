@@ -43,6 +43,7 @@ type RawPost = {
   body: string;
   ups: number;
   comments: number;
+  createdUtc?: number;
 };
 
 const USER_AGENTS = [
@@ -253,6 +254,7 @@ function parseJsonPosts(payload: unknown): RawPost[] {
       body: compactText(post.selftext || ""),
       ups: Number(post.ups || 0),
       comments: Number(post.num_comments || 0),
+      createdUtc: Number(post.created_utc || 0) || undefined,
     }));
 }
 
@@ -273,8 +275,35 @@ function parseRssPosts(xml: string): RawPost[] {
       body,
       ups: 0,
       comments: 0,
+      createdUtc: undefined,
     };
   }).filter((post) => post.title && post.permalink);
+}
+
+function snippetForPost(post: RawPost) {
+  return compactText(post.body || post.title).slice(0, 260);
+}
+
+function problemTypeForPost(title: string, body: string) {
+  const text = `${title} ${body}`.toLowerCase();
+  if (hasAny(text, ["cold outreach", "no one replies", "outreach not working", "prospecting"])) return "lead generation problems";
+  if (hasAny(text, ["no traffic", "organic", "without ads", "promote my business", "visibility"])) return "organic marketing problems";
+  if (hasAny(text, ["no leads", "need leads", "find leads", "get leads"])) return "lead generation problems";
+  if (hasAny(text, ["no sales", "not converting", "abandoned cart", "product page"])) return "no sales / no traffic complaints";
+  if (hasAny(text, ["saas", "startup", "founder", "app", "users"])) return "startup/founder growth questions";
+  if (hasAny(text, ["local business", "bookings", "appointments", "service business"])) return "local business visibility problems";
+  if (hasAny(text, ["ecommerce", "store", "shopify", "checkout"])) return "ecommerce growth problems";
+  if (hasAny(text, ["freelancer", "clients", "client acquisition", "agency"])) return "freelancer/client acquisition problems";
+  return "customer acquisition problems";
+}
+
+function audienceTypeForPost(title: string, body: string, target: string) {
+  const text = `${title} ${body} ${target}`.toLowerCase();
+  if (hasAny(text, ["freelancer", "agency", "consultant", "web design", "seo"])) return "freelancers/agencies";
+  if (hasAny(text, ["saas", "startup", "founder", "app", "software"])) return "startup/founders";
+  if (hasAny(text, ["local", "service business", "restaurant", "clinic", "salon", "bookings"])) return "local businesses";
+  if (hasAny(text, ["ecommerce", "store", "shopify", "product page", "checkout"])) return "ecommerce businesses";
+  return "business owners";
 }
 
 function relevantSubreddits(queryText: string) {
@@ -430,8 +459,16 @@ export async function GET(request: Request) {
 
       return {
         subreddit: post.subreddit,
+        platform: "Reddit",
         title: post.title,
         url: post.permalink,
+        snippet: snippetForPost(post),
+        painPoint: extractPain(post.title, post.body),
+        detectedPainPoint: extractPain(post.title, post.body),
+        intentScore: Math.max(0, Math.min(100, conversionIntentScore(post))),
+        problemType: problemTypeForPost(post.title, post.body),
+        audienceType: audienceTypeForPost(post.title, post.body, target),
+        createdUtc: post.createdUtc || null,
         niche,
         target,
         score,

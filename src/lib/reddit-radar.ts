@@ -34,12 +34,12 @@ export type RedditRadarRankablePost = {
 };
 
 const LOW_INTEL_REPLY = "LOW INTEL — SKIP THIS ONE...\n\nThere isn't enough context or engagement to write a useful reply.\n\nLook for posts with a real question, clear problem, or active comments.";
-const PAIN_SIGNAL_PATTERN = /\b(need help|help|problem|struggling|struggle|stuck|traffic|not converting|no traffic|no sales|website not working|what should i do|how do i get|how can i get|any advice|need advice|advice|looking for tool|recommend|shopify|ecommerce|customers|clients|leads|sales|prospects|prospecting|outreach|local businesses|web design clients|seo clients|agency lead generation|client acquisition)\b/i;
+const PAIN_SIGNAL_PATTERN = /\b(need help|help|problem|struggling|struggle|stuck|traffic|not converting|no traffic|no sales|no customers|no clients|no leads|website not working|what should i do|how do i get|how can i get|how do i promote|how do i grow|any advice|need advice|advice|looking for tool|recommend|customers|clients|leads|sales|prospects|prospecting|outreach|organic marketing|without ads|visibility|bookings|appointments|growth|promote my business|find customers|find clients|find leads|customer acquisition)\b/i;
 const JOB_POST_PATTERN = /\b(hiring|remote developer|salary|full-time|full time|part-time|part time|job|career|vacancy|looking for developer|apply now|worldwide|per month)\b|\$\s*\/\s*month|\$\s*\d[\d,]*(?:\.\d{2})?\s*\/\s*month/i;
 const RSS_METADATA_PATTERN = /\bsubmitted by\b|\/u\/|\[comments\]|\bcomments link\b|\bpermalink\b|\breddit metadata\b|\bto \/r\/|\bfrom \/r\/|reddit\.com\/comments/i;
-const MARKETVIBE_BUYER_INTENT_PATTERN = /\b(how do i find web design clients|how do i get seo clients|where to find local business leads|how to sell websites to local businesses|how to get clients as a freelancer|cold outreach for web design|local businesses that need websites|website redesign leads|lead generation for agencies|finding businesses with bad websites|prospecting for web design|selling seo services|agency lead generation|client acquisition for web designers|web design clients|seo clients|local business leads|sell websites to local businesses|get clients as a freelancer|client acquisition|cold outreach|website redesign|redesign leads|bad websites|prospecting|businesses to pitch|find clients|find leads|get clients|get leads|lead generation|local leads|agency leads|outreach help)\b/i;
+const MARKETVIBE_BUYER_INTENT_PATTERN = /\b(how do i find web design clients|how do i get seo clients|where to find local business leads|how to sell websites to local businesses|how to get clients as a freelancer|cold outreach for web design|local businesses that need websites|website redesign leads|lead generation for agencies|finding businesses with bad websites|prospecting for web design|selling seo services|agency lead generation|client acquisition for web designers|web design clients|seo clients|local business leads|sell websites to local businesses|get clients as a freelancer|client acquisition|cold outreach|website redesign|redesign leads|bad websites|prospecting|businesses to pitch|find clients|find leads|get clients|get leads|lead generation|local leads|agency leads|outreach help|how do i get more customers|where can i find clients|how do i promote my business without ads|what tool can help me with organic marketing|struggling to get sales|how do i grow my saas|how do i grow my app|how do i grow my store|need help finding leads|my business has no leads|my website gets no traffic)\b/i;
 const NON_BUYER_INTENT_PATTERN = /\b(shopify setup|new to shopify|claude setup|store automation|automating the setup|dropshipping|dropshipping beginners|fixing my website|fix my website|technical help|general business advice|business advice|setup help)\b/i;
-const BROAD_PROBLEM_INTENT_PATTERN = /\b(need help|struggling|problem|no sales|no traffic|not converting|customers|leads|where to sell|how do i|any advice|looking for tool|recommend|stuck|stock not moving|inventory problem|quote problem|customer problem|no customers|not selling|abandoned cart|product page)\b/i;
+const BROAD_PROBLEM_INTENT_PATTERN = /\b(need help|struggling|problem|no sales|no traffic|no leads|no customers|no clients|not converting|customers|leads|clients|how do i|how can i|any advice|looking for tool|recommend|stuck|customer problem|not selling|abandoned cart|product page|organic marketing|without ads|promote my business|find customers|find clients|find leads|bookings|appointments|visibility|growth)\b/i;
 const SPAM_PROMO_PATTERN = /\b(check out my|use my code|promo code|limited offer|dm me|buy now|launching my|i built this|my app|my course|subscribe|newsletter)\b/i;
 
 export function compactRedditText(value: string) {
@@ -161,22 +161,54 @@ export function expandRedditRadarQueries(niche: string, customer = "", keywords 
   };
 
   add(base.join(" "));
-  for (const seed of base) {
-    ["need help", "problem", "struggling", "no sales", "customers", "where to sell", "how do i", "advice", "looking for tool"].forEach((pain) => add(`${seed} ${pain}`));
-  }
+  const intentSeeds = [
+    "how do i get more customers",
+    "how do i get clients",
+    "where can i find clients",
+    "where do i find customers",
+    "need help finding leads",
+    "my business has no leads",
+    "my website gets no traffic",
+    "how do i promote my business without ads",
+    "what tool can help me with organic marketing",
+    "struggling to get sales",
+    "how do i grow my saas",
+    "how do i grow my app",
+    "how do i grow my store",
+    "how do i get bookings",
+    "how do i get appointments",
+    "cold outreach not working",
+    "no one replies to my outreach",
+    "looking for tool to find leads",
+  ];
+  intentSeeds.forEach(add);
 
   const text = base.join(" ").toLowerCase();
-  if (/\b(sneaker|sneakers|shoe|shoes|resell|reseller|flipping)\b/.test(text)) {
-    ["sneakers no sales", "reselling sneakers stuck", "sneaker inventory problem", "where to sell sneakers", "stock not moving", "reselling shoes advice", "sneaker flipping problem"].forEach(add);
-  }
-  if (/\b(book|books|bookstore|author|self publish|self-published)\b/.test(text)) {
-    ["book selling no sales", "selling books online help", "used books inventory problem", "where to sell books online", "book reseller advice", "bookstore no customers", "self published book not selling"].forEach(add);
-  }
-  if (/\b(roof|roofer|roofing|contractor)\b/.test(text)) {
-    ["roof leak help", "roofing quote problem", "storm damage roof advice", "roofing leads", "roof repair customer problem", "roofer no leads"].forEach(add);
-  }
   if (/\b(ecommerce|shopify|online store|store|cart|product page)\b/.test(text)) {
-    ["shopify no traffic", "store not converting", "abandoned cart problem", "product page not converting", "ecommerce no sales", "need help with online store"].forEach(add);
+    ["ecommerce no sales", "store not converting", "abandoned cart problem", "product page not converting", "online store no traffic", "how do i grow my store"].forEach(add);
+  }
+  if (/\b(saas|startup|founder|app|tool|software)\b/.test(text)) {
+    ["how do i grow my saas", "how do i get users for my app", "startup no customers", "founder struggling to get sales", "organic marketing for saas"].forEach(add);
+  }
+  if (/\b(local|restaurant|clinic|salon|roofer|contractor|service business|small business)\b/.test(text)) {
+    ["local business no leads", "how do i get bookings", "local business visibility problem", "my website gets no traffic", "how do i market my service business"].forEach(add);
+  }
+  if (/\b(freelance|freelancer|consultant|agency|coach|web design|seo|marketer)\b/.test(text)) {
+    ["how do i get clients as a freelancer", "cold outreach not working", "where can i find clients", "client acquisition problem", "no one replies to my outreach"].forEach(add);
+  }
+  for (const seed of base) {
+    [
+      "customer acquisition problem",
+      "organic marketing problem",
+      "lead generation problem",
+      "no sales no traffic",
+      "startup growth question",
+      "local business visibility problem",
+      "ecommerce growth problem",
+      "freelancer client acquisition problem",
+      "how do i get customers",
+      "looking for tool to find leads",
+    ].forEach((pain) => add(`${seed} ${pain}`));
   }
   if (!queries.size && primary) add(primary);
 
@@ -185,16 +217,9 @@ export function expandRedditRadarQueries(niche: string, customer = "", keywords 
 
 export function expandRedditRadarSubreddits(queryText: string) {
   const text = queryText.toLowerCase();
-  const subs = new Set(["smallbusiness", "Entrepreneur", "startups", "marketing", "DigitalMarketing", "sales", "ecommerce"]);
-  if (/\b(sneaker|sneakers|shoe|shoes|resell|reselling|flipping)\b/.test(text)) {
-    ["Flipping", "reselling", "Sneakers", "SneakerMarket"].forEach((sub) => subs.add(sub));
-  }
-  if (/\b(book|books|bookstore|author|self publish|self-published)\b/.test(text)) {
-    ["bookselling", "selfpublish", "Flipping"].forEach((sub) => subs.add(sub));
-  }
-  if (/\b(roof|roofer|roofing|contractor|home improvement)\b/.test(text)) {
-    ["HomeImprovement", "Roofing", "Contractor", "smallbusiness"].forEach((sub) => subs.add(sub));
-  }
+  const subs = new Set(["smallbusiness", "Entrepreneur", "startups", "marketing", "DigitalMarketing", "sales", "SaaS", "SideProject", "growmybusiness"]);
+  if (/\b(ecommerce|store|shopify|cart|product page)\b/.test(text)) ["ecommerce", "shopify", "smallbusiness"].forEach((sub) => subs.add(sub));
+  if (/\b(local|service business|restaurant|clinic|salon|contractor|bookings|visibility)\b/.test(text)) ["smallbusiness", "Entrepreneur", "marketing"].forEach((sub) => subs.add(sub));
   if (/\b(web design|website|seo|agency|freelance|client|lead|prospect|outreach)\b/.test(text)) {
     ["web_design", "freelance", "SEO", "bigseo", "agency"].forEach((sub) => subs.add(sub));
   }

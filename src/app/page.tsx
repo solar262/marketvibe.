@@ -9,7 +9,6 @@ import {
   FileSearch,
   Globe2,
   Layers3,
-  MapPinned,
   MousePointerClick,
   SearchCheck,
   ShieldCheck,
@@ -20,24 +19,24 @@ import {
 import { sampleLeads } from "@/lib/lead-engine";
 
 export const metadata: Metadata = {
-  title: "MarketVibe Lead Engine | Find Business Leads for Service Sellers",
-  description: "Find public business opportunities, review website gaps, and create practical audit reports for web design, SEO, booking, review, and local service outreach.",
+  title: "MarketVibe Lead Engine | Find High-Intent Customer Conversations",
+  description: "Find people already talking about the problems your business solves, then join conversations with helpful, human replies.",
 };
 
 export default function Home() {
   const lead = sampleLeads[0];
   const visibleFindings = lead.audit.findings.filter((finding) => finding.found).slice(0, 3);
   const heroBenefits = [
-    [MapPinned, "Search by niche + location"],
-    [Globe2, "Scan public business websites"],
-    [MousePointerClick, "Spot weak conversion signals"],
-    [Target, "Generate lead opportunities"],
+    [SearchCheck, "Scan public conversations"],
+    [Target, "Rank high-intent problems"],
+    [MousePointerClick, "Spot lead and traffic pain"],
+    [Globe2, "Review public business signals"],
   ] as const;
   const howItWorks = [
-    [MapPinned, "Choose a market", "Pick a city, business category, and service angle."],
-    [SearchCheck, "Find public opportunities", "Rank visible business signals and focus on stronger matches."],
-    [ClipboardCheck, "Review audit signals", "Check website gaps, contact routes, booking visibility, and trust signals."],
-    [UnlockKeyhole, "Unlock reports or start a plan", "Move into full reports, Starter, or Pro when you need more volume."],
+    [SearchCheck, "Enter your product and audience", "Describe who you help, what problem you solve, and the terms buyers use."],
+    [Target, "Find high-intent conversations", "Rank public posts where people ask for help with customers, leads, traffic, sales, visibility, or growth."],
+    [ClipboardCheck, "Review pain and reply angle", "See the detected pain point, intent score, relevance reason, and a helpful reply draft."],
+    [UnlockKeyhole, "Move into lead search or reports", "Use public business signals and audit reports when you want local prospect research too."],
   ] as const;
   const audience = ["Web designers", "SEO freelancers", "Agencies", "Consultants", "Local marketers", "Service sellers"];
   const auditIncludes = [
@@ -53,7 +52,7 @@ export default function Home() {
   const trustItems = [
     "Secure checkout",
     "Audit preview",
-    "Public business signals",
+    "Public conversations",
     "Built for service sellers",
   ];
 
@@ -69,10 +68,10 @@ export default function Home() {
               <Sparkles className="h-4 w-4 text-emerald-300" /> MarketVibe Lead Engine
             </p>
             <h1 className="mt-5 max-w-2xl text-4xl font-semibold tracking-tight text-white sm:text-5xl lg:text-[3.7rem] lg:leading-[1.02]">
-              Turn Public Business Signals Into Better Leads
+              Find People Already Talking About the Problems You Solve
             </h1>
             <p className="mt-5 max-w-xl text-base leading-7 text-slate-300 sm:text-lg">
-              MarketVibe helps web designers, SEO freelancers, agencies, consultants, local marketers, and service sellers spot practical opportunities from visible website gaps.
+              MarketVibe helps you discover public conversations where people are asking for help with customers, leads, traffic, sales, visibility, or growth.
             </p>
 
             <div className="mt-6 grid max-w-xl gap-2 sm:grid-cols-2">
@@ -175,8 +174,8 @@ export default function Home() {
               <p className="text-sm font-semibold text-emerald-300">How MarketVibe Works</p>
               <h2 className="mt-2 text-3xl font-semibold tracking-tight text-white">A focused workflow for finding better opportunities.</h2>
             </div>
-            <Link href="/lead-search" className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-white/10">
-              Open Lead Search <ArrowRight className="h-4 w-4" />
+            <Link href="/reddit-radar" className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-white/10">
+              Open Conversation Radar <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
