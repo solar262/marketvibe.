@@ -54,15 +54,15 @@ function hasAny(text: string, pattern: RegExp) {
 
 function buildFacebookSearchUrl(targetBuyer: string, painKeywords: string) {
   const query = cleanText([targetBuyer, painKeywords].filter(Boolean).join(" "));
-  return query ? `https://www.facebook.com/search/posts/?q=${encodeURIComponent(query)}` : "https://www.facebook.com/search/posts/";
+  return query ? `https://m.facebook.com/search/posts/?q=${encodeURIComponent(query)}` : "https://m.facebook.com/search/";
 }
 
 function facebookPostsUrl(query: string) {
-  return `https://www.facebook.com/search/posts/?q=${encodeURIComponent(query)}`;
+  return `https://m.facebook.com/search/posts/?q=${encodeURIComponent(query)}`;
 }
 
 function facebookGroupsUrl(query: string) {
-  return `https://www.facebook.com/search/groups/?q=${encodeURIComponent(query)}`;
+  return `https://m.facebook.com/search/groups/?q=${encodeURIComponent(query)}`;
 }
 
 function splitTerms(value: string) {
@@ -236,7 +236,8 @@ function scorePost(text: string, targetBuyer: string, painKeywords: string) {
   if (/\b(my website gets no traffic|website gets no traffic|my business has no leads|no leads|no sales|store not converting|shopify store has no sales)\b/i.test(text)) score += 30;
   if (/\b(looking for a tool to find leads|how do i get leads|how do i get clients|where do i find customers|need help getting customers)\b/i.test(text)) score += 26;
   if (targetBuyer && text.toLowerCase().includes(targetBuyer.toLowerCase().split(/\s+/)[0] || "")) score += 4;
-  for (const keyword of painKeywords.toLowerCase().split(/[,;\n]/).map((item) => item.trim()).filter(Boolean)) {
+
+  for (const keyword of splitTerms(painKeywords)) {
     if (keyword.length > 2 && text.toLowerCase().includes(keyword)) score += 4;
   }
   if (BAD_PATTERN.test(text)) score -= 55;
