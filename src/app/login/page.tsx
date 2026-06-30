@@ -7,14 +7,14 @@ import { inputClass } from "@/lib/ui";
 async function login(formData: FormData) {
   "use server";
   const email = String(formData.get("email") || "").trim().toLowerCase();
-  const password = String(formData.get("password") || "");
+  const password = String(formData.get("password") || "").trim();
   const credentials = adminCredentials();
 
   if (!credentials.email || !credentials.password) {
     redirect("/login?error=config");
   }
 
-  if (email === credentials.email.toLowerCase() && password === credentials.password) {
+  if (email === credentials.email && password === credentials.password) {
     const cookieStore = await cookies();
     cookieStore.set(ADMIN_COOKIE, adminSessionValue(), {
       httpOnly: true,
