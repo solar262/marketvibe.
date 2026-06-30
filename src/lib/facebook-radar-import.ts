@@ -119,7 +119,7 @@ export function scoreImportedFacebookPosts(input: {
 }) {
   const searchPhrase = clean(input.searchPhrase, 180);
   const targetBuyer = clean(input.targetBuyer || "web designers, SEO freelancers, local marketers, small agencies", 240);
-  const painKeywords = clean(input.painKeywords || "need clients, looking for leads, cold outreach not working, no customers", 240);
+  const painKeywords = clean(input.painKeywords || "web design clients, SEO clients, local business leads, prospecting, cold outreach not working", 240);
   const seen = new Set<string>();
 
   return (input.posts || [])

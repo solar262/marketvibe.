@@ -50,17 +50,28 @@ type LeadHuntStatus = {
   extensionVersion?: string;
 };
 
+type LeadHuntEvent = {
+  runId?: string;
+  eventType: string;
+  message?: string;
+  reason?: string;
+  sourceUrl?: string;
+  query?: string;
+  score?: number;
+  createdAt?: string;
+};
+
 const LEAD_HUNT_QUERIES = [
-  "I need leads",
-  "how do I get clients",
-  "struggling to get clients",
-  "need more customers",
-  "looking for leads",
-  "need clients fast",
-  "my outreach is not working",
-  "web designer need leads",
-  "SEO freelancer need clients",
-  "agency owner need leads",
+  "how do I get web design clients",
+  "how do I get SEO clients",
+  "where can I find local business leads",
+  "how to sell websites to local businesses",
+  "how to sell SEO to local businesses",
+  "web designer struggling to get clients",
+  "SEO freelancer struggling to get clients",
+  "agency owner client acquisition",
+  "cold outreach not working for agency",
+  "where do marketers find prospects",
 ];
 
 export default function LeadHuntAutopilotPage() {
@@ -69,9 +80,10 @@ export default function LeadHuntAutopilotPage() {
   const [maxImportedLeads, setMaxImportedLeads] = useState(10);
   const [delayMs, setDelayMs] = useState(3500);
   const [outreachMode, setOutreachMode] = useState<OutreachMode>("draft-only");
-  const [status, setStatus] = useState("Ready. Click Run Lead Hunt to launch the browser extension workflow.");
+  const [status, setStatus] = useState("Ready. Click Run Buyer Radar to launch the browser extension workflow.");
   const [internalKey, setInternalKey] = useState("");
   const [importData, setImportData] = useState<ImportResponse | null>(null);
+  const [runLogs, setRunLogs] = useState<LeadHuntEvent[]>([]);
   const [runtimeSeconds, setRuntimeSeconds] = useState(0);
   const [liveProgress, setLiveProgress] = useState({
     runId: "",
@@ -105,6 +117,13 @@ export default function LeadHuntAutopilotPage() {
   async function refreshImports() {
     const response = await fetch("/api/internal-marketing-leads", { cache: "no-store" });
     setImportData(await response.json());
+  }
+
+  async function refreshRunLogs() {
+    const response = await fetch("/api/internal-marketing-leads/events?limit=25", { cache: "no-store" });
+    if (!response.ok) return;
+    const payload = await response.json() as { events?: LeadHuntEvent[] };
+    setRunLogs(Array.isArray(payload.events) ? payload.events : []);
   }
 
   async function refreshHuntStatus() {
@@ -160,6 +179,7 @@ export default function LeadHuntAutopilotPage() {
       return;
     }
     await refreshHuntStatus();
+    await refreshRunLogs();
   }
 
   useEffect(() => {
@@ -169,6 +189,11 @@ export default function LeadHuntAutopilotPage() {
       .then((response) => response.json())
       .then((nextData: ImportResponse) => {
         if (!ignore) setImportData(nextData);
+      });
+    void fetch("/api/internal-marketing-leads/events?limit=25", { cache: "no-store" })
+      .then((response) => response.ok ? response.json() : { events: [] })
+      .then((payload: { events?: LeadHuntEvent[] }) => {
+        if (!ignore) setRunLogs(Array.isArray(payload.events) ? payload.events : []);
       });
 
     return () => {
@@ -199,7 +224,7 @@ export default function LeadHuntAutopilotPage() {
       extensionVersion: "",
       updatedAt: new Date().toISOString(),
     });
-    setStatus("Lead Hunt launched. The extension will open searches, scan visible public pages, import High Intent matches, and stop at your caps.");
+    setStatus("Buyer Radar launched. The extension will open internal buyer-intent searches, collect high-confidence service-seller matches, and stop at your caps.");
     const config = {
       runId,
       queries: LEAD_HUNT_QUERIES,
@@ -280,18 +305,34 @@ export default function LeadHuntAutopilotPage() {
     const timer = window.setInterval(() => {
       void refreshHuntStatus();
       void refreshImports();
+      void refreshRunLogs();
     }, 1500);
     return () => window.clearInterval(timer);
   }, [status, liveProgress.active, liveProgress.currentUrl, liveProgress.paused, liveProgress.recoveryNeeded]);
+
+  const displayState = liveProgress.recoveryNeeded
+    ? "Recovery needed"
+    : liveProgress.paused
+      ? "Paused"
+      : liveProgress.active
+        ? "Running"
+        : /error|failed/i.test(status) || Boolean(liveProgress.lastError)
+          ? "Error"
+          : /completed|complete/i.test(status)
+            ? "Completed"
+            : /stopped|stop/i.test(status)
+              ? "Stopped"
+              : "Idle";
+  const currentTarget = [liveProgress.source, liveProgress.query].filter((value) => value && value !== "Not started").join(" / ") || "No active target";
 
   return (
     <main className="min-h-screen bg-[#050b16] px-4 py-8 text-white sm:px-6 lg:px-8">
       <section className="mx-auto max-w-6xl">
         <div className="rounded-[2rem] border border-white/10 bg-white/[0.06] p-6 shadow-2xl shadow-black/30">
           <p className="text-sm font-bold uppercase tracking-[0.18em] text-emerald-300">Internal Growth Tool</p>
-          <h1 className="mt-3 text-4xl font-semibold tracking-tight">Lead Hunt Autopilot</h1>
+          <h1 className="mt-3 text-4xl font-semibold tracking-tight">Buyer Radar Autopilot</h1>
           <p className="mt-3 max-w-3xl text-slate-300">
-            One button launches an automated public-source buyer-intent hunt. No auto-DM, no auto-comment, no private data, and no spam actions.
+            Internal browser workflow for finding service sellers with client-acquisition pain. No auto-DM, no auto-comment, no private data, and no spam actions.
           </p>
 
           <label className="mt-5 grid max-w-xl gap-2 text-sm font-bold text-slate-200">
@@ -307,7 +348,7 @@ export default function LeadHuntAutopilotPage() {
 
           <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <button onClick={runLeadHunt} className="inline-flex min-w-0 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-emerald-300 to-cyan-200 px-5 py-4 text-sm font-black text-slate-950 shadow-xl shadow-emerald-950/30 sm:text-base">
-              <Play className="h-5 w-5 shrink-0" /> <span className="truncate">{liveProgress.active || liveProgress.paused || liveProgress.recoveryNeeded ? "Start New Run" : "Run Lead Hunt"}</span>
+              <Play className="h-5 w-5 shrink-0" /> <span className="truncate">{liveProgress.active || liveProgress.paused || liveProgress.recoveryNeeded ? "Start New Run" : "Run Buyer Radar"}</span>
             </button>
             <button onClick={() => void pauseLeadHunt()} disabled={!liveProgress.active || liveProgress.paused} className="inline-flex min-w-0 items-center justify-center gap-2 rounded-full border border-white/15 bg-white/10 px-5 py-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50 sm:text-base">
               <Pause className="h-5 w-5 shrink-0" /> Pause
@@ -330,7 +371,7 @@ export default function LeadHuntAutopilotPage() {
             liveProgress.active ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-50" :
             "border-white/10 bg-slate-950/40 text-slate-200"
           }`}>
-            Current status: {liveProgress.recoveryNeeded ? "Recovery needed" : liveProgress.paused ? "Paused" : liveProgress.active ? "Running" : status.includes("Stopped") ? "Stopped" : "Ready"}
+            Current state: {displayState}
           </p>
           {liveProgress.extensionVersion && liveProgress.extensionVersion !== "0.1.2" && (
             <p className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm font-semibold text-amber-50">
@@ -338,7 +379,7 @@ export default function LeadHuntAutopilotPage() {
             </p>
           )}
           <div className="mt-5 grid gap-3 sm:grid-cols-4">
-            <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4"><p className="text-xs uppercase tracking-[0.16em] text-slate-400">Live query</p><p className="mt-2 min-w-0 break-words text-sm font-bold text-white">{liveProgress.query}</p></div>
+            <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4"><p className="text-xs uppercase tracking-[0.16em] text-slate-400">Current target</p><p className="mt-2 min-w-0 break-words text-sm font-bold text-white">{currentTarget}</p></div>
             <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4"><p className="text-xs uppercase tracking-[0.16em] text-slate-400">Live source</p><p className="mt-2 text-sm font-bold text-white">{liveProgress.source}</p></div>
             <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4"><p className="text-xs uppercase tracking-[0.16em] text-slate-400">Runtime</p><p className="mt-2 text-sm font-bold text-white">{Math.floor(runtimeSeconds / 60)}m {runtimeSeconds % 60}s</p></div>
             <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4"><p className="text-xs uppercase tracking-[0.16em] text-slate-400">Current URL</p><p className="mt-2 min-w-0 break-all text-xs font-bold text-cyan-100">{liveProgress.currentUrl || "Extension panel updates while running"}</p></div>
@@ -407,7 +448,7 @@ export default function LeadHuntAutopilotPage() {
             <div className="mt-5 rounded-2xl border border-white/10 bg-slate-950/40 p-4">
               <p className="text-sm font-bold text-emerald-200">Queue system</p>
               <p className="mt-2 text-sm leading-6 text-slate-300">
-                Tracks current query, source, result number, imported count, skipped count, duplicate count, daily caps, and extension errors in the floating panel.
+                Tracks current target, result number, imported count, skipped count, duplicate count, run caps, and extension errors in the floating panel.
               </p>
               <p className="mt-2 text-sm text-slate-400">Enabled sources: {enabledSourceLabels.join(", ") || "none"}</p>
             </div>
@@ -421,7 +462,7 @@ export default function LeadHuntAutopilotPage() {
               ))}
             </div>
             <p className="mt-5 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm leading-6 text-amber-50">
-              The extension skips low-quality, spam, seller, job, freelancer-noise, duplicate, blocked, blank, and unavailable pages.
+              Internal only: these searches look for buyers of MarketVibe opportunity inventory, not salon/cafe/gym/dentist owners. The extension skips generic business posts, job spam, reseller offers, duplicates, blocked pages, and low-confidence results.
             </p>
           </section>
         </div>
@@ -429,8 +470,35 @@ export default function LeadHuntAutopilotPage() {
         <section className="mt-6 rounded-[2rem] border border-white/10 bg-white/[0.06] p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-2xl font-semibold">Final imported leads</h2>
-              <p className="mt-1 text-sm text-slate-400">Only imported leads are shown here. Skipped pages stay out of this list.</p>
+              <h2 className="text-2xl font-semibold">Run logs</h2>
+              <p className="mt-1 text-sm text-slate-400">Recent browser actions, skips, imports, and recovery events from the internal runner.</p>
+            </div>
+            <button onClick={refreshRunLogs} className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-3 text-sm font-bold text-white">
+              <RefreshCw className="h-4 w-4" /> Refresh logs
+            </button>
+          </div>
+          <div className="mt-5 grid gap-3">
+            {runLogs.length ? runLogs.map((log, index) => (
+              <article key={`${log.createdAt || index}-${log.eventType}`} className="rounded-2xl border border-white/10 bg-slate-950/40 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1 text-xs font-black text-cyan-100">{log.eventType || "event"}</span>
+                  {log.score ? <span className="rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1 text-xs font-bold text-emerald-100">Score {log.score}</span> : null}
+                  <span className="text-xs font-semibold text-slate-400">{log.createdAt ? new Date(log.createdAt).toLocaleString() : "Just now"}</span>
+                </div>
+                <p className="mt-2 text-sm font-semibold text-white">{log.message || log.reason || "Runner event recorded."}</p>
+                {(log.query || log.sourceUrl) && <p className="mt-2 min-w-0 break-words text-xs text-slate-400">{log.query || ""}{log.query && log.sourceUrl ? " · " : ""}{log.sourceUrl || ""}</p>}
+              </article>
+            )) : (
+              <div className="rounded-3xl border border-white/10 bg-slate-950/40 p-8 text-center text-slate-300">No run logs yet. Start Buyer Radar or refresh after the extension reports activity.</div>
+            )}
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-[2rem] border border-white/10 bg-white/[0.06] p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-semibold">Latest processed buyer-intent items</h2>
+              <p className="mt-1 text-sm text-slate-400">Saved service-seller opportunities with buyer intent. Skipped pages stay out of this list.</p>
             </div>
             <button onClick={refreshImports} className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-3 text-sm font-bold text-white">
               <RefreshCw className="h-4 w-4" /> Refresh
@@ -456,7 +524,7 @@ export default function LeadHuntAutopilotPage() {
                 </div>
               </article>
             )) : (
-              <div className="rounded-3xl border border-white/10 bg-slate-950/40 p-8 text-center text-slate-300">No imported leads yet. Run Lead Hunt, then refresh this list.</div>
+              <div className="rounded-3xl border border-white/10 bg-slate-950/40 p-8 text-center text-slate-300">No buyer-intent items yet. Run Buyer Radar, then refresh this list.</div>
             )}
           </div>
         </section>

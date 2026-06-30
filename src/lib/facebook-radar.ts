@@ -93,31 +93,30 @@ export type FacebookRadarSchedule = {
 };
 
 export const BUYER_INTENT_QUERY_LIBRARY = [
-  "I need a website for my business",
-  "looking for someone to build website",
-  "need help getting clients",
-  "how do I get more customers",
-  "need more leads for my business",
-  "looking for marketing help",
-  "recommend marketing agency",
-  "need someone to run ads",
-  "need SEO help",
-  "my website is not getting customers",
-  "who to increase sales online",
-  "need help with ecommerce store",
-  "looking for social media manager",
-  "best way to get more clients",
-  "need email marketing help",
-  "looking for branding help",
-  "need content for my business",
-  "need help with Google Ads",
-  "my business is slow need help",
+  "how do I get web design clients",
+  "how do I get SEO clients",
+  "where can I find local business leads",
+  "how to sell websites to local businesses",
+  "how to sell SEO to local businesses",
+  "how to find clients for local marketing agency",
+  "web designer struggling to get clients",
+  "SEO freelancer struggling to get clients",
+  "agency owner client acquisition",
+  "cold outreach not working for agency",
+  "no one replies to my outreach",
+  "where do marketers find prospects",
+  "how to find booking system clients",
+  "how to sell booking systems to small businesses",
+  "how to get social media management clients",
+  "automation consultant how to find clients",
+  "best niches for local lead generation",
+  "how to prospect local businesses",
+  "where to find businesses that need websites",
 ];
 
 export const DEFAULT_FACEBOOK_EXCLUDE_KEYWORDS = [
   "job",
   "hire me",
-  "freelancer",
   "looking for work",
   "crypto",
   "MLM",
@@ -127,13 +126,14 @@ export const DEFAULT_FACEBOOK_EXCLUDE_KEYWORDS = [
   "spam",
 ];
 
-const BUYER_PATTERN = /\b(my business|our business|business owner|small business|local business|restaurant|clinic|salon|contractor|roofer|plumber|law firm|ecommerce store|online store|shopify store|startup|founder|coach|consultant|service business|need a website|marketing agency|google ads|seo help|social media manager|branding help|email marketing|content for my business)\b/i;
-const PAIN_PATTERN = /\b(need clients|how do i get clients|get clients|get more customers|more customers|looking for leads|need more leads|need leads|generating more leads|generate more leads|struggling generating more leads|struggling to generate leads|lead generation|cold outreach not working|outreach not working|cold calling is too time consuming|alternatives to cold calling|no one replies|no replies|where do i find customers|no traffic|no sales|increase sales online|not converting|bookings|appointments|don't know how to market|dont know how to market|marketing help|website is not getting customers|business is slow|need someone to run ads|need seo help|ecommerce store|recommend marketing agency|looking for someone to build website)\b/i;
+const SERVICE_SELLER_PATTERN = /\b(web designers?|website designers?|web design services?|website services?|seo freelancers?|seo agencies?|seo consultants?|seo services?|local marketers?|local marketing agencies?|marketing agencies?|agency owners?|freelancers?|booking system sellers?|booking systems?|automation consultants?|social media managers?|service providers?|lead gen agencies?|lead generation agencies?|web design agency|website agency)\b/i;
+const PAIN_PATTERN = /\b(need clients|how do i get clients|get clients|client acquisition|looking for clients|find clients|finding clients|need leads|looking for leads|local business leads|local leads|prospecting|prospect list|find prospects|business prospects|generating more leads|generate more leads|struggling generating more leads|struggling to generate leads|lead generation|cold outreach not working|outreach not working|cold calling is too time consuming|alternatives to cold calling|no one replies|no replies|where do i find prospects|where can i find prospects|where do i find local business leads|sell websites|selling websites|sell seo|selling seo|sell booking systems|social media management clients)\b/i;
+const LOCAL_BUSINESS_OWNER_PATTERN = /\b(my business|our business|business owner|small business owner|restaurant|cafe|clinic|salon|contractor|roofer|plumber|law firm|gym|dentist|shopify store|ecommerce store|online store|need a website for my business|my website is not getting customers|business is slow)\b/i;
 const BAD_PATTERN = /\b(hiring|hire me|looking for work|looking for web developer|need a web developer|web developer needed|pay per website|\$50 per website|remote developer|salary|full-time|part-time|job opening|job post|vacancy|apply now|course launch|buy my|dm me for|limited offer|promo code|giveaway|i built this|i build websites|i can build|i offer|we provide leads|guaranteed clients|guaranteed leads|buy leads|sell leads|cheap website|crypto|forex|mlm|multi level|affiliate|dropshipping|drop shipping|reseller|wholesale|telegram)\b/i;
 const PRIVATE_GROUP_PATTERN = /\b(private group|members only|screenshot from a private group|do not share|confidential)\b/i;
 const SEARCH_SKIP_SIGNALS = ["hiring", "jobs", "cheap web developer", "pay per website", "people selling leads", "spam offers", "DM me", "guaranteed clients"];
-const SEARCH_GOOD_SIGNALS = ["questions", "advice requests", "business owner pain", "no sales/no leads/no traffic", "outreach failure", "marketing confusion"];
-const WEAK_SEARCH_PATTERN = /\b(need clients web design|web design clients|looking for web developer|need web developer|cheap website|hire developer|buy leads|guaranteed leads|looking for leads small business|how do i sell websites)\b/i;
+const SEARCH_GOOD_SIGNALS = ["client-acquisition questions", "prospecting advice requests", "agency/freelancer pain", "local business lead sourcing", "outreach failure", "service-selling strategy"];
+const WEAK_SEARCH_PATTERN = /\b(need clients web design|looking for web developer|need web developer|cheap website|hire developer|buy leads|guaranteed leads|looking for leads small business)\b/i;
 
 function cleanText(value: string) {
   return value.replace(/\s+/g, " ").trim().slice(0, 1400);
@@ -141,6 +141,19 @@ function cleanText(value: string) {
 
 function hasAny(text: string, pattern: RegExp) {
   return pattern.test(text);
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function hasExcludedKeyword(text: string, keyword: string) {
+  const cleanKeyword = keyword.trim();
+  if (!cleanKeyword) return false;
+  if (/^[a-z0-9 ]+$/i.test(cleanKeyword)) {
+    return new RegExp(`\\b${escapeRegExp(cleanKeyword).replace(/\s+/g, "\\s+")}\\b`, "i").test(text);
+  }
+  return text.toLowerCase().includes(cleanKeyword.toLowerCase());
 }
 
 function buildFacebookSearchUrl(targetBuyer: string, painKeywords: string) {
@@ -175,7 +188,7 @@ function nicheVariants(value: string) {
     ["SEO freelancer", "SEO clients", "local SEO"].forEach(add);
   }
   if (/\bshopify|ecommerce|online store|store\b/.test(text)) {
-    ["Shopify", "ecommerce", "online store", "product page"].forEach(add);
+    ["Shopify service clients", "ecommerce service clients", "store audit prospects"].forEach(add);
   }
   if (/\blocal business|local businesses\b/.test(text)) {
     ["local businesses", "local business leads", "service business"].forEach(add);
@@ -205,10 +218,9 @@ function marketVibeSearchScore(phrase: string) {
   const text = phrase.toLowerCase();
   let score = 45;
   if (/\b(cold outreach not working|outreach not working|no one replies|prospecting is not working)\b/.test(text)) score += 45;
-  if (/\b(how do i get clients|where do i find customers|how do i get leads|looking for a tool to find leads)\b/.test(text)) score += 38;
-  if (/\b(no traffic|no sales|no leads|not converting|store not converting|website gets no traffic)\b/.test(text)) score += 45;
-  if (/\b(launched my business|don't know how to market|dont know how to market|how do i market|need help getting customers)\b/.test(text)) score += 30;
-  if (/\b(bookings|appointments|service business|small business|agency|freelancer|founder|web design|seo|shopify)\b/.test(text)) score += 8;
+  if (/\b(how do i get clients|where do i find prospects|where can i find prospects|how do i get leads|where can i find local business leads)\b/.test(text)) score += 38;
+  if (/\b(sell websites|sell seo|sell booking systems|social media management clients|automation consultant)\b/.test(text)) score += 30;
+  if (/\b(agency|freelancer|web design|seo|local marketing|booking system|automation consultant|social media manager)\b/.test(text)) score += 12;
   if (WEAK_SEARCH_PATTERN.test(text)) score -= 80;
   if (BAD_PATTERN.test(text)) score -= 90;
   return Math.max(0, Math.min(100, score));
@@ -237,19 +249,18 @@ export function generateFacebookSearchLinks(input: FacebookRadarSearchInput): Fa
     "no one replies to my outreach",
     "cold outreach not working",
     "how do I get clients",
-    "where do I find customers",
-    "my website gets no traffic",
-    "my business has no leads",
+    "where can I find local business leads",
     "how do I get leads",
-    "need help getting customers",
-    "launched my business don't know how to market",
-    "my Shopify store has no sales",
-    "store not converting",
-    "looking for a tool to find leads",
+    "how do I get web design clients",
+    "how do I get SEO clients",
+    "where do marketers find prospects",
     "prospecting is not working",
-    "how do I get bookings",
+    "how do I sell websites to local businesses",
+    "how do I sell SEO to small businesses",
+    "how do I get booking system clients",
+    "how do I get social media management clients",
     "outreach not working",
-    "how do I get appointments",
+    "agency owner client acquisition",
     ...BUYER_INTENT_QUERY_LIBRARY,
   ];
   const phrases = new Set<string>();
@@ -265,7 +276,8 @@ export function generateFacebookSearchLinks(input: FacebookRadarSearchInput): Fa
       addQuotedNiche("cold outreach not working", "web design"),
       addQuotedNiche("how do I get clients", "web design"),
       addQuotedNiche("no one replies to my outreach", "web designer"),
-      addQuotedNiche("where do I find customers", "website design"),
+      addQuotedNiche("where can I find local business leads", "website design"),
+      addQuotedNiche("how to sell websites to local businesses", "web designer"),
     ].forEach(add);
   }
   if (/\bseo\b/i.test(`${input.targetBuyer} ${input.niche}`)) {
@@ -273,6 +285,7 @@ export function generateFacebookSearchLinks(input: FacebookRadarSearchInput): Fa
       addQuotedNiche("how do I get clients", "SEO freelancer"),
       addQuotedNiche("cold outreach not working", "SEO agency"),
       addQuotedNiche("how do I get leads", "SEO"),
+      addQuotedNiche("how to sell SEO to local businesses", "SEO consultant"),
     ].forEach(add);
   }
   if (/\bagency|local marketing|small agency\b/i.test(`${input.targetBuyer} ${input.niche}`)) {
@@ -299,29 +312,33 @@ export function generateFacebookSearchLinks(input: FacebookRadarSearchInput): Fa
       fitScore,
       goodSignals: SEARCH_GOOD_SIGNALS,
       skipSignals: SEARCH_SKIP_SIGNALS,
-      reason: `MarketVibe fit ${fitScore}/100: best when results show lead, customer, traffic, conversion, or outreach pain.`,
+      reason: `MarketVibe fit ${fitScore}/100: best when results show agency, freelancer, prospecting, local-lead, client-acquisition, or outreach pain.`,
       postsUrl: facebookPostsUrl(phrase),
       groupsUrl: facebookGroupsUrl(phrase),
     }));
 }
 
 function detectPainPoint(text: string) {
-  if (/\b(website|site|web design|build website)\b/i.test(text)) return "website help";
-  if (/\b(seo|rank|google visibility)\b/i.test(text)) return "SEO help";
-  if (/\b(ads|google ads|facebook ads|run ads)\b/i.test(text)) return "ads help";
-  if (/\b(ecommerce|shopify|online store|store not converting)\b/i.test(text)) return "ecommerce growth";
-  if (/\b(no sales|increase sales|business is slow)\b/i.test(text)) return "sales growth";
-  if (/\b(leads|clients|customers|bookings|appointments)\b/i.test(text)) return "customer acquisition";
-  if (/\b(marketing|social media|branding|content|email marketing)\b/i.test(text)) return "marketing help";
-  return "buyer problem";
+  if (/\b(cold outreach|no one replies|outreach not working)\b/i.test(text)) return "outreach not working";
+  if (/\b(web design|web designer|sell websites|website clients)\b/i.test(text)) return "web design client acquisition";
+  if (/\b(seo clients|seo freelancer|seo agency|sell seo)\b/i.test(text)) return "SEO client acquisition";
+  if (/\b(local business leads|local leads|prospects|prospecting)\b/i.test(text)) return "local prospect sourcing";
+  if (/\b(booking system|booking software|appointments)\b/i.test(text)) return "booking-system client acquisition";
+  if (/\b(social media management|social media manager)\b/i.test(text)) return "social media client acquisition";
+  if (/\b(automation consultant|automation clients)\b/i.test(text)) return "automation client acquisition";
+  if (/\b(leads|clients|client acquisition)\b/i.test(text)) return "client acquisition";
+  return "service-seller buyer intent";
 }
 
 function detectBusinessCategory(text: string) {
-  if (/\b(ecommerce|shopify|online store)\b/i.test(text)) return "ecommerce";
-  if (/\b(restaurant|cafe|salon|clinic|contractor|roofer|plumber|law firm|gym|dentist)\b/i.test(text)) return "local business";
-  if (/\b(coach|consultant|service business|agency)\b/i.test(text)) return "service business";
-  if (/\b(startup|founder|saas|app)\b/i.test(text)) return "startup";
-  return "business owner";
+  if (/\b(web design|web designer|website agency)\b/i.test(text)) return "web design seller";
+  if (/\b(seo|local seo)\b/i.test(text)) return "SEO seller";
+  if (/\b(local marketing|marketing agency|agency owner)\b/i.test(text)) return "local marketing agency";
+  if (/\b(booking system|booking software)\b/i.test(text)) return "booking-system seller";
+  if (/\b(automation consultant|automation agency)\b/i.test(text)) return "automation consultant";
+  if (/\b(social media manager|social media management)\b/i.test(text)) return "social media manager";
+  if (/\b(freelancer|service provider|consultant)\b/i.test(text)) return "freelancer/service provider";
+  return "service seller";
 }
 
 function detectLocation(text: string, fallback = "") {
@@ -345,13 +362,15 @@ export function normalizeFacebookLeadSignature(value: { text?: string; url?: str
 export function scoreFacebookLeadPreview(candidate: FacebookLeadCandidate, filters: FacebookRadarFilters = createDefaultFacebookFilters(), seen = new Set<string>()): FacebookLeadPreview {
   const text = cleanText(candidate.text || "");
   const combined = cleanText([text, candidate.groupName, candidate.location].filter(Boolean).join(" "));
-  let rank = scorePost(combined, "business owners", filters.includeCategories.join(", "));
+  let rank = scorePost(combined, "service sellers", filters.includeCategories.join(", "));
   const skipReasons: string[] = [];
   const signature = normalizeFacebookLeadSignature({ text, url: candidate.url });
 
   if (!text || text.length < 35) skipReasons.push("post has too little useful text");
   if (seen.has(signature)) skipReasons.push("duplicate post");
-  if (BAD_PATTERN.test(combined)) skipReasons.push("seller, job, spam, crypto, MLM, reseller, or low-quality intent");
+  if (BAD_PATTERN.test(combined)) skipReasons.push("job, spam, crypto, MLM, reseller, seller marketplace, or low-quality intent");
+  if (LOCAL_BUSINESS_OWNER_PATTERN.test(combined) && !SERVICE_SELLER_PATTERN.test(combined)) skipReasons.push("generic local business owner post, not a service-seller buyer");
+  if (!SERVICE_SELLER_PATTERN.test(combined) && !/\b(sell websites|sell seo|local business leads|find prospects|prospecting|client acquisition|agency clients)\b/i.test(combined)) skipReasons.push("not clearly from a freelancer, agency, marketer, or service seller");
   if (filters.publicGroupsOnly && candidate.isPublicGroup === false) skipReasons.push("not confirmed public");
   if ((candidate.groupMembers || 0) < filters.minimumMembers) skipReasons.push("group below minimum members");
   if ((candidate.groupPostsPerDay || 0) < filters.minimumPostsPerDay) skipReasons.push("group below minimum daily activity");
@@ -360,7 +379,7 @@ export function scoreFacebookLeadPreview(candidate: FacebookLeadCandidate, filte
   if (filters.location && !combined.toLowerCase().includes(filters.location.toLowerCase())) skipReasons.push("location mismatch");
 
   for (const keyword of filters.excludeKeywords) {
-    if (keyword && combined.toLowerCase().includes(keyword.toLowerCase())) skipReasons.push(`excluded keyword: ${keyword}`);
+    if (hasExcludedKeyword(combined, keyword)) skipReasons.push(`excluded keyword: ${keyword}`);
   }
 
   const category = detectBusinessCategory(combined);
@@ -380,14 +399,14 @@ export function scoreFacebookLeadPreview(candidate: FacebookLeadCandidate, filte
     groupName: candidate.groupName || "Facebook source",
     groupSizeActivity: `${candidate.groupMembers || 0} members · ${candidate.groupPostsPerDay || 0} posts/day`,
     snippet: text.slice(0, 260),
-    authorType: /\b(my business|our business|i own|we own|founder)\b/i.test(text) ? "Likely business owner" : "Unknown",
+    authorType: SERVICE_SELLER_PATTERN.test(text) ? "Likely service seller" : "Unknown",
     intentScore: scoreLabel(rank),
     intentRank: rank,
     painPoint,
     businessCategory: category,
     location: detectLocation(combined, candidate.location),
     reason: passedFilters
-      ? `Matched ${painPoint} with buyer-style language and passed activity/safety filters.`
+      ? `Matched ${painPoint} from a service-seller buyer and passed activity/safety filters.`
       : `Skipped or downgraded: ${skipReasons.join("; ") || "not enough buyer intent"}.`,
     duplicateWarning: seen.has(signature) ? "Duplicate: already seen or sent." : "No duplicate detected.",
     passedFilters,
@@ -423,21 +442,24 @@ function detectIntent(text: string) {
 
 function scorePost(text: string, targetBuyer: string, painKeywords: string) {
   let score = 0;
-  if (hasAny(text, BUYER_PATTERN)) score += 28;
+  const hasServiceSeller = hasAny(text, SERVICE_SELLER_PATTERN);
+  const localBusinessOwner = hasAny(text, LOCAL_BUSINESS_OWNER_PATTERN);
+  if (hasServiceSeller) score += 34;
   if (hasAny(text, PAIN_PATTERN)) score += 42;
   if (/\?/.test(text)) score += 8;
   if (/\b(help|advice|struggling|stuck|not working|where do i find|how do i)\b/i.test(text)) score += 10;
   if (/\b(cold outreach not working|outreach not working|no one replies|no replies to my outreach|prospecting is not working)\b/i.test(text)) score += 24;
   if (/\b(struggling (?:on |with |to )?(?:generat(?:e|ing)|get(?:ting)?) (?:more )?leads?|looking for alternatives? to cold calling|cold calling is too time consuming)\b/i.test(text)) score += 36;
   if (/\b(agency|web designer|seo freelancer|freelancer)\b/i.test(text) && /\b(leads|clients|appointments|outreach|cold calling)\b/i.test(text)) score += 16;
-  if (/\b(launched my business|don't know how to market|dont know how to market|how do i market my small business)\b/i.test(text)) score += 36;
-  if (/\b(my website gets no traffic|website gets no traffic|my business has no leads|no leads|no sales|store not converting|shopify store has no sales)\b/i.test(text)) score += 30;
-  if (/\b(looking for a tool to find leads|how do i get leads|how do i get clients|where do i find customers|need help getting customers)\b/i.test(text)) score += 26;
+  if (/\b(looking for a tool to find leads|how do i get leads|how do i get clients|where can i find local business leads|where do i find prospects)\b/i.test(text)) score += 26;
+  if (/\b(sell websites|sell seo|booking system clients|social media management clients|automation clients)\b/i.test(text)) score += 26;
   if (targetBuyer && text.toLowerCase().includes(targetBuyer.toLowerCase().split(/\s+/)[0] || "")) score += 4;
 
   for (const keyword of splitTerms(painKeywords)) {
     if (keyword.length > 2 && text.toLowerCase().includes(keyword)) score += 4;
   }
+  if (localBusinessOwner && !hasServiceSeller) score -= 60;
+  if (!hasServiceSeller && !/\b(sell websites|sell seo|local business leads|find prospects|prospecting|client acquisition|agency clients)\b/i.test(text)) score -= 35;
   if (BAD_PATTERN.test(text)) score -= 55;
   if (PRIVATE_GROUP_PATTERN.test(text)) score -= 35;
   return Math.max(0, Math.min(100, score));
@@ -499,7 +521,7 @@ export function analyzeFacebookLead(input: FacebookRadarInput): FacebookRadarRes
       reason: blocked ? "Skip: empty, job-like, promotional, or not suitable for manual engagement." : "Skip: not enough buyer pain or MarketVibe-fit intent.",
       quickReply: "SKIP THIS ONE.",
       deeperReply: "Not recommended",
-      manualNote: "Do not post a normal reply. Look for posts where someone is asking for clients, leads, prospecting, web design, SEO, or local business outreach help.",
+      manualNote: "Do not post a normal reply. Look for service sellers asking for clients, local business leads, prospecting help, web design clients, SEO clients, or outreach help.",
       searchUrl: input.sourceUrl || buildFacebookSearchUrl(input.targetBuyer, input.painKeywords),
     };
   }

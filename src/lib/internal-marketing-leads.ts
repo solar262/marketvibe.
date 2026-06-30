@@ -58,6 +58,10 @@ export type LeadHuntEventPayload = {
   metadata?: Record<string, unknown>;
 };
 
+export type LeadHuntEventRecord = LeadHuntEventPayload & {
+  createdAt?: string;
+};
+
 export type ProcessedUrlPayload = {
   runId?: string;
   sourceUrl: string;
@@ -68,7 +72,7 @@ export type ProcessedUrlPayload = {
 };
 
 const memoryLeads: ScoredFacebookPost[] = [];
-const memoryEvents: LeadHuntEventPayload[] = [];
+const memoryEvents: LeadHuntEventRecord[] = [];
 const memoryProcessedUrls = new Map<string, ProcessedUrlPayload>();
 
 let latestImport: InternalMarketingLeadResponse | null = null;
@@ -359,6 +363,7 @@ export async function logLeadHuntEvent(payload: LeadHuntEventPayload) {
     sourceUrl: clean(payload.sourceUrl, 700),
     query: clean(payload.query, 180),
     score: asNumber(payload.score),
+    createdAt: new Date().toISOString(),
   };
   const supabase = requireInternalStore();
   if (!supabase) {
@@ -378,6 +383,29 @@ export async function logLeadHuntEvent(payload: LeadHuntEventPayload) {
   });
   if (error) throw new Error(error.message);
   return event;
+}
+
+export async function getLeadHuntEvents(limit = 25): Promise<LeadHuntEventRecord[]> {
+  const safeLimit = Math.max(1, Math.min(100, asNumber(limit) || 25));
+  const supabase = requireInternalStore();
+  if (!supabase) return memoryEvents.slice(0, safeLimit);
+  const { data, error } = await supabase
+    .from("lead_hunt_events")
+    .select("run_id,event_type,message,reason,source_url,query,score,metadata,created_at")
+    .order("created_at", { ascending: false })
+    .limit(safeLimit);
+  if (error) throw new Error(error.message);
+  return (data || []).map((row) => ({
+    runId: row.run_id ? String(row.run_id) : "",
+    eventType: String(row.event_type || ""),
+    message: row.message ? String(row.message) : "",
+    reason: row.reason ? String(row.reason) : "",
+    sourceUrl: row.source_url ? String(row.source_url) : "",
+    query: row.query ? String(row.query) : "",
+    score: asNumber(row.score),
+    metadata: row.metadata && typeof row.metadata === "object" ? row.metadata as Record<string, unknown> : {},
+    createdAt: row.created_at ? String(row.created_at) : "",
+  }));
 }
 
 export async function recordProcessedUrl(payload: ProcessedUrlPayload) {
@@ -435,13 +463,13 @@ export async function exportInternalMarketingLeadsCsv() {
 export async function createTestInternalMarketingLead() {
   return importInternalMarketingLeads({
     runId: `test-${Date.now()}`,
-    searchPhrase: "test internal lead survives refresh",
+    searchPhrase: "test buyer radar item survives refresh",
     posts: [{
-      text: "I launched a business but do not know how to market it. My website gets no traffic and I need more leads.",
+      text: "I run a small web design service and cold outreach is not working. How do I find local business leads without spamming people?",
       sourceName: "MarketVibe Internal Test",
       author: "Internal QA",
       url: `https://www.facebook.com/groups/marketvibe-test/posts/${Date.now()}`,
-      queryUsed: "test internal lead survives refresh",
+      queryUsed: "test buyer radar item survives refresh",
       sourceUsed: "internal test",
     }],
   });

@@ -19,16 +19,16 @@
   const CONTROL_POLL_MS = 2000;
   const OUTREACH_MODES = ["off", "draft-only", "manual-approval", "allowed-adapters"];
   const LEAD_HUNT_PRESETS = [
-    "I need leads",
-    "how do I get clients",
-    "struggling to get clients",
-    "need more customers",
-    "looking for leads",
-    "need clients fast",
-    "my outreach is not working",
-    "web designer need leads",
-    "SEO freelancer need clients",
-    "agency owner need leads",
+    "how do I get web design clients",
+    "how do I get SEO clients",
+    "where can I find local business leads",
+    "how to sell websites to local businesses",
+    "how to sell SEO to local businesses",
+    "web designer struggling to get clients",
+    "SEO freelancer struggling to get clients",
+    "agency owner client acquisition",
+    "cold outreach not working for agency",
+    "where do marketers find prospects",
   ];
   let leadHuntIntervalId = 0;
   let leadHuntControlPollId = 0;
@@ -37,7 +37,7 @@
   if (document.getElementById("marketvibe-import-button")) return;
 
   function logLeadHunt(event, details = {}) {
-    console.log(`[MarketVibe Lead Hunt] ${event}`, details);
+    console.log(`[MarketVibe Buyer Radar] ${event}`, details);
   }
 
   function newRunId() {
@@ -209,12 +209,11 @@
 
   const STRONG_BUYER_SIGNALS = [
     /how do i get clients?/i,
-    /where do i find customers?/i,
+    /where (?:do|can) i find (?:prospects|local business leads|business leads)/i,
     /how do i get leads?/i,
     /struggling (?:on |with |to )?(?:generat(?:e|ing)|get(?:ting)?) (?:more )?leads?/i,
     /struggling to get clients?/i,
     /need more leads?/i,
-    /need more customers?/i,
     /looking for leads?/i,
     /looking for alternatives? to cold calling/i,
     /no clients? this month/i,
@@ -222,22 +221,22 @@
     /agency owner struggling/i,
     /web designers? need clients?/i,
     /seo freelancers? need leads?/i,
-    /need help getting customers/i,
+    /client acquisition/i,
     /looking for (?:a )?tool to find leads/i,
     /cold outreach.*not working/i,
     /cold calling.*time consuming/i,
     /no one replies/i,
     /prospecting.*not working/i,
-    /my website gets no traffic/i,
-    /my business has no leads/i,
-    /my shopify store has no sales/i,
-    /store not converting/i,
-    /launched my business.*(?:don't|dont|do not).*market/i,
+    /how (?:do|can) i sell websites? to (?:local|small) businesses/i,
+    /how (?:do|can) i sell seo to (?:local|small) businesses/i,
+    /booking system clients/i,
+    /social media management clients/i,
+    /automation consultant.*clients/i,
     /first few clients/i,
     /client acquisition/i,
     /lead generation help/i,
     /struggling to get/i,
-    /how do i get bookings/i,
+    /how do i get booking system clients/i,
   ];
 
   const SUPPORTING_BUYER_SIGNALS = [
@@ -269,10 +268,8 @@
     /we are expanding/i,
     /we operate across/i,
     /professional web developer/i,
-    /i help businesses/i,
     /my services/i,
     /we provide/i,
-    /our agency/i,
     /lead generation service/i,
     /need more clients for your business/i,
     /stop wasting time searching/i,
@@ -296,7 +293,6 @@
   ];
 
   const SELLER_PHRASES = [
-    /i build/i,
     /i can help/i,
     /i offer/i,
     /we offer/i,
@@ -311,6 +307,8 @@
   function scorePost(text) {
     let score = 0;
     let strongMatches = 0;
+    const serviceSeller = /\b(web designers?|website designers?|web design services?|website services?|seo freelancers?|seo agencies?|seo consultants?|seo services?|local marketers?|local marketing agencies?|marketing agencies?|agency owners?|freelancers?|booking system sellers?|booking systems?|automation consultants?|social media managers?|service providers?|lead gen agencies?|lead generation agencies?|web design agency|website agency)\b/i.test(text);
+    const genericLocalBusiness = /\b(my business|our business|business owner|small business owner|restaurant|cafe|clinic|salon|contractor|roofer|plumber|law firm|gym|dentist|shopify store|ecommerce store|online store|my website gets no traffic|my business has no leads|store not converting)\b/i.test(text);
 
     for (const pattern of HARD_SKIP_SIGNALS) {
       if (pattern.test(text)) return -999;
@@ -328,12 +326,14 @@
     }
 
     for (const pattern of SELLER_PHRASES) {
-      if (pattern.test(text)) score -= 35;
+      if (pattern.test(text) && !/\b(clients?|leads?|prospects?|outreach|prospecting|client acquisition)\b/i.test(text)) score -= 35;
     }
 
     if (/\?/.test(text)) score += 8;
     if (/\b(i|my|we|our)\b/i.test(text) && /\b(struggling|stuck|need|looking|can't|cannot|no|help|advice)\b/i.test(text)) score += 15;
-    if (/\b(agency|web designer|seo freelancer|freelancer)\b/i.test(text) && /\b(leads|clients|appointments|outreach|cold calling)\b/i.test(text)) score += 12;
+    if (serviceSeller && /\b(leads|clients|prospects|outreach|prospecting|cold calling|client acquisition)\b/i.test(text)) score += 24;
+    if (genericLocalBusiness && !serviceSeller) score -= 80;
+    if (!serviceSeller && !/\b(sell websites?|sell seo|local business leads|find prospects|prospecting|client acquisition|agency clients)\b/i.test(text)) score -= 35;
     if (!strongMatches) score -= 28;
     if (text.length < 80) score -= 20;
 
@@ -419,17 +419,16 @@
 
   function detectPainPoint(text) {
     if (/\b(outreach|no one replies)\b/i.test(text)) return "outreach not working";
-    if (/\b(leads?|clients?|customers?)\b/i.test(text)) return "customer acquisition";
-    if (/\b(website|web design)\b/i.test(text)) return "website help";
-    if (/\b(seo|google)\b/i.test(text)) return "SEO help";
-    if (/\b(ads?|advertising)\b/i.test(text)) return "ads help";
-    if (/\b(ecommerce|shopify|sales|store)\b/i.test(text)) return "ecommerce or sales growth";
-    return "buyer-intent problem";
+    if (/\b(website clients?|web design clients?|sell websites?)\b/i.test(text)) return "web design client acquisition";
+    if (/\b(seo clients?|sell seo|local seo clients?)\b/i.test(text)) return "SEO client acquisition";
+    if (/\b(booking system clients?|social media management clients?|automation consultant.*clients?)\b/i.test(text)) return "service niche client acquisition";
+    if (/\b(prospects?|local business leads|client acquisition|clients?)\b/i.test(text)) return "client acquisition";
+    return "service-seller buyer intent";
   }
 
   function createReply(post) {
     const opening = post.text.length > 130 ? `${post.text.slice(0, 130)}...` : post.text;
-    return `This looks like a useful MarketVibe lead to review: "${opening}"\n\nMarketVibe helps spot public business signals and lead opportunities without scraping private data: https://www.marketvibe1.com`;
+    return `This looks like a useful MarketVibe buyer-intent item to review: "${opening}"\n\nMarketVibe stores researched opportunity inventory for service sellers without scraping private data or auto-contacting businesses: https://www.marketvibe1.com`;
   }
 
   function createContextualReply(post) {
@@ -440,21 +439,21 @@
         "I would tighten the reason for reaching out before changing channels. Replies usually improve when the first message points to one specific visible problem instead of a broad service pitch.",
         "If outreach is not getting replies, I would check the targeting and opener first. A short note about one real issue you noticed usually lands better than a general offer.",
       ],
-      "customer acquisition": [
+      "client acquisition": [
         "I would start by narrowing the buyer and the trigger. It is easier to find leads when you look for businesses showing one clear problem, like weak visibility, no clear CTA, or poor follow-up.",
         "This sounds like a positioning and prospecting issue before a tools issue. Pick one customer type, then look for visible signs they may need help.",
       ],
-      "website help": [
-        "I would look at the basics first: mobile layout, clear CTA, trust signals, and whether visitors can quickly understand what to do next.",
-        "For a website issue, I would start with the conversion path. If the offer, CTA, or contact path is fuzzy, more traffic may not fix it.",
+      "web design client acquisition": [
+        "I would look for local businesses where the website problem is visible before pitching. Outdated design, unclear CTA, weak mobile layout, or missing trust signals gives you a specific opener.",
+        "For web design clients, I would start with proof of a real website gap. A specific issue makes the conversation feel less random than a broad redesign pitch.",
       ],
-      "SEO help": [
-        "I would check whether the local/service pages match what people actually search for. Missing service pages and weak titles can make good businesses hard to find.",
-        "For SEO, I would begin with the obvious visibility gaps: page titles, service pages, local terms, and whether competitors explain the offer more clearly.",
+      "SEO client acquisition": [
+        "For SEO clients, I would look for visible local search gaps first: thin service pages, weak titles, missing location pages, or competitors clearly outranking them.",
+        "I would avoid generic SEO outreach. Find one visible ranking or content gap, then use that as the reason to start the conversation.",
       ],
-      "ecommerce or sales growth": [
-        "I would separate traffic from conversion. If people are visiting but not buying, product page trust, offer clarity, checkout friction, and abandoned carts are worth checking first.",
-        "For store growth, I would look at the product page and trust signals before adding more ads. Traffic helps only if the page makes the next step obvious.",
+      "service niche client acquisition": [
+        "I would narrow the niche and the trigger. Booking, automation, and social media services are easier to sell when the business already shows a visible operational gap.",
+        "For niche services, build the list around businesses with a clear symptom first. The offer lands better when it connects to a real missing system or follow-up problem.",
       ],
     };
     const options = variants[pain] || [
@@ -884,7 +883,7 @@
     }
   }
 
-  function stopLeadHunt(message = "Lead Hunt stopped.", options = {}) {
+  function stopLeadHunt(message = "Buyer Radar stopped.", options = {}) {
     const state = getLeadHuntState();
     clearLeadHuntTimers();
     if (state) {
@@ -948,11 +947,11 @@
       lastActiveSignature: "",
       loadingSince: 0,
       loadingReloaded: false,
-      status: "Lead Hunt starting.",
+      status: "Buyer Radar starting.",
     };
     saveLeadHuntState(state);
     logLeadHunt("LEAD_HUNT_START", { searches: searches.length, caps: state.caps });
-    postLeadHuntEvent("LEAD_HUNT_START", { message: "Lead Hunt started", metadata: { searches: searches.length, caps: state.caps, extensionVersion: EXTENSION_VERSION } });
+    postLeadHuntEvent("LEAD_HUNT_START", { message: "Buyer Radar started", metadata: { searches: searches.length, caps: state.caps, extensionVersion: EXTENSION_VERSION } });
     ensureLeadHuntRunner("hunt started");
     const first = currentLeadHuntSearch(state);
     if (first && location.href !== first.url) navigateWithDelay(first.url, { ...state, nextActionAt: Date.now() + 250 }, "Opening first buyer-intent search.");
@@ -969,7 +968,7 @@
         ensureLeadHuntRunner("state restored");
         return;
       } catch {
-        showStatus("Lead Hunt state could not be restored on this page.");
+        showStatus("Buyer Radar state could not be restored on this page.");
       }
     }
 
@@ -980,7 +979,7 @@
       history.replaceState(null, document.title, location.pathname + location.search);
       startLeadHunt(config);
     } catch {
-      showStatus("Lead Hunt launch settings could not be read.");
+      showStatus("Buyer Radar launch settings could not be read.");
     }
   }
 
@@ -995,13 +994,13 @@
       } else {
         saveLeadHuntState(pausedState);
       }
-      postLeadHuntEvent("LEAD_HUNT_PAUSE", { message: "Lead Hunt paused", sourceUrl: location.href });
+      postLeadHuntEvent("LEAD_HUNT_PAUSE", { message: "Buyer Radar paused", sourceUrl: location.href });
       ensureLeadHuntControlPoller();
       showStatus("Paused. No new browser actions will start.");
     }
   }
 
-  function resumeLeadHunt(message = "Resuming Lead Hunt.", options = {}) {
+  function resumeLeadHunt(message = "Resuming Buyer Radar.", options = {}) {
     const state = getLeadHuntState();
     if (state) {
       const resumedState = { ...state, active: true, paused: false, currentLock: "", status: message, nextActionAt: Date.now() + 250 };
@@ -1012,7 +1011,7 @@
         saveLeadHuntState(resumedState);
       }
       logLeadHunt("hunt resumed");
-      postLeadHuntEvent("LEAD_HUNT_RESUME", { message: "Lead Hunt resumed", sourceUrl: location.href });
+      postLeadHuntEvent("LEAD_HUNT_RESUME", { message: "Buyer Radar resumed", sourceUrl: location.href });
       ensureLeadHuntRunner("resume");
     }
   }
@@ -1020,7 +1019,7 @@
   function nextLeadHuntSearch(state, reason) {
     const nextIndex = (state.currentSearchIndex || 0) + 1;
     if (nextIndex >= (state.searches || []).length || nextIndex >= Number(state.caps?.maxSearches || 10)) {
-      stopLeadHunt(`Lead Hunt complete. Imported ${state.importedCount || 0} lead(s).`);
+      stopLeadHunt(`Buyer Radar complete. Imported ${state.importedCount || 0} buyer-intent item(s).`);
       return;
     }
     const nextState = {
@@ -1167,14 +1166,14 @@
         currentLock: "",
         scrollAttempts: 0,
         importedLeads: [post, ...(state.importedLeads || [])].slice(0, 30),
-        status: `Auto-imported high-intent lead. Good: ${data.counts?.good || 0}. Continuing Lead Hunt.`,
+        status: `Auto-imported high-intent buyer item. Good: ${data.counts?.good || 0}. Continuing Buyer Radar.`,
         lastProgressAt: Date.now(),
         lastActiveSignature: "",
         nextActionAt: Date.now() + continuationDelay,
       });
       logLeadHunt("LEAD_HUNT_IMPORT", { count: 1, importedCount, query: search?.query || "", reason });
       if (importedCount >= Number(latest.caps?.maxImportedLeads || 10)) {
-        stopLeadHunt(`Daily import cap reached. Imported ${importedCount} lead(s).`);
+        stopLeadHunt(`Daily import cap reached. Imported ${importedCount} buyer-intent item(s).`);
       } else {
         closeOpenFacebookModal();
         scheduleLeadHuntAction(() => ensureLeadHuntRunner("post-import continuation"), continuationDelay + 150, "post-import continuation");
@@ -1187,7 +1186,7 @@
         failedCount,
         errors: [`${new Date().toLocaleTimeString()} ${error && error.message ? error.message : "Auto-import failed"}`, ...(state.errors || [])].slice(0, 8),
         currentLock: "",
-        status: "Auto-import failed. Continuing Lead Hunt.",
+        status: "Auto-import failed. Continuing Buyer Radar.",
         lastProgressAt: Date.now(),
         nextActionAt: Date.now() + leadHuntDelay(state),
       });
@@ -1244,11 +1243,11 @@
       postLeadHuntEvent("LEAD_HUNT_SCAN_TICK", { message: "Scan tick", sourceUrl: location.href, query: search?.query || "", metadata: { trigger } });
 
       if (!search) {
-        stopLeadHunt("Lead Hunt complete. No searches left.");
+        stopLeadHunt("Buyer Radar complete. No searches left.");
         return;
       }
       if (Number(state.importedCount || 0) >= Number(state.caps?.maxImportedLeads || 10)) {
-        stopLeadHunt(`Daily import cap reached. Imported ${state.importedCount} lead(s).`);
+        stopLeadHunt(`Daily import cap reached. Imported ${state.importedCount} buyer-intent item(s).`);
         return;
       }
 
@@ -1303,7 +1302,7 @@
           if (state.currentLock) return;
           const sentPosts = decisions.importItems.map(({ post }) => post);
           const batchLock = `batch:${sentPosts.map(getPostKey).join("|").slice(0, 180)}`;
-          saveLeadHuntState({ ...state, currentLock: batchLock, status: `Saving ${sentPosts.length} high-intent lead(s).` });
+          saveLeadHuntState({ ...state, currentLock: batchLock, status: `Saving ${sentPosts.length} high-intent buyer item(s).` });
           const data = await sendPosts(sentPosts, search.query);
           const latest = getLeadHuntState();
           if (!latest?.active || latest.paused) {
@@ -1330,7 +1329,7 @@
             currentLock: "",
             scrollAttempts: 0,
             importedLeads: [...sentPosts, ...(state.importedLeads || [])].slice(0, 30),
-            status: `Imported ${sentPosts.length} high-intent lead(s). Good: ${data.counts?.good || 0}. Continuing Lead Hunt.`,
+            status: `Imported ${sentPosts.length} high-intent buyer item(s). Good: ${data.counts?.good || 0}. Continuing Buyer Radar.`,
             lastProgressAt: Date.now(),
             lastActiveSignature: "",
             nextActionAt: Date.now() + continuationDelay,
@@ -1338,7 +1337,7 @@
           saveLeadHuntState(nextState);
           logLeadHunt("LEAD_HUNT_IMPORT", { count: sentPosts.length, importedCount, query: search.query });
           if (importedCount >= Number(latest.caps?.maxImportedLeads || 10)) {
-            stopLeadHunt(`Daily import cap reached. Imported ${importedCount} lead(s).`);
+            stopLeadHunt(`Daily import cap reached. Imported ${importedCount} buyer-intent item(s).`);
           } else {
             closeOpenFacebookModal();
             scheduleLeadHuntAction(() => ensureLeadHuntRunner("post-import continuation"), continuationDelay + 150, "post-import continuation");
@@ -1355,7 +1354,7 @@
       const failedCount = Number(state.failedCount || 0) + 1;
       const failedState = {
         ...state,
-        errors: [`${new Date().toLocaleTimeString()} ${error && error.message ? error.message : "Unknown Lead Hunt error"}`, ...(state.errors || [])].slice(0, 8),
+        errors: [`${new Date().toLocaleTimeString()} ${error && error.message ? error.message : "Unknown Buyer Radar error"}`, ...(state.errors || [])].slice(0, 8),
         failedCount,
         currentLock: "",
         status: "Recovered from a blocked, blank, or unavailable page.",
@@ -1383,9 +1382,9 @@
     const search = state ? currentLeadHuntSearch(state) : null;
     const runLabel = state?.paused ? "Paused" : state?.active ? "Running" : state ? "Stopped" : "Ready";
     panel.innerHTML = `
-      <div style="font-weight:900;color:#a7f3d0;margin-bottom:6px;">MarketVibe Lead Hunt</div>
+      <div style="font-weight:900;color:#a7f3d0;margin-bottom:6px;">MarketVibe Buyer Radar</div>
       <div style="display:inline-block;border-radius:999px;background:${state?.paused ? "rgba(103,232,249,.18)" : state?.active ? "rgba(16,185,129,.18)" : "rgba(148,163,184,.18)"};color:white;padding:4px 8px;font-weight:900;margin-bottom:8px;">${runLabel}</div>
-      <div style="line-height:1.45;color:#e5eef9;margin-bottom:8px;">${state?.status || "Ready. Automated public-source discovery. No auto-DM or auto-comment."}</div>
+      <div style="line-height:1.45;color:#e5eef9;margin-bottom:8px;">${state?.status || "Ready. Internal buyer discovery only. No auto-DM or auto-comment."}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;color:#cbd5e1;">
         <div>Query: ${search?.query || "not started"}</div>
         <div>Source: ${search?.source || "none"}</div>
@@ -1393,7 +1392,7 @@
         <div>Runtime: ${state?.startedAt ? Math.round((Date.now() - state.startedAt) / 1000) : 0}s</div>
         <div>Current item: ${Number(state?.currentSearchIndex || 0) + (state ? 1 : 0)} / ${Math.min((state?.searches || []).length || 0, Number(state?.caps?.maxSearches || 10))}</div>
         <div>Completed: ${Number(state?.importedCount || 0) + Number(state?.skippedCount || 0) + Number(state?.duplicateCount || 0) + Number(state?.failedCount || 0)}</div>
-        <div>Imported: ${state?.importedCount || 0}</div>
+        <div>Buyer items: ${state?.importedCount || 0}</div>
         <div>Skipped: ${state?.skippedCount || 0}</div>
         <div>Duplicates: ${state?.duplicateCount || 0}</div>
         <div>Failed: ${state?.failedCount || 0}</div>
@@ -1409,7 +1408,7 @@
     controls.style.cssText = "display:flex;gap:7px;flex-wrap:wrap;";
     const start = document.createElement("button");
     start.type = "button";
-    start.textContent = "Start Lead Hunt";
+    start.textContent = "Start Buyer Radar";
     start.style.cssText = "border:0;border-radius:999px;background:#10b981;color:#03131f;font-weight:900;padding:8px 10px;cursor:pointer;";
     start.addEventListener("click", () => startLeadHunt(defaultLeadHuntConfig()));
     const pause = document.createElement("button");
@@ -1641,8 +1640,8 @@
 
   async function sendPosts(posts, searchPhrase = new URLSearchParams(location.search).get("q") || "") {
     const state = getLeadHuntState();
-    if (state?.active && state.paused) throw new Error("Lead Hunt is paused");
-    if (state && !state.active) throw new Error("Lead Hunt is stopped");
+    if (state?.active && state.paused) throw new Error("Buyer Radar is paused");
+    if (state && !state.active) throw new Error("Buyer Radar is stopped");
     const response = await fetchWithTimeout(API_URL, {
       method: "POST",
       headers: internalHeaders(),

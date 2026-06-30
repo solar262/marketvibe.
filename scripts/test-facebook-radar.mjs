@@ -10,6 +10,7 @@ const leadHuntPageSource = fs.readFileSync("src/app/lead-hunt-autopilot/page.tsx
 const importedPageSource = fs.readFileSync("src/app/facebook-radar/imported/page.tsx", "utf8");
 const internalMarketingLeadsPageSource = fs.readFileSync("src/app/internal-marketing-leads/page.tsx", "utf8");
 const internalMarketingLeadsApiSource = fs.readFileSync("src/app/api/internal-marketing-leads/route.ts", "utf8");
+const internalMarketingLeadEventsApiSource = fs.readFileSync("src/app/api/internal-marketing-leads/events/route.ts", "utf8");
 const huntStatusSource = fs.readFileSync("src/app/api/internal-marketing-leads/hunt-status/route.ts", "utf8");
 const internalMarketingLeadsSource = fs.readFileSync("src/lib/internal-marketing-leads.ts", "utf8");
 const internalMarketingLeadsMigration = fs.readFileSync("supabase/migrations/0004_internal_marketing_leads.sql", "utf8");
@@ -78,12 +79,12 @@ assert.match(firstWebDesignLink.groupsUrl, /^https:\/\/(www|m)\.facebook\.com\/s
 assert.ok(firstWebDesignLink.fitScore >= 90, "High-intent searches should rank first");
 
 const highIntentPhrases = phrasesFor({
-  targetBuyer: "founders, freelancers, agencies",
-  niche: "customer acquisition",
-  painKeywords: "no leads, no traffic, cold outreach not working",
+  targetBuyer: "web designers, SEO freelancers, agencies",
+  niche: "client acquisition",
+  painKeywords: "local business leads, prospects, cold outreach not working",
 });
 assert.match(highIntentPhrases, /"no one replies to my outreach"|"cold outreach not working"|"how do i get clients"|"looking for a tool to find leads"/, "Searches should prioritize high-intent buyer pain");
-assert.doesNotMatch(highIntentPhrases, /need clients web design|web design clients|looking for web developer|need web developer|cheap website|hire developer|buy leads|guaranteed leads/i, "Weak or hiring searches should be removed");
+assert.doesNotMatch(highIntentPhrases, /need clients web design|looking for web developer|need web developer|cheap website|hire developer|buy leads|guaranteed leads/i, "Weak or hiring searches should be removed");
 
 const analysis = analyzeFacebookLead({
   postText: "I run a small web design service and cold outreach is not working. How do I get clients without spamming people?",
@@ -104,12 +105,12 @@ const cheapDeveloper = analyzeFacebookLead({
 assert.equal(cheapDeveloper.action, "Skip", "Cheap web developer hiring posts should be Skip / bad fit");
 
 const launchedBusiness = analyzeFacebookLead({
-  postText: "I launched a business but don't know how to market it. Where do I find customers?",
+  postText: "I launched a cafe and don't know how to market it. Where do I find customers?",
   targetBuyer: "small business owners",
   painKeywords: "need customers, no leads",
   sourceUrl: "",
 });
-assert.equal(launchedBusiness.score, "High", "Launched business marketing confusion should be High fit");
+assert.equal(launchedBusiness.action, "Skip", "Generic local business owner posts should be skipped as buyer-radar inventory");
 
 const outreachPain = analyzeFacebookLead({
   postText: "Cold outreach not working. No one replies to my outreach. How do I get clients?",
@@ -129,12 +130,12 @@ assert.notEqual(skippedAgencyExample.action, "Skip", "Agency lead-generation pai
 assert.equal(skippedAgencyExample.score, "High", "Agency struggling to generate more leads should be High fit");
 
 const shopifyPain = analyzeFacebookLead({
-  postText: "My Shopify store has no sales and the store is not converting. What should I fix first?",
-  targetBuyer: "ecommerce founders",
-  painKeywords: "no sales, not converting",
+  postText: "I sell Shopify setup services and need ecommerce prospects. How do I find local businesses that need a better store?",
+  targetBuyer: "booking-system sellers, automation consultants, Shopify service providers",
+  painKeywords: "local business leads, prospects",
   sourceUrl: "",
 });
-assert.equal(shopifyPain.score, "High", "Shopify store no sales should be High fit");
+assert.equal(shopifyPain.score, "High", "Service sellers seeking ecommerce prospects should be High fit");
 
 const guaranteedLeads = analyzeFacebookLead({
   postText: "We provide guaranteed leads for agencies. DM me for packages.",
@@ -144,14 +145,31 @@ const guaranteedLeads = analyzeFacebookLead({
 });
 assert.equal(guaranteedLeads.action, "Skip", "Guaranteed lead offer posts should be Skip / bad fit");
 
-assert.ok(BUYER_INTENT_QUERY_LIBRARY.includes("I need a website for my business"), "Buyer intent query library should include website buyer queries");
-assert.ok(BUYER_INTENT_QUERY_LIBRARY.includes("my business is slow need help"), "Buyer intent query library should include business slowdown queries");
+assert.ok(BUYER_INTENT_QUERY_LIBRARY.includes("how do I get web design clients"), "Buyer intent query library should include web design client-acquisition queries");
+assert.ok(BUYER_INTENT_QUERY_LIBRARY.includes("where can I find local business leads"), "Buyer intent query library should include local-business-lead sourcing queries");
+assert.equal(BUYER_INTENT_QUERY_LIBRARY.includes("I need a website for my business"), false, "Buyer intent query library should not target local business owners as buyers");
 
 const defaultFilters = createDefaultFacebookFilters();
 const buyerIntentPreviews = filterAndRankFacebookLeads([
   {
-    text: "I own a local cleaning business and my website is not getting customers. Need more leads for my business. Any advice?",
+    text: "I run a small web design service and cold outreach is not working. Where can I find local business leads and get clients without spamming?",
     url: "https://www.facebook.com/groups/local/posts/123",
+    groupName: "Web Design Agency Owners",
+    groupMembers: 4200,
+    groupPostsPerDay: 18,
+    comments: 4,
+    reactions: 7,
+    language: "English",
+    isPublicGroup: true,
+  },
+], defaultFilters);
+assert.equal(buyerIntentPreviews[0].intentScore, "High", "Service-seller buyer intent should score High");
+assert.equal(buyerIntentPreviews[0].passedFilters, true, "Service-seller buyer intent should pass filters");
+
+const genericBusinessOwnerPreviews = filterAndRankFacebookLeads([
+  {
+    text: "I own a local cleaning business and my website is not getting customers. Need more leads for my business. Any advice?",
+    url: "https://www.facebook.com/groups/local/posts/124",
     groupName: "Local Business Owners",
     groupMembers: 4200,
     groupPostsPerDay: 18,
@@ -161,8 +179,8 @@ const buyerIntentPreviews = filterAndRankFacebookLeads([
     isPublicGroup: true,
   },
 ], defaultFilters);
-assert.equal(buyerIntentPreviews[0].intentScore, "High", "Business-owner buyer intent should score High");
-assert.equal(buyerIntentPreviews[0].passedFilters, true, "Business-owner buyer intent should pass filters");
+assert.equal(genericBusinessOwnerPreviews[0].passedFilters, false, "Generic local business owners should not pass buyer-radar filters");
+assert.match(genericBusinessOwnerPreviews[0].reason, /service-seller|local business owner/i, "Generic local owner skips should explain the buyer mismatch");
 
 const badIntentPreviews = filterAndRankFacebookLeads([
   {
@@ -212,7 +230,7 @@ const duplicatePreviews = filterAndRankFacebookLeads([
 assert.equal(duplicatePreviews[0].passedFilters, false, "Duplicate posts should be blocked");
 assert.match(duplicatePreviews[0].duplicateWarning, /Duplicate/i, "Duplicate posts should show a warning");
 
-assert.equal(shouldSendFacebookLead(buyerIntentPreviews[0], new Set()), true, "Only filtered High Intent posts should be sendable");
+assert.equal(shouldSendFacebookLead(buyerIntentPreviews[0], new Set()), true, "Only filtered service-seller High Intent posts should be sendable");
 assert.equal(shouldSendFacebookLead(badIntentPreviews[0], new Set()), false, "Rejected posts should not be sendable");
 assert.equal(shouldSendFacebookLead(duplicatePreviews[0], new Set([duplicatePreviews[0].id])), false, "Duplicate posts should not be sendable");
 
@@ -264,7 +282,7 @@ assert.match(pageSource, /No reply link available/, "Facebook Radar should show 
 assert.match(pageSource, /Confirmation required before send\/post/, "Facebook welcome mode should require operator confirmation");
 assert.match(pageSource, /Do not auto-spam groups/, "Facebook welcome mode should warn against group spam");
 
-assert.match(leadHuntPageSource, /Run Lead Hunt/, "Lead Hunt Autopilot should have one main run button");
+assert.match(leadHuntPageSource, /Run Buyer Radar/, "Buyer Radar Autopilot should have one main run button");
 assert.match(leadHuntPageSource, /Facebook Search/, "Lead Hunt Autopilot should include Facebook source toggle");
 assert.match(leadHuntPageSource, /Google indexed Facebook results/, "Lead Hunt Autopilot should include Google indexed Facebook source");
 assert.match(leadHuntPageSource, /Bing indexed Facebook results/, "Lead Hunt Autopilot should include Bing indexed Facebook source");
@@ -272,9 +290,9 @@ assert.match(leadHuntPageSource, /Max searches/, "Lead Hunt Autopilot should inc
 assert.match(leadHuntPageSource, /Max imported leads/, "Lead Hunt Autopilot should include max imported leads cap");
 assert.match(leadHuntPageSource, /Delay between actions/, "Lead Hunt Autopilot should include delay cap");
 assert.match(leadHuntPageSource, /marketvibeLeadHunt/, "Lead Hunt Autopilot should launch extension mode with encoded settings");
-assert.match(leadHuntPageSource, /Final imported leads/, "Lead Hunt Autopilot should show final imported leads only");
+assert.match(leadHuntPageSource, /Latest processed buyer-intent items/, "Lead Hunt Autopilot should show latest processed buyer-intent items");
 assert.match(leadHuntPageSource, /No auto-DM, no auto-comment, no private data/, "Lead Hunt Autopilot should show safety guardrails");
-assert.match(leadHuntPageSource, /Live query/, "Lead Hunt Autopilot should show live query");
+assert.match(leadHuntPageSource, /Current target/, "Lead Hunt Autopilot should show current target");
 assert.match(leadHuntPageSource, /Live source/, "Lead Hunt Autopilot should show live source");
 assert.match(leadHuntPageSource, /Current URL/, "Lead Hunt Autopilot should show current URL");
 assert.match(leadHuntPageSource, /Runtime/, "Lead Hunt Autopilot should show runtime");
@@ -283,6 +301,8 @@ assert.match(leadHuntPageSource, /Failed/, "Lead Hunt Autopilot should show fail
 assert.match(leadHuntPageSource, /Current item/, "Lead Hunt Autopilot should show current item progress");
 assert.match(leadHuntPageSource, /Completed/, "Lead Hunt Autopilot should show completed count");
 assert.match(leadHuntPageSource, /Last error/, "Lead Hunt Autopilot should show last error");
+assert.match(leadHuntPageSource, /Run logs/, "Lead Hunt Autopilot should show browser run logs");
+assert.match(leadHuntPageSource, /refreshRunLogs/, "Lead Hunt Autopilot should poll recent run logs");
 assert.match(leadHuntPageSource, /Skip Current/, "Lead Hunt Autopilot should include a Skip Current control");
 assert.match(leadHuntPageSource, /updateHuntControl/, "Lead Hunt dashboard controls should write to the status API");
 assert.match(leadHuntPageSource, /Recovery needed/, "Lead Hunt page should show recovery needed state");
@@ -296,6 +316,8 @@ assert.match(internalMarketingLeadsSource, /RUN_STALE_MS/, "Lead Hunt status sto
 assert.match(internalMarketingLeadsSource, /currentItem/, "Lead Hunt status store should keep current item progress");
 assert.match(internalMarketingLeadsSource, /lastError/, "Lead Hunt status store should keep last error progress");
 assert.match(internalMarketingLeadsApiSource, /importInternalMarketingLeads/, "Internal marketing lead API should import Lead Hunt posts");
+assert.match(internalMarketingLeadEventsApiSource, /export async function GET/, "Internal marketing lead events API should expose read-only run logs");
+assert.match(internalMarketingLeadsSource, /getLeadHuntEvents/, "Internal marketing lead store should read run logs for the dashboard");
 assert.match(internalMarketingLeadsSource, /internal_marketing_leads/, "Internal marketing lead store should use the internal_marketing_leads table");
 assert.doesNotMatch(internalMarketingLeadsSource, /\.from\("leads"\)|\.from\("audits"\)|\.from\("search_runs"\)/, "Internal marketing lead store must not use customer lead tables");
 assert.match(internalMarketingLeadsMigration, /create table if not exists public\.internal_marketing_leads/, "Migration should create the internal_marketing_leads table");
@@ -351,8 +373,9 @@ assert.doesNotMatch(extensionSource, /querySelector\('a\[href\*="\/posts\/"\], a
 assert.match(extensionSource, /cold outreach\.\*not working/, "Facebook importer should highlight outreach pain");
 assert.match(extensionSource, /struggling \(\?:on \|with \|to \)\?\(\?:generat/, "Facebook importer should import struggling-to-generate-leads posts");
 assert.match(extensionSource, /looking for alternatives\? to cold calling/, "Facebook importer should import cold-calling alternative buyer intent");
-assert.match(extensionSource, /my website gets no traffic/, "Facebook importer should highlight traffic pain");
+assert.match(extensionSource, /where \(\?:do\|can\) i find \(\?:prospects\|local business leads\|business leads\)/, "Facebook importer should highlight prospect sourcing pain");
 assert.match(extensionSource, /looking for \(\?:a \)\?tool to find leads/, "Facebook importer should highlight tool-buying intent");
+assert.doesNotMatch(extensionSource, /need more customers/, "Facebook importer should not target generic customer-need posts");
 assert.match(extensionSource, /cheap website/, "Facebook importer should reject cheap-work posts");
 assert.match(extensionSource, /guaranteed clients/, "Facebook importer should reject guaranteed-client spam");
 assert.match(extensionSource, /group directory/, "Facebook importer should reject directory noise");
@@ -376,7 +399,7 @@ assert.match(extensionSource, /\.slice\(0, MAX_RECENT_IMPORTS\)/, "Local import 
 assert.match(extensionSource, /Recent MarketVibe imports/, "Recent imports panel should exist");
 assert.match(extensionSource, /getRecentImports\(\)\.slice\(0, 3\)/, "Recent imports panel should show the last 3 posts");
 assert.match(extensionSource, /function createReply/, "Cached posts should have a copyable reply");
-assert.match(extensionSource, /MarketVibe helps spot public business signals/, "Copy reply should mention MarketVibe");
+assert.match(extensionSource, /MarketVibe stores researched opportunity inventory/, "Copy reply should frame MarketVibe as opportunity inventory");
 assert.match(extensionSource, /https:\/\/www\.marketvibe1\.com/, "Copy reply should include the MarketVibe URL");
 assert.match(extensionManifest, /www\.google\.com/, "Extension should be allowed to inspect Google result pages");
 assert.match(extensionManifest, /www\.bing\.com/, "Extension should be allowed to inspect Bing result pages");
@@ -403,9 +426,9 @@ assert.match(extensionSource, /close-modal-after-import|escape-modal-after-impor
 assert.match(extensionSource, /function autoImportLeadHuntNode/, "Lead Hunt should auto-import a high-intent visible card or modal");
 assert.match(extensionSource, /buyer-intent-badge/, "High-intent badge path should trigger Lead Hunt auto-import");
 assert.match(extensionSource, /data-marketvibe-auto-importing/, "Lead Hunt auto-import should guard against duplicate in-flight imports");
-assert.match(extensionSource, /Auto-imported high-intent lead/, "High-intent modal auto-import should update running status");
+assert.match(extensionSource, /Auto-imported high-intent buyer item/, "High-intent modal auto-import should update running status");
 assert.match(extensionSource, /post-import continuation/, "Autopilot should schedule a continuation tick after successful import");
-assert.match(extensionSource, /Continuing Lead Hunt/, "Successful import status should not imply the hunt has stopped");
+assert.match(extensionSource, /Continuing Buyer Radar/, "Successful import status should not imply the hunt has stopped");
 assert.match(extensionSource, /nextActionAt: Date\.now\(\) \+ continuationDelay/, "Successful import should wait a randomized delay before continuing");
 assert.match(extensionSource, /ensureLeadHuntRunner\("active state detected"\)/, "Autopilot should run from active localStorage state without manual Send/Next/Skip");
 assert.match(extensionSource, /LEAD_HUNT_START/, "Autopilot should log LEAD_HUNT_START");
@@ -447,6 +470,7 @@ assert.match(extensionSource, /isHandledPostKey/, "Autopilot should skip duplica
 assert.match(extensionSource, /maxImportedLeads/, "Autopilot should stop at imported lead cap");
 assert.match(extensionSource, /maxSearches/, "Autopilot should stop at search cap");
 assert.match(extensionSource, /No auto-DM or auto-comment/, "Extension panel should show no messaging/commenting safety");
+assert.match(extensionSource, /Start Buyer Radar/, "Extension panel should label the internal buyer-radar workflow");
 assert.match(extensionSource, /Recovered from a blocked, blank, or unavailable page/, "Autopilot should recover from blocked or blank pages");
 assert.match(extensionSource, /Repeated failures on this page/, "Autopilot should advance after repeated failures");
 assert.match(extensionSource, /OUTREACH_MODES/, "Extension should include outreach mode architecture");
