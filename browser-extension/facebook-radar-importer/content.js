@@ -824,6 +824,7 @@
     const seenThisTick = new Set();
 
     for (const node of getVisibleCandidateNodes()) {
+      if (node.getAttribute("data-marketvibe-auto-importing") === "true") continue;
       const text = getPostText(node);
       const score = scorePost(text);
       const post = buildPostFromNode(node, score, { queryUsed: search?.query || "", sourceUsed: search?.source || "", outreachMode: state.outreach?.mode || "draft-only" });
@@ -882,6 +883,57 @@
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
     logLeadHunt("next match", { action: "escape-modal-after-import" });
     return true;
+  }
+
+  async function autoImportLeadHuntNode(node, score, reason = "highlighted-modal") {
+    const state = getLeadHuntState();
+    if (!state?.active || state.paused || score < HIGH_INTENT_IMPORT_THRESHOLD) return false;
+    const search = currentLeadHuntSearch(state);
+    const post = buildPostFromNode(node, score, { queryUsed: search?.query || "", sourceUsed: search?.source || "", outreachMode: state.outreach?.mode || "draft-only" });
+    const key = getPostKey(post);
+    if (!key || isHandledPostKey(key) || (state.seen || []).includes(key) || node.getAttribute("data-marketvibe-auto-importing") === "true") return false;
+
+    node.setAttribute("data-marketvibe-auto-importing", "true");
+    try {
+      const data = await sendPosts([post], search?.query || "");
+      saveRecentImport(post);
+      saveHandledPostKey(key);
+      markNodeHandled(node, score);
+
+      const importedCount = Number(state.importedCount || 0) + 1;
+      const seen = Array.from(new Set([...(state.seen || []), key]));
+      const continuationDelay = leadHuntDelay(state);
+      saveLeadHuntState({
+        ...state,
+        importedCount,
+        seen,
+        scrollAttempts: 0,
+        importedLeads: [post, ...(state.importedLeads || [])].slice(0, 30),
+        status: `Auto-imported high-intent lead. Good: ${data.counts?.good || 0}. Continuing Lead Hunt.`,
+        nextActionAt: Date.now() + continuationDelay,
+      });
+      logLeadHunt("LEAD_HUNT_IMPORT", { count: 1, importedCount, query: search?.query || "", reason });
+      if (importedCount >= Number(state.caps?.maxImportedLeads || 10)) {
+        stopLeadHunt(`Daily import cap reached. Imported ${importedCount} lead(s).`);
+      } else {
+        closeOpenFacebookModal();
+        window.setTimeout(() => ensureLeadHuntRunner("post-import continuation"), continuationDelay + 150);
+      }
+      return true;
+    } catch (error) {
+      const failedCount = Number(state.failedCount || 0) + 1;
+      saveLeadHuntState({
+        ...state,
+        failedCount,
+        errors: [`${new Date().toLocaleTimeString()} ${error && error.message ? error.message : "Auto-import failed"}`, ...(state.errors || [])].slice(0, 8),
+        status: "Auto-import failed. Continuing Lead Hunt.",
+        nextActionAt: Date.now() + leadHuntDelay(state),
+      });
+      logLeadHunt("auto import failed", { message: error?.message || "unknown", score });
+      return false;
+    } finally {
+      node.removeAttribute("data-marketvibe-auto-importing");
+    }
   }
 
   function advanceAfterFacebookPage(state, reason) {
@@ -1189,7 +1241,7 @@
 
     try {
       cleanupScanUi();
-      const nodes = Array.from(document.querySelectorAll('[role="article"], div[aria-posinset]'));
+      const nodes = getVisibleCandidateNodes();
       for (const node of nodes) {
         const text = getPostText(node);
         const score = scorePost(text);
@@ -1212,6 +1264,9 @@
             node.prepend(badge);
           }
           injectSingleImportButton(node, score);
+          if (score >= HIGH_INTENT_IMPORT_THRESHOLD && getLeadHuntState()?.active) {
+            void autoImportLeadHuntNode(node, score, "buyer-intent-badge");
+          }
         } else {
           if (score >= 25 && handled) {
             node.setAttribute("data-marketvibe-handled", "true");

@@ -351,6 +351,10 @@ assert.match(extensionSource, /function scrollAndRescan/, "Autopilot should scro
 assert.match(extensionSource, /function advanceAfterFacebookPage/, "Autopilot should advance to next result or query by itself");
 assert.match(extensionSource, /function closeOpenFacebookModal/, "Autopilot should close Facebook modal posts after successful import");
 assert.match(extensionSource, /close-modal-after-import|escape-modal-after-import/, "Autopilot should close modal or use Escape after import");
+assert.match(extensionSource, /function autoImportLeadHuntNode/, "Lead Hunt should auto-import a high-intent visible card or modal");
+assert.match(extensionSource, /buyer-intent-badge/, "High-intent badge path should trigger Lead Hunt auto-import");
+assert.match(extensionSource, /data-marketvibe-auto-importing/, "Lead Hunt auto-import should guard against duplicate in-flight imports");
+assert.match(extensionSource, /Auto-imported high-intent lead/, "High-intent modal auto-import should update running status");
 assert.match(extensionSource, /post-import continuation/, "Autopilot should schedule a continuation tick after successful import");
 assert.match(extensionSource, /Continuing Lead Hunt/, "Successful import status should not imply the hunt has stopped");
 assert.match(extensionSource, /nextActionAt: Date\.now\(\) \+ continuationDelay/, "Successful import should wait a randomized delay before continuing");
