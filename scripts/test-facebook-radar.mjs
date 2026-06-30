@@ -285,10 +285,14 @@ assert.match(internalMarketingLeadsApiSource, /importInternalMarketingLeads/, "I
 assert.match(internalMarketingLeadsSource, /internal_marketing_leads/, "Internal marketing lead store should use the internal_marketing_leads table");
 assert.doesNotMatch(internalMarketingLeadsSource, /\.from\("leads"\)|\.from\("audits"\)|\.from\("search_runs"\)/, "Internal marketing lead store must not use customer lead tables");
 assert.match(internalMarketingLeadsMigration, /create table if not exists public\.internal_marketing_leads/, "Migration should create the internal_marketing_leads table");
+assert.match(internalMarketingLeadsMigration, /set search_path = public/, "Internal marketing migration should use the public schema search path");
 assert.match(internalMarketingLeadsMigration, /public\.internal_marketing_leads/, "Internal marketing migration should schema-qualify the expected table");
 assert.match(internalMarketingLeadsMigration, /add column if not exists run_id/, "Internal marketing migration should be idempotent for Lead Hunt columns");
 assert.match(internalMarketingLeadsMigration, /internal_marketing_leads_status_check/, "Internal marketing migration should add the follow-up status constraint idempotently");
 assert.match(leadHuntPipelineMigration, /create table if not exists public\.internal_marketing_leads/, "Pipeline migration should self-heal if internal_marketing_leads is missing");
+assert.match(leadHuntPipelineMigration, /set search_path = public/, "Pipeline migration should use the public schema search path");
+assert.doesNotMatch(leadHuntPipelineMigration, /alter table internal_marketing_leads\b/i, "Pipeline migration must not use an unqualified internal_marketing_leads alter");
+assert.doesNotMatch(leadHuntPipelineMigration, /on internal_marketing_leads\b/i, "Pipeline migration must not use unqualified internal_marketing_leads indexes");
 assert.match(leadHuntPipelineMigration, /create table if not exists public\.lead_hunt_runs/, "Pipeline migration should create lead_hunt_runs");
 assert.match(leadHuntPipelineMigration, /create table if not exists public\.lead_hunt_events/, "Pipeline migration should create lead_hunt_events");
 assert.match(leadHuntPipelineMigration, /create table if not exists public\.lead_hunt_processed_urls/, "Pipeline migration should create processed URL table");

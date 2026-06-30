@@ -1,4 +1,6 @@
 create extension if not exists "uuid-ossp";
+create schema if not exists public;
+set search_path = public;
 
 create table if not exists public.internal_marketing_leads (
   id uuid primary key default uuid_generate_v4(),
