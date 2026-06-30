@@ -28,6 +28,21 @@ type ImportResponse = {
   importedAt: string;
 };
 
+type LeadHuntStatus = {
+  active: boolean;
+  paused: boolean;
+  query: string;
+  source: string;
+  currentUrl: string;
+  imported: number;
+  skipped: number;
+  duplicates: number;
+  failed: number;
+  status: string;
+  errors: string[];
+  updatedAt: string;
+};
+
 const LEAD_HUNT_QUERIES = [
   "I need leads",
   "how do I get clients",
@@ -72,6 +87,23 @@ export default function LeadHuntAutopilotPage() {
   async function refreshImports() {
     const response = await fetch("/api/facebook-radar/import", { cache: "no-store" });
     setImportData(await response.json());
+  }
+
+  async function refreshHuntStatus() {
+    const response = await fetch("/api/facebook-radar/hunt-status", { cache: "no-store" });
+    if (!response.ok) return;
+    const next = (await response.json()) as LeadHuntStatus;
+    setLiveProgress({
+      query: next.query || "Not started",
+      source: next.source || "Not started",
+      currentUrl: next.currentUrl || "",
+      imported: next.imported || 0,
+      skipped: next.skipped || 0,
+      duplicates: next.duplicates || 0,
+      failed: next.failed || 0,
+      errors: next.errors || [],
+    });
+    if (next.status) setStatus(next.status);
   }
 
   useEffect(() => {
@@ -126,10 +158,19 @@ export default function LeadHuntAutopilotPage() {
   }
 
   useEffect(() => {
-    if (!status.includes("launched")) return;
+    if (!status.includes("launched") && !liveProgress.currentUrl) return;
     const timer = window.setInterval(() => setRuntimeSeconds((value) => value + 1), 1000);
     return () => window.clearInterval(timer);
-  }, [status]);
+  }, [status, liveProgress.currentUrl]);
+
+  useEffect(() => {
+    if (!status.includes("launched") && !status.includes("Lead Hunt") && !liveProgress.currentUrl) return;
+    const timer = window.setInterval(() => {
+      void refreshHuntStatus();
+      void refreshImports();
+    }, 1500);
+    return () => window.clearInterval(timer);
+  }, [status, liveProgress.currentUrl]);
 
   return (
     <main className="min-h-screen bg-[#050b16] px-4 py-8 text-white sm:px-6 lg:px-8">

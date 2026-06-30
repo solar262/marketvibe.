@@ -1,5 +1,6 @@
 (() => {
   const API_URL = "https://www.marketvibe1.com/api/facebook-radar/import";
+  const STATUS_API_URL = "https://www.marketvibe1.com/api/facebook-radar/hunt-status";
   const CACHE_KEY = "marketvibe_recent_facebook_imports";
   const MAX_RECENT_IMPORTS = 20;
   const SCAN_INTERVAL_MS = 1500;
@@ -8,6 +9,7 @@
   const MAX_HANDLED_POSTS = 500;
   const LEAD_HUNT_KEY = "marketvibe_lead_hunt_autopilot";
   const MAX_SCROLL_ATTEMPTS = 4;
+  const HIGH_INTENT_IMPORT_THRESHOLD = 55;
   const OUTREACH_MODES = ["off", "draft-only", "manual-approval", "allowed-adapters"];
   const LEAD_HUNT_PRESETS = [
     "I need leads",
@@ -118,9 +120,21 @@
     /how do i get clients?/i,
     /where do i find customers?/i,
     /how do i get leads?/i,
+    /struggling (?:on |with |to )?(?:generat(?:e|ing)|get(?:ting)?) (?:more )?leads?/i,
+    /struggling to get clients?/i,
+    /need more leads?/i,
+    /need more customers?/i,
+    /looking for leads?/i,
+    /looking for alternatives? to cold calling/i,
+    /no clients? this month/i,
+    /need appointments?/i,
+    /agency owner struggling/i,
+    /web designers? need clients?/i,
+    /seo freelancers? need leads?/i,
     /need help getting customers/i,
     /looking for (?:a )?tool to find leads/i,
     /cold outreach.*not working/i,
+    /cold calling.*time consuming/i,
     /no one replies/i,
     /prospecting.*not working/i,
     /my website gets no traffic/i,
@@ -142,6 +156,9 @@
     /what should i do/i,
     /where do i find/i,
     /i hate cold emails/i,
+    /running a .*agency/i,
+    /web development agency/i,
+    /alternatives? to cold calling/i,
   ];
 
   const HARD_SKIP_SIGNALS = [
@@ -225,6 +242,7 @@
 
     if (/\?/.test(text)) score += 8;
     if (/\b(i|my|we|our)\b/i.test(text) && /\b(struggling|stuck|need|looking|can't|cannot|no|help|advice)\b/i.test(text)) score += 15;
+    if (/\b(agency|web designer|seo freelancer|freelancer)\b/i.test(text) && /\b(leads|clients|appointments|outreach|cold calling)\b/i.test(text)) score += 12;
     if (!strongMatches) score -= 28;
     if (text.length < 80) score -= 20;
 
@@ -418,6 +436,10 @@
 
   function getVisibleCandidateNodes() {
     const selectors = [
+      '[role="dialog"] [role="article"]',
+      '[role="dialog"]',
+      '[aria-modal="true"] [role="article"]',
+      '[aria-modal="true"]',
       '[role="article"]',
       "div[aria-posinset]",
       "div[data-pagelet*='FeedUnit']",
@@ -603,6 +625,29 @@
   function saveLeadHuntState(nextState) {
     localStorage.setItem(LEAD_HUNT_KEY, JSON.stringify(nextState));
     renderLeadHuntPanel();
+    syncLeadHuntStatus(nextState);
+  }
+
+  function syncLeadHuntStatus(nextState) {
+    const search = currentLeadHuntSearch(nextState);
+    fetch(STATUS_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        active: Boolean(nextState.active),
+        paused: Boolean(nextState.paused),
+        query: search?.query || "Not started",
+        source: search?.source || "Not started",
+        currentUrl: location.href,
+        imported: Number(nextState.importedCount || 0),
+        skipped: Number(nextState.skippedCount || 0),
+        duplicates: Number(nextState.duplicateCount || 0),
+        failed: Number(nextState.failedCount || 0),
+        status: nextState.status || "",
+        errors: Array.isArray(nextState.errors) ? nextState.errors.slice(0, 8) : [],
+        updatedAt: new Date().toISOString(),
+      }),
+    }).catch((error) => logLeadHunt("status sync failed", { message: error?.message || "unknown" }));
   }
 
   function ensureLeadHuntRunner(reason = "runner ensure") {
@@ -793,7 +838,7 @@
         continue;
       }
 
-      if (score >= 55) {
+      if (score >= HIGH_INTENT_IMPORT_THRESHOLD) {
         decisions.importItems.push({ node, score, post, key });
         logLeadHunt("score decision", { decision: "import", score, text: text.slice(0, 80) });
         continue;

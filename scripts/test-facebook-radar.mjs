@@ -8,6 +8,7 @@ const importSource = fs.readFileSync("src/lib/facebook-radar-import.ts", "utf8")
 const pageSource = fs.readFileSync("src/app/facebook-radar/page.tsx", "utf8");
 const leadHuntPageSource = fs.readFileSync("src/app/lead-hunt-autopilot/page.tsx", "utf8");
 const importedPageSource = fs.readFileSync("src/app/facebook-radar/imported/page.tsx", "utf8");
+const huntStatusSource = fs.readFileSync("src/app/api/facebook-radar/hunt-status/route.ts", "utf8");
 const extensionSource = fs.readFileSync("browser-extension/facebook-radar-importer/content.js", "utf8");
 const extensionManifest = fs.readFileSync("browser-extension/facebook-radar-importer/manifest.json", "utf8");
 const transpiled = ts.transpileModule(source, {
@@ -111,6 +112,15 @@ const outreachPain = analyzeFacebookLead({
   sourceUrl: "",
 });
 assert.equal(outreachPain.score, "High", "Cold outreach not working should be High fit");
+
+const skippedAgencyExample = analyzeFacebookLead({
+  postText: "I'm running a web development agency and struggling on generating more leads. I find cold calling is too time consuming and I am looking for alternatives.",
+  targetBuyer: "web designers, SEO freelancers, local marketers, small agencies",
+  painKeywords: "struggling generating more leads, looking for alternatives to cold calling, agency owner struggling",
+  sourceUrl: "https://www.facebook.com/groups/webdesign/posts/123",
+});
+assert.notEqual(skippedAgencyExample.action, "Skip", "Agency lead-generation pain must not be skipped");
+assert.equal(skippedAgencyExample.score, "High", "Agency struggling to generate more leads should be High fit");
 
 const shopifyPain = analyzeFacebookLead({
   postText: "My Shopify store has no sales and the store is not converting. What should I fix first?",
@@ -216,6 +226,18 @@ assert.match(cleanedImports[0].text, /client acquisition problem/i, "Imported po
 assert.equal(cleanedImports[0].sourceName, "Web Design and Development |", "Importer should clean group/page names");
 assert.equal(cleanedImports[0].author, "Muhammad Adnan", "Importer should clean author names");
 
+const agencyLeadPainImport = scoreImportedFacebookPosts({
+  posts: [{
+    text: "I'm running a web development agency and struggling on generating more leads. I find cold calling is too time consuming and I am looking for alternatives.",
+    sourceName: "Web Design and Development",
+    author: "Agency owner",
+    url: "https://www.facebook.com/groups/webdesign/posts/123",
+  }],
+  searchPhrase: "agency owner need leads",
+});
+assert.equal(agencyLeadPainImport[0]?.label, "Good", "Exact agency lead-generation pain should import as Good");
+assert.ok(agencyLeadPainImport[0]?.fitRank >= 70, "Exact skipped example should rank as high-intent import");
+
 assert.match(pageSource, /activeSearchLink = availableSearchLinks/, "One-card workflow state should use one active search card");
 assert.match(pageSource, /MAIN_TABS/, "Facebook Radar should expose main workflow tabs");
 assert.match(pageSource, /Presets/, "Facebook Radar should include a Presets tab");
@@ -247,6 +269,10 @@ assert.match(leadHuntPageSource, /Current URL/, "Lead Hunt Autopilot should show
 assert.match(leadHuntPageSource, /Runtime/, "Lead Hunt Autopilot should show runtime");
 assert.match(leadHuntPageSource, /Duplicates/, "Lead Hunt Autopilot should show duplicate count");
 assert.match(leadHuntPageSource, /Failed/, "Lead Hunt Autopilot should show failed count");
+assert.match(leadHuntPageSource, /\/api\/facebook-radar\/hunt-status/, "Lead Hunt page should poll extension status counters");
+assert.match(huntStatusSource, /Access-Control-Allow-Origin/, "Lead Hunt status API should allow extension CORS updates");
+assert.match(huntStatusSource, /skipped/, "Lead Hunt status API should store skipped counters");
+assert.match(huntStatusSource, /duplicates/, "Lead Hunt status API should store duplicate counters");
 assert.match(leadHuntPageSource, /Outreach engine mode/, "Lead Hunt Autopilot should include outreach mode architecture");
 assert.match(leadHuntPageSource, /Autopilot for allowed adapters only/, "Lead Hunt Autopilot should include allowed-adapter outreach mode");
 
@@ -274,6 +300,8 @@ assert.ok(extensionSource.includes("/^\\/groups\\/[^/]+$/i"), "Facebook importer
 assert.ok(extensionSource.includes("/^\\/pages\\/[^/]+$/i"), "Facebook importer should reject bare page URLs");
 assert.doesNotMatch(extensionSource, /querySelector\('a\[href\*="\/posts\/"\], a\[href\*="\/groups\/"\]/, "Facebook importer should not use broad group links as source URLs");
 assert.match(extensionSource, /cold outreach\.\*not working/, "Facebook importer should highlight outreach pain");
+assert.match(extensionSource, /struggling \(\?:on \|with \|to \)\?\(\?:generat/, "Facebook importer should import struggling-to-generate-leads posts");
+assert.match(extensionSource, /looking for alternatives\? to cold calling/, "Facebook importer should import cold-calling alternative buyer intent");
 assert.match(extensionSource, /my website gets no traffic/, "Facebook importer should highlight traffic pain");
 assert.match(extensionSource, /looking for \(\?:a \)\?tool to find leads/, "Facebook importer should highlight tool-buying intent");
 assert.match(extensionSource, /cheap website/, "Facebook importer should reject cheap-work posts");
@@ -329,6 +357,9 @@ assert.match(extensionSource, /LEAD_HUNT_SKIP/, "Autopilot should log LEAD_HUNT_
 assert.match(extensionSource, /LEAD_HUNT_NEXT_QUERY/, "Autopilot should log LEAD_HUNT_NEXT_QUERY");
 assert.match(extensionSource, /function scanVisibleLeadHuntCards/, "Autopilot should scan and decide visible cards directly");
 assert.match(extensionSource, /decisions\.skipped \+= 1/, "Autopilot should increment skipped decisions for rejected cards");
+assert.match(extensionSource, /\[role="dialog"\]/, "Autopilot should scan Facebook modal post text");
+assert.match(extensionSource, /STATUS_API_URL/, "Autopilot should sync live counters back to MarketVibe");
+assert.match(extensionSource, /syncLeadHuntStatus/, "Autopilot should update MarketVibe hunt status counters");
 assert.match(extensionSource, /function withLeadHuntStateHash/, "Autopilot should preserve queue state while moving across Facebook, Google, and Bing");
 assert.match(extensionSource, /marketvibeLeadHuntState/, "Autopilot should restore cross-domain queue state from URL hash");
 assert.match(extensionSource, /function pauseLeadHunt/, "Extension should include Pause Lead Hunt control");
@@ -337,7 +368,8 @@ assert.match(extensionSource, /function stopLeadHunt/, "Extension should include
 assert.match(extensionSource, /function collectIndexedFacebookResultUrls/, "Extension should collect indexed public Facebook result URLs");
 assert.match(extensionSource, /function scanVisibleLeadHuntCards/, "Extension should scan visible posts for autopilot");
 assert.match(extensionSource, /decisions\.duplicates \+= 1/, "Autopilot should count duplicate/handled posts");
-assert.match(extensionSource, /score >= 55/, "Autopilot should only import higher-intent matches by default");
+assert.match(extensionSource, /HIGH_INTENT_IMPORT_THRESHOLD = 55/, "Autopilot should keep the high-intent import threshold explicit");
+assert.match(extensionSource, /score >= HIGH_INTENT_IMPORT_THRESHOLD/, "Autopilot should only import higher-intent matches by default");
 assert.match(extensionSource, /isHandledPostKey/, "Autopilot should skip duplicate or handled posts");
 assert.match(extensionSource, /maxImportedLeads/, "Autopilot should stop at imported lead cap");
 assert.match(extensionSource, /maxSearches/, "Autopilot should stop at search cap");
