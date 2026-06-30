@@ -29,16 +29,22 @@ type ImportResponse = {
 };
 
 type LeadHuntStatus = {
+  runId?: string;
   active: boolean;
   paused: boolean;
+  recoveryNeeded?: boolean;
   query: string;
   source: string;
   currentUrl: string;
+  currentItem: number;
+  totalQueued: number;
+  completed: number;
   imported: number;
   skipped: number;
   duplicates: number;
   failed: number;
   status: string;
+  lastError: string;
   errors: string[];
   updatedAt: string;
   extensionVersion?: string;
@@ -68,15 +74,24 @@ export default function LeadHuntAutopilotPage() {
   const [importData, setImportData] = useState<ImportResponse | null>(null);
   const [runtimeSeconds, setRuntimeSeconds] = useState(0);
   const [liveProgress, setLiveProgress] = useState({
+    runId: "",
+    active: false,
+    paused: false,
+    recoveryNeeded: false,
     query: "Not started",
     source: "Not started",
     currentUrl: "",
+    currentItem: 0,
+    totalQueued: 0,
+    completed: 0,
     imported: 0,
     skipped: 0,
     duplicates: 0,
     failed: 0,
+    lastError: "",
     errors: [] as string[],
     extensionVersion: "",
+    updatedAt: "",
   });
 
   const enabledSourceLabels = useMemo(() => {
@@ -97,17 +112,54 @@ export default function LeadHuntAutopilotPage() {
     if (!response.ok) return;
     const next = (await response.json()) as LeadHuntStatus;
     setLiveProgress({
+      runId: next.runId || "",
+      active: Boolean(next.active),
+      paused: Boolean(next.paused),
+      recoveryNeeded: Boolean(next.recoveryNeeded),
       query: next.query || "Not started",
       source: next.source || "Not started",
       currentUrl: next.currentUrl || "",
+      currentItem: next.currentItem || 0,
+      totalQueued: next.totalQueued || 0,
+      completed: next.completed || 0,
       imported: next.imported || 0,
       skipped: next.skipped || 0,
       duplicates: next.duplicates || 0,
       failed: next.failed || 0,
+      lastError: next.lastError || next.errors?.[0] || "",
       errors: next.errors || [],
       extensionVersion: next.extensionVersion || "",
+      updatedAt: next.updatedAt || "",
     });
     if (next.status) setStatus(next.status);
+  }
+
+  async function updateHuntControl(patch: Partial<LeadHuntStatus>) {
+    const response = await fetch("/api/internal-marketing-leads/hunt-status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        runId: liveProgress.runId,
+        query: liveProgress.query,
+        source: liveProgress.source,
+        currentUrl: liveProgress.currentUrl,
+        currentItem: liveProgress.currentItem,
+        totalQueued: liveProgress.totalQueued,
+        completed: liveProgress.completed,
+        imported: liveProgress.imported,
+        skipped: liveProgress.skipped,
+        duplicates: liveProgress.duplicates,
+        failed: liveProgress.failed,
+        errors: liveProgress.errors,
+        extensionVersion: liveProgress.extensionVersion,
+        ...patch,
+      }),
+    });
+    if (!response.ok) {
+      setStatus("Control update failed. Refresh status and try again.");
+      return;
+    }
+    await refreshHuntStatus();
   }
 
   useEffect(() => {
@@ -128,15 +180,24 @@ export default function LeadHuntAutopilotPage() {
     const runId = globalThis.crypto?.randomUUID?.() || `hunt-${Date.now()}`;
     setRuntimeSeconds(0);
     setLiveProgress({
+      runId,
+      active: true,
+      paused: false,
+      recoveryNeeded: false,
       query: LEAD_HUNT_QUERIES[0],
       source: enabledSourceLabels[0] || "No source enabled",
       currentUrl: "",
+      currentItem: 1,
+      totalQueued: Math.min(maxSearches, LEAD_HUNT_QUERIES.length * enabledSourceLabels.length),
+      completed: 0,
       imported: 0,
       skipped: 0,
       duplicates: 0,
       failed: 0,
+      lastError: "",
       errors: [],
       extensionVersion: "",
+      updatedAt: new Date().toISOString(),
     });
     setStatus("Lead Hunt launched. The extension will open searches, scan visible public pages, import High Intent matches, and stop at your caps.");
     const config = {
@@ -150,8 +211,27 @@ export default function LeadHuntAutopilotPage() {
     window.open(`https://www.facebook.com/search/posts/?q=${encodeURIComponent(LEAD_HUNT_QUERIES[0])}#marketvibeLeadHunt=${encodeURIComponent(JSON.stringify(config))}`, "_blank", "noopener,noreferrer");
   }
 
-  function passiveControl(label: string) {
-    setStatus(`${label} is controlled from the floating extension panel on Facebook/Google/Bing so you can stop immediately while pages are opening.`);
+  async function pauseLeadHunt() {
+    await updateHuntControl({ active: true, paused: true, status: "Paused. No new browser action will start until resumed." });
+  }
+
+  async function resumeLeadHunt() {
+    await updateHuntControl({ active: true, paused: false, recoveryNeeded: false, status: "Resuming from next unprocessed queued item." });
+  }
+
+  async function stopLeadHunt() {
+    await updateHuntControl({ active: false, paused: false, recoveryNeeded: false, status: "Stopped. Browser loop, timers, and current task lock cleared." });
+  }
+
+  async function skipCurrent() {
+    await updateHuntControl({
+      active: liveProgress.active || liveProgress.paused,
+      paused: liveProgress.paused,
+      skipped: liveProgress.skipped + 1,
+      completed: liveProgress.completed + 1,
+      currentItem: liveProgress.currentItem + 1,
+      status: "Skip current requested. Active tab will mark this item skipped and move to the next queued item.",
+    });
   }
 
   async function createTestLead() {
@@ -167,33 +247,42 @@ export default function LeadHuntAutopilotPage() {
   function clearLocalProgressHint() {
     setRuntimeSeconds(0);
     setLiveProgress({
+      runId: "",
+      active: false,
+      paused: false,
+      recoveryNeeded: false,
       query: "Not started",
       source: "Not started",
       currentUrl: "",
+      currentItem: 0,
+      totalQueued: 0,
+      completed: 0,
       imported: 0,
       skipped: 0,
       duplicates: 0,
       failed: 0,
+      lastError: "",
       errors: [],
       extensionVersion: "",
+      updatedAt: "",
     });
     setStatus("Local dashboard progress cleared. Use Stop in the extension panel to stop an active browser tab.");
   }
 
   useEffect(() => {
-    if (!status.includes("launched") && !liveProgress.currentUrl) return;
+    if (!liveProgress.active && !liveProgress.paused && !status.includes("launched") && !liveProgress.currentUrl) return;
     const timer = window.setInterval(() => setRuntimeSeconds((value) => value + 1), 1000);
     return () => window.clearInterval(timer);
-  }, [status, liveProgress.currentUrl]);
+  }, [status, liveProgress.active, liveProgress.currentUrl, liveProgress.paused]);
 
   useEffect(() => {
-    if (!status.includes("launched") && !status.includes("Lead Hunt") && !liveProgress.currentUrl) return;
+    if (!liveProgress.active && !liveProgress.paused && !liveProgress.recoveryNeeded && !status.includes("launched") && !status.includes("Lead Hunt") && !liveProgress.currentUrl) return;
     const timer = window.setInterval(() => {
       void refreshHuntStatus();
       void refreshImports();
     }, 1500);
     return () => window.clearInterval(timer);
-  }, [status, liveProgress.currentUrl]);
+  }, [status, liveProgress.active, liveProgress.currentUrl, liveProgress.paused, liveProgress.recoveryNeeded]);
 
   return (
     <main className="min-h-screen bg-[#050b16] px-4 py-8 text-white sm:px-6 lg:px-8">
@@ -216,23 +305,34 @@ export default function LeadHuntAutopilotPage() {
             />
           </label>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-4">
-            <button onClick={runLeadHunt} className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-emerald-300 to-cyan-200 px-6 py-4 text-base font-black text-slate-950 shadow-xl shadow-emerald-950/30">
-              <Play className="h-5 w-5" /> Run Lead Hunt
+          <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <button onClick={runLeadHunt} className="inline-flex min-w-0 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-emerald-300 to-cyan-200 px-5 py-4 text-sm font-black text-slate-950 shadow-xl shadow-emerald-950/30 sm:text-base">
+              <Play className="h-5 w-5 shrink-0" /> <span className="truncate">{liveProgress.active || liveProgress.paused || liveProgress.recoveryNeeded ? "Start New Run" : "Run Lead Hunt"}</span>
             </button>
-            <button onClick={() => passiveControl("Pause")} className="inline-flex items-center justify-center gap-2 rounded-full border border-white/15 bg-white/10 px-5 py-4 font-bold text-white">
-              <Pause className="h-5 w-5" /> Pause
+            <button onClick={() => void pauseLeadHunt()} disabled={!liveProgress.active || liveProgress.paused} className="inline-flex min-w-0 items-center justify-center gap-2 rounded-full border border-white/15 bg-white/10 px-5 py-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50 sm:text-base">
+              <Pause className="h-5 w-5 shrink-0" /> Pause
             </button>
-            <button onClick={() => passiveControl("Resume")} className="inline-flex items-center justify-center gap-2 rounded-full border border-white/15 bg-white/10 px-5 py-4 font-bold text-white">
-              <Play className="h-5 w-5" /> Resume
+            <button onClick={() => void resumeLeadHunt()} disabled={!liveProgress.runId || (!liveProgress.paused && !liveProgress.recoveryNeeded && liveProgress.active)} className="inline-flex min-w-0 items-center justify-center gap-2 rounded-full border border-white/15 bg-white/10 px-5 py-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50 sm:text-base">
+              <Play className="h-5 w-5 shrink-0" /> Resume
             </button>
-            <button onClick={() => passiveControl("Stop")} className="inline-flex items-center justify-center gap-2 rounded-full border border-rose-300/25 bg-rose-300/10 px-5 py-4 font-bold text-rose-100">
-              <Square className="h-5 w-5" /> Stop
+            <button onClick={() => void skipCurrent()} disabled={!liveProgress.active && !liveProgress.paused && !liveProgress.recoveryNeeded} className="inline-flex min-w-0 items-center justify-center gap-2 rounded-full border border-amber-300/25 bg-amber-300/10 px-5 py-4 text-sm font-bold text-amber-100 disabled:cursor-not-allowed disabled:opacity-50 sm:text-base">
+              Skip Current
+            </button>
+            <button onClick={() => void stopLeadHunt()} disabled={!liveProgress.active && !liveProgress.paused && !liveProgress.recoveryNeeded} className="inline-flex min-w-0 items-center justify-center gap-2 rounded-full border border-rose-300/25 bg-rose-300/10 px-5 py-4 text-sm font-bold text-rose-100 disabled:cursor-not-allowed disabled:opacity-50 sm:text-base">
+              <Square className="h-5 w-5 shrink-0" /> Stop
             </button>
           </div>
 
           <p className="mt-4 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4 text-sm font-semibold text-cyan-50">{status}</p>
-          {liveProgress.extensionVersion && liveProgress.extensionVersion !== "0.1.1" && (
+          <p className={`mt-3 rounded-2xl border p-4 text-sm font-black ${
+            liveProgress.recoveryNeeded ? "border-amber-300/25 bg-amber-300/10 text-amber-50" :
+            liveProgress.paused ? "border-cyan-300/25 bg-cyan-300/10 text-cyan-50" :
+            liveProgress.active ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-50" :
+            "border-white/10 bg-slate-950/40 text-slate-200"
+          }`}>
+            Current status: {liveProgress.recoveryNeeded ? "Recovery needed" : liveProgress.paused ? "Paused" : liveProgress.active ? "Running" : status.includes("Stopped") ? "Stopped" : "Ready"}
+          </p>
+          {liveProgress.extensionVersion && liveProgress.extensionVersion !== "0.1.2" && (
             <p className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm font-semibold text-amber-50">
               Extension version warning: loaded extension reports {liveProgress.extensionVersion}. Reload the unpacked extension if the latest runner is not active.
             </p>
@@ -243,11 +343,16 @@ export default function LeadHuntAutopilotPage() {
             <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4"><p className="text-xs uppercase tracking-[0.16em] text-slate-400">Runtime</p><p className="mt-2 text-sm font-bold text-white">{Math.floor(runtimeSeconds / 60)}m {runtimeSeconds % 60}s</p></div>
             <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4"><p className="text-xs uppercase tracking-[0.16em] text-slate-400">Current URL</p><p className="mt-2 min-w-0 break-all text-xs font-bold text-cyan-100">{liveProgress.currentUrl || "Extension panel updates while running"}</p></div>
           </div>
-          <div className="mt-3 grid gap-3 sm:grid-cols-4">
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4"><p className="text-xs uppercase tracking-[0.16em] text-cyan-200">Current item</p><p className="mt-2 text-2xl font-black text-cyan-100">{liveProgress.currentItem || 0}/{liveProgress.totalQueued || Math.max(liveProgress.currentItem, liveProgress.completed, 0)}</p></div>
+            <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4"><p className="text-xs uppercase tracking-[0.16em] text-slate-400">Completed</p><p className="mt-2 text-2xl font-black text-white">{liveProgress.completed || liveProgress.imported + liveProgress.skipped + liveProgress.duplicates + liveProgress.failed}</p></div>
             <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-4"><p className="text-xs uppercase tracking-[0.16em] text-emerald-200">Imported</p><p className="mt-2 text-2xl font-black text-emerald-100">{importData?.counts.good || liveProgress.imported}</p></div>
             <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4"><p className="text-xs uppercase tracking-[0.16em] text-amber-200">Skipped</p><p className="mt-2 text-2xl font-black text-amber-100">{liveProgress.skipped}</p></div>
-            <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4"><p className="text-xs uppercase tracking-[0.16em] text-slate-400">Duplicates</p><p className="mt-2 text-2xl font-black text-white">{liveProgress.duplicates}</p></div>
             <div className="rounded-2xl border border-rose-300/20 bg-rose-300/10 p-4"><p className="text-xs uppercase tracking-[0.16em] text-rose-200">Failed</p><p className="mt-2 text-2xl font-black text-rose-100">{liveProgress.failed}</p></div>
+          </div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4"><p className="text-xs uppercase tracking-[0.16em] text-slate-400">Duplicates</p><p className="mt-2 text-2xl font-black text-white">{liveProgress.duplicates}</p></div>
+            <div className="rounded-2xl border border-rose-300/20 bg-rose-300/10 p-4"><p className="text-xs uppercase tracking-[0.16em] text-rose-200">Last error</p><p className="mt-2 min-w-0 break-words text-sm font-bold text-rose-50">{liveProgress.lastError || liveProgress.errors[0] || "None"}</p></div>
           </div>
           <div className="mt-4 flex flex-wrap gap-3">
             <button onClick={createTestLead} className="rounded-full border border-emerald-300/25 bg-emerald-300/10 px-5 py-3 text-sm font-bold text-emerald-100">Create test internal lead</button>

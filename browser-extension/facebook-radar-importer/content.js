@@ -3,7 +3,7 @@
   const STATUS_API_URL = "https://www.marketvibe1.com/api/internal-marketing-leads/hunt-status";
   const EVENT_API_URL = "https://www.marketvibe1.com/api/internal-marketing-leads/events";
   const PROCESSED_URL_API_URL = "https://www.marketvibe1.com/api/internal-marketing-leads/processed-url";
-  const EXTENSION_VERSION = "0.1.1";
+  const EXTENSION_VERSION = "0.1.2";
   const CACHE_KEY = "marketvibe_recent_facebook_imports";
   const MAX_RECENT_IMPORTS = 20;
   const SCAN_INTERVAL_MS = 1500;
@@ -15,6 +15,8 @@
   const HIGH_INTENT_IMPORT_THRESHOLD = 55;
   const STUCK_RECOVERY_MS = 60000;
   const LOADING_RECOVERY_MS = 30000;
+  const ACTION_TIMEOUT_MS = 15000;
+  const CONTROL_POLL_MS = 2000;
   const OUTREACH_MODES = ["off", "draft-only", "manual-approval", "allowed-adapters"];
   const LEAD_HUNT_PRESETS = [
     "I need leads",
@@ -29,7 +31,9 @@
     "agency owner need leads",
   ];
   let leadHuntIntervalId = 0;
+  let leadHuntControlPollId = 0;
   let leadHuntTickRunning = false;
+  const leadHuntTimeoutIds = new Set();
   if (document.getElementById("marketvibe-import-button")) return;
 
   function logLeadHunt(event, details = {}) {
@@ -52,9 +56,47 @@
     return headers;
   }
 
+  async function fetchWithTimeout(url, options = {}, timeoutMs = ACTION_TIMEOUT_MS) {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } finally {
+      window.clearTimeout(timer);
+    }
+  }
+
+  function clearLeadHuntTimers() {
+    for (const timerId of leadHuntTimeoutIds) window.clearTimeout(timerId);
+    leadHuntTimeoutIds.clear();
+    if (leadHuntIntervalId) {
+      window.clearInterval(leadHuntIntervalId);
+      leadHuntIntervalId = 0;
+    }
+    leadHuntTickRunning = false;
+  }
+
+  function scheduleLeadHuntAction(callback, delay, reason = "scheduled action") {
+    const timerId = window.setTimeout(() => {
+      leadHuntTimeoutIds.delete(timerId);
+      const state = getLeadHuntState();
+      if (!state?.active || state.paused) {
+        logLeadHunt("scheduled action blocked", { reason, active: Boolean(state?.active), paused: Boolean(state?.paused) });
+        return;
+      }
+      callback(state);
+    }, Math.max(0, delay));
+    leadHuntTimeoutIds.add(timerId);
+    return timerId;
+  }
+
+  function leadHuntIsRunnable(state = getLeadHuntState()) {
+    return Boolean(state?.active && !state.paused);
+  }
+
   function postLeadHuntEvent(eventType, payload = {}) {
     const state = getLeadHuntState();
-    fetch(EVENT_API_URL, {
+    fetchWithTimeout(EVENT_API_URL, {
       method: "POST",
       headers: internalHeaders(),
       body: JSON.stringify({
@@ -68,7 +110,7 @@
   function recordProcessedUrl(sourceUrl, status, payload = {}) {
     const state = getLeadHuntState();
     if (!sourceUrl) return;
-    fetch(PROCESSED_URL_API_URL, {
+    fetchWithTimeout(PROCESSED_URL_API_URL, {
       method: "POST",
       headers: internalHeaders(),
       body: JSON.stringify({
@@ -647,10 +689,14 @@
     }
     showStatus(`${reason}. Moving to the next result.`);
     forceCloseModalOrBack(reason);
-    window.setTimeout(() => {
-      if (state?.active && !state.paused) ensureLeadHuntRunner("skip current recovery");
+    const timerId = window.setTimeout(() => {
+      leadHuntTimeoutIds.delete(timerId);
+      const latest = getLeadHuntState();
+      if (!latest?.active) return;
+      if (!latest.paused) ensureLeadHuntRunner("skip current recovery");
       moveToNextQualifiedPost(current?.node || null);
     }, 3600);
+    leadHuntTimeoutIds.add(timerId);
   }
 
   function skipCurrentQualifiedPost() {
@@ -747,7 +793,7 @@
 
   function syncLeadHuntStatus(nextState) {
     const search = currentLeadHuntSearch(nextState);
-    fetch(STATUS_API_URL, {
+    fetchWithTimeout(STATUS_API_URL, {
       method: "POST",
       headers: internalHeaders(),
       body: JSON.stringify({
@@ -757,11 +803,15 @@
         query: search?.query || "Not started",
         source: search?.source || "Not started",
         currentUrl: location.href,
+        currentItem: Number(nextState.currentSearchIndex || 0) + 1,
+        totalQueued: Math.min((nextState.searches || []).length, Number(nextState.caps?.maxSearches || 10)),
+        completed: Number(nextState.importedCount || 0) + Number(nextState.skippedCount || 0) + Number(nextState.duplicateCount || 0) + Number(nextState.failedCount || 0),
         imported: Number(nextState.importedCount || 0),
         skipped: Number(nextState.skippedCount || 0),
         duplicates: Number(nextState.duplicateCount || 0),
         failed: Number(nextState.failedCount || 0),
         status: nextState.status || "",
+        lastError: Array.isArray(nextState.errors) ? nextState.errors[0] || "" : "",
         errors: Array.isArray(nextState.errors) ? nextState.errors.slice(0, 8) : [],
         updatedAt: new Date().toISOString(),
         extensionVersion: EXTENSION_VERSION,
@@ -769,15 +819,59 @@
     }).catch((error) => logLeadHunt("status sync failed", { message: error?.message || "unknown" }));
   }
 
+  async function pollLeadHuntControl(reason = "poll") {
+    const state = getLeadHuntState();
+    if (!state?.runId) return false;
+    try {
+      const response = await fetchWithTimeout(STATUS_API_URL, { headers: internalHeaders({ "Content-Type": "application/json" }) }, 8000);
+      if (!response.ok) return false;
+      const remote = await response.json();
+      if (!remote || remote.runId !== state.runId) return false;
+      if (remote.active === false && state.active) {
+        stopLeadHunt(remote.status || "Stopped from MarketVibe dashboard.", { sync: false });
+        return true;
+      }
+      if (remote.paused && !state.paused) {
+        pauseLeadHunt(remote.status || "Paused from MarketVibe dashboard.", { sync: false });
+        return true;
+      }
+      if (/skip current requested/i.test(remote.status || "") && state.status !== remote.status) {
+        saveLeadHuntState({ ...state, status: remote.status, nextActionAt: Date.now() + 250 });
+        recoverCurrentLeadHuntItem("Skip current");
+        return true;
+      }
+      if (remote.active && !remote.paused && state.paused) {
+        resumeLeadHunt(remote.status || "Resumed from MarketVibe dashboard.", { sync: false });
+        return true;
+      }
+      if (remote.active && !state.active) {
+        saveLeadHuntState({ ...state, active: true, paused: false, status: remote.status || "Resuming from MarketVibe dashboard.", nextActionAt: Date.now() + 250 });
+        ensureLeadHuntRunner(`dashboard resume:${reason}`);
+        return true;
+      }
+    } catch (error) {
+      logLeadHunt("control poll failed", { reason, message: error?.message || "unknown" });
+    }
+    return false;
+  }
+
+  function ensureLeadHuntControlPoller() {
+    if (leadHuntControlPollId) return;
+    leadHuntControlPollId = window.setInterval(() => {
+      void pollLeadHuntControl("interval");
+    }, CONTROL_POLL_MS);
+  }
+
   function ensureLeadHuntRunner(reason = "runner ensure") {
+    ensureLeadHuntControlPoller();
     if (!leadHuntIntervalId) {
       leadHuntIntervalId = window.setInterval(() => {
         void runLeadHuntTick("interval");
       }, SCAN_INTERVAL_MS);
       logLeadHunt("runner interval started", { reason });
     }
-    window.setTimeout(() => void runLeadHuntTick(reason), 250);
-    window.setTimeout(() => void runLeadHuntTick(`${reason}:followup`), 1250);
+    scheduleLeadHuntAction(() => void runLeadHuntTick(reason), 250, reason);
+    scheduleLeadHuntAction(() => void runLeadHuntTick(`${reason}:followup`), 1250, `${reason}:followup`);
   }
 
   function withLeadHuntStateHash(url, state) {
@@ -790,14 +884,17 @@
     }
   }
 
-  function stopLeadHunt(message = "Lead Hunt stopped.") {
+  function stopLeadHunt(message = "Lead Hunt stopped.", options = {}) {
     const state = getLeadHuntState();
+    clearLeadHuntTimers();
     if (state) {
-      saveLeadHuntState({ ...state, active: false, paused: false, status: message });
-    }
-    if (leadHuntIntervalId) {
-      window.clearInterval(leadHuntIntervalId);
-      leadHuntIntervalId = 0;
+      const stoppedState = { ...state, active: false, paused: false, currentLock: "", status: message, nextActionAt: 0 };
+      if (options.sync === false) {
+        localStorage.setItem(LEAD_HUNT_KEY, JSON.stringify(stoppedState));
+        renderLeadHuntPanel();
+      } else {
+        saveLeadHuntState(stoppedState);
+      }
     }
     logLeadHunt("hunt completed", { message });
     postLeadHuntEvent("LEAD_HUNT_STOP", { message, sourceUrl: location.href });
@@ -817,10 +914,10 @@
     const nextState = { ...state, status: reason, currentUrl: url, nextActionAt: Date.now() + leadHuntDelay(state) };
     saveLeadHuntState(nextState);
     logLeadHunt("next query/result scheduled", { reason, url, query: currentLeadHuntSearch(state)?.query });
-    window.setTimeout(() => {
-      const latest = getLeadHuntState();
-      if (latest?.active && !latest.paused) window.location.assign(withLeadHuntStateHash(url, latest));
-    }, Math.max(300, nextState.nextActionAt - Date.now()));
+    scheduleLeadHuntAction(async (latest) => {
+      if (await pollLeadHuntControl("before navigation")) return;
+      if (leadHuntIsRunnable(latest)) window.location.assign(withLeadHuntStateHash(url, latest));
+    }, Math.max(300, nextState.nextActionAt - Date.now()), "navigate");
   }
 
   function startLeadHunt(config = defaultLeadHuntConfig()) {
@@ -887,18 +984,33 @@
     }
   }
 
-  function pauseLeadHunt() {
+  function pauseLeadHunt(message = "Paused. Resume when ready.", options = {}) {
     const state = getLeadHuntState();
     if (state) {
-      saveLeadHuntState({ ...state, paused: true, status: "Paused. Resume when ready.", nextActionAt: Date.now() + 3600000 });
+      clearLeadHuntTimers();
+      const pausedState = { ...state, active: true, paused: true, status: message, nextActionAt: Date.now() + 3600000 };
+      if (options.sync === false) {
+        localStorage.setItem(LEAD_HUNT_KEY, JSON.stringify(pausedState));
+        renderLeadHuntPanel();
+      } else {
+        saveLeadHuntState(pausedState);
+      }
       postLeadHuntEvent("LEAD_HUNT_PAUSE", { message: "Lead Hunt paused", sourceUrl: location.href });
+      ensureLeadHuntControlPoller();
+      showStatus("Paused. No new browser actions will start.");
     }
   }
 
-  function resumeLeadHunt() {
+  function resumeLeadHunt(message = "Resuming Lead Hunt.", options = {}) {
     const state = getLeadHuntState();
     if (state) {
-      saveLeadHuntState({ ...state, active: true, paused: false, status: "Resuming Lead Hunt.", nextActionAt: Date.now() + 250 });
+      const resumedState = { ...state, active: true, paused: false, currentLock: "", status: message, nextActionAt: Date.now() + 250 };
+      if (options.sync === false) {
+        localStorage.setItem(LEAD_HUNT_KEY, JSON.stringify(resumedState));
+        renderLeadHuntPanel();
+      } else {
+        saveLeadHuntState(resumedState);
+      }
       logLeadHunt("hunt resumed");
       postLeadHuntEvent("LEAD_HUNT_RESUME", { message: "Lead Hunt resumed", sourceUrl: location.href });
       ensureLeadHuntRunner("resume");
@@ -987,6 +1099,7 @@
   }
 
   function scrollAndRescan(state, message) {
+    if (!leadHuntIsRunnable(state)) return false;
     const attempts = Number(state.scrollAttempts || 0) + 1;
     if (attempts > MAX_SCROLL_ATTEMPTS) return false;
     window.scrollBy({ top: Math.round(window.innerHeight * 0.9), behavior: "smooth" });
@@ -1022,26 +1135,36 @@
   async function autoImportLeadHuntNode(node, score, reason = "highlighted-modal") {
     const state = getLeadHuntState();
     if (!state?.active || state.paused || score < HIGH_INTENT_IMPORT_THRESHOLD) return false;
+    if (await pollLeadHuntControl("before auto import")) return false;
     const search = currentLeadHuntSearch(state);
     const post = buildPostFromNode(node, score, { queryUsed: search?.query || "", sourceUsed: search?.source || "", outreachMode: state.outreach?.mode || "draft-only" });
     const key = getPostKey(post);
     if (!key || isHandledPostKey(key) || (state.seen || []).includes(key) || node.getAttribute("data-marketvibe-auto-importing") === "true") return false;
+    if (state.currentLock && state.currentLock !== key) return false;
+    saveLeadHuntState({ ...state, currentLock: key, status: "Saving high-intent lead." });
 
     node.setAttribute("data-marketvibe-auto-importing", "true");
     try {
       const data = await sendPosts([post], search?.query || "");
+      const latest = getLeadHuntState();
+      if (!latest?.active || latest.paused) {
+        recordProcessedUrl(post.url || key, "imported", { reason: "import-finished-after-cancel", query: search?.query || "", score });
+        showStatus("Import finished, but run is paused or stopped. No continuation started.");
+        return true;
+      }
       saveRecentImport(post);
       saveHandledPostKey(key);
       recordProcessedUrl(post.url || key, "imported", { reason, query: search?.query || "", score });
       markNodeHandled(node, score);
 
-      const importedCount = Number(state.importedCount || 0) + 1;
-      const seen = Array.from(new Set([...(state.seen || []), key]));
-      const continuationDelay = leadHuntDelay(state);
+      const importedCount = Number(latest.importedCount || 0) + 1;
+      const seen = Array.from(new Set([...(latest.seen || []), key]));
+      const continuationDelay = leadHuntDelay(latest);
       saveLeadHuntState({
-        ...state,
+        ...latest,
         importedCount,
         seen,
+        currentLock: "",
         scrollAttempts: 0,
         importedLeads: [post, ...(state.importedLeads || [])].slice(0, 30),
         status: `Auto-imported high-intent lead. Good: ${data.counts?.good || 0}. Continuing Lead Hunt.`,
@@ -1050,11 +1173,11 @@
         nextActionAt: Date.now() + continuationDelay,
       });
       logLeadHunt("LEAD_HUNT_IMPORT", { count: 1, importedCount, query: search?.query || "", reason });
-      if (importedCount >= Number(state.caps?.maxImportedLeads || 10)) {
+      if (importedCount >= Number(latest.caps?.maxImportedLeads || 10)) {
         stopLeadHunt(`Daily import cap reached. Imported ${importedCount} lead(s).`);
       } else {
         closeOpenFacebookModal();
-        window.setTimeout(() => ensureLeadHuntRunner("post-import continuation"), continuationDelay + 150);
+        scheduleLeadHuntAction(() => ensureLeadHuntRunner("post-import continuation"), continuationDelay + 150, "post-import continuation");
       }
       return true;
     } catch (error) {
@@ -1063,6 +1186,7 @@
         ...state,
         failedCount,
         errors: [`${new Date().toLocaleTimeString()} ${error && error.message ? error.message : "Auto-import failed"}`, ...(state.errors || [])].slice(0, 8),
+        currentLock: "",
         status: "Auto-import failed. Continuing Lead Hunt.",
         lastProgressAt: Date.now(),
         nextActionAt: Date.now() + leadHuntDelay(state),
@@ -1070,6 +1194,8 @@
       logLeadHunt("auto import failed", { message: error?.message || "unknown", score });
       return false;
     } finally {
+      const latest = getLeadHuntState();
+      if (latest?.currentLock === key) saveLeadHuntState({ ...latest, currentLock: "" });
       node.removeAttribute("data-marketvibe-auto-importing");
     }
   }
@@ -1103,6 +1229,7 @@
     const state = getLeadHuntState();
     if (!state?.active || state.paused) return;
     if (Date.now() < Number(state.nextActionAt || 0)) return;
+    if (await pollLeadHuntControl(`before tick:${trigger}`)) return;
     leadHuntTickRunning = true;
 
     const search = currentLeadHuntSearch(state);
@@ -1133,6 +1260,7 @@
             saveLeadHuntState({ ...loadingState, loadingReloaded: true, status: "Facebook loading watchdog reloading once." });
             logLeadHunt("STUCK_RECOVERY", { reason: "loading watchdog reload" });
             postLeadHuntEvent("STUCK_RECOVERY", { message: "Loading watchdog reload", reason: "loading-timeout", sourceUrl: location.href });
+            if (await pollLeadHuntControl("before loading reload")) return;
             location.reload();
             return;
           }
@@ -1172,23 +1300,34 @@
         const skippedCount = Number(state.skippedCount || 0) + decisions.skipped;
         logLeadHunt("score decision", { source: search.source, query: search.query, scanned: decisions.scanned, matches: decisions.importItems.length, skipped: decisions.skipped, duplicateCount });
         if (decisions.importItems.length) {
+          if (state.currentLock) return;
           const sentPosts = decisions.importItems.map(({ post }) => post);
+          const batchLock = `batch:${sentPosts.map(getPostKey).join("|").slice(0, 180)}`;
+          saveLeadHuntState({ ...state, currentLock: batchLock, status: `Saving ${sentPosts.length} high-intent lead(s).` });
           const data = await sendPosts(sentPosts, search.query);
+          const latest = getLeadHuntState();
+          if (!latest?.active || latest.paused) {
+            sentPosts.forEach((post) => recordProcessedUrl(post.url || getPostKey(post), "imported", { reason: "batch-import-finished-after-cancel", query: search.query, score: post.score || 0 }));
+            if (latest?.currentLock === batchLock) saveLeadHuntState({ ...latest, currentLock: "" });
+            showStatus("Import finished, but run is paused or stopped. No continuation started.");
+            return;
+          }
           decisions.importItems.forEach(({ node, score, post }) => {
             saveRecentImport(post);
             saveHandledPostKey(getPostKey(post));
             recordProcessedUrl(post.url || getPostKey(post), "imported", { reason: "auto-import", query: search.query, score });
             markNodeHandled(node, score);
           });
-          const importedCount = Number(state.importedCount || 0) + sentPosts.length;
-          const seen = Array.from(new Set([...(state.seen || []), ...sentPosts.map(getPostKey)]));
-          const continuationDelay = leadHuntDelay(state);
+          const importedCount = Number(latest.importedCount || 0) + sentPosts.length;
+          const seen = Array.from(new Set([...(latest.seen || []), ...sentPosts.map(getPostKey)]));
+          const continuationDelay = leadHuntDelay(latest);
           const nextState = {
-            ...state,
+            ...latest,
             importedCount,
             duplicateCount,
             skippedCount,
             seen,
+            currentLock: "",
             scrollAttempts: 0,
             importedLeads: [...sentPosts, ...(state.importedLeads || [])].slice(0, 30),
             status: `Imported ${sentPosts.length} high-intent lead(s). Good: ${data.counts?.good || 0}. Continuing Lead Hunt.`,
@@ -1198,11 +1337,11 @@
           };
           saveLeadHuntState(nextState);
           logLeadHunt("LEAD_HUNT_IMPORT", { count: sentPosts.length, importedCount, query: search.query });
-          if (importedCount >= Number(state.caps?.maxImportedLeads || 10)) {
+          if (importedCount >= Number(latest.caps?.maxImportedLeads || 10)) {
             stopLeadHunt(`Daily import cap reached. Imported ${importedCount} lead(s).`);
           } else {
             closeOpenFacebookModal();
-            window.setTimeout(() => ensureLeadHuntRunner("post-import continuation"), continuationDelay + 150);
+            scheduleLeadHuntAction(() => ensureLeadHuntRunner("post-import continuation"), continuationDelay + 150, "post-import continuation");
           }
           return;
         }
@@ -1218,6 +1357,7 @@
         ...state,
         errors: [`${new Date().toLocaleTimeString()} ${error && error.message ? error.message : "Unknown Lead Hunt error"}`, ...(state.errors || [])].slice(0, 8),
         failedCount,
+        currentLock: "",
         status: "Recovered from a blocked, blank, or unavailable page.",
         nextActionAt: Date.now() + leadHuntDelay(state),
       };
@@ -1241,15 +1381,18 @@
       document.body.appendChild(panel);
     }
     const search = state ? currentLeadHuntSearch(state) : null;
+    const runLabel = state?.paused ? "Paused" : state?.active ? "Running" : state ? "Stopped" : "Ready";
     panel.innerHTML = `
       <div style="font-weight:900;color:#a7f3d0;margin-bottom:6px;">MarketVibe Lead Hunt</div>
+      <div style="display:inline-block;border-radius:999px;background:${state?.paused ? "rgba(103,232,249,.18)" : state?.active ? "rgba(16,185,129,.18)" : "rgba(148,163,184,.18)"};color:white;padding:4px 8px;font-weight:900;margin-bottom:8px;">${runLabel}</div>
       <div style="line-height:1.45;color:#e5eef9;margin-bottom:8px;">${state?.status || "Ready. Automated public-source discovery. No auto-DM or auto-comment."}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;color:#cbd5e1;">
         <div>Query: ${search?.query || "not started"}</div>
         <div>Source: ${search?.source || "none"}</div>
         <div>Current URL: ${clean(state?.currentUrl || location.href).slice(0, 72)}</div>
         <div>Runtime: ${state?.startedAt ? Math.round((Date.now() - state.startedAt) / 1000) : 0}s</div>
-        <div>Result: ${state?.resultNumber || 0}</div>
+        <div>Current item: ${Number(state?.currentSearchIndex || 0) + (state ? 1 : 0)} / ${Math.min((state?.searches || []).length || 0, Number(state?.caps?.maxSearches || 10))}</div>
+        <div>Completed: ${Number(state?.importedCount || 0) + Number(state?.skippedCount || 0) + Number(state?.duplicateCount || 0) + Number(state?.failedCount || 0)}</div>
         <div>Imported: ${state?.importedCount || 0}</div>
         <div>Skipped: ${state?.skippedCount || 0}</div>
         <div>Duplicates: ${state?.duplicateCount || 0}</div>
@@ -1279,7 +1422,12 @@
     stop.textContent = "Stop";
     stop.style.cssText = "border:1px solid rgba(251,113,133,.55);border-radius:999px;background:rgba(255,255,255,.08);color:white;font-weight:800;padding:8px 10px;cursor:pointer;";
     stop.addEventListener("click", () => stopLeadHunt());
-    controls.append(start, pause, stop);
+    const skip = document.createElement("button");
+    skip.type = "button";
+    skip.textContent = "Skip current";
+    skip.style.cssText = "border:1px solid rgba(251,191,36,.55);border-radius:999px;background:rgba(255,255,255,.08);color:white;font-weight:800;padding:8px 10px;cursor:pointer;";
+    skip.addEventListener("click", () => recoverCurrentLeadHuntItem("Skip current"));
+    controls.append(start, pause, skip, stop);
     panel.appendChild(controls);
   }
 
@@ -1493,7 +1641,9 @@
 
   async function sendPosts(posts, searchPhrase = new URLSearchParams(location.search).get("q") || "") {
     const state = getLeadHuntState();
-    const response = await fetch(API_URL, {
+    if (state?.active && state.paused) throw new Error("Lead Hunt is paused");
+    if (state && !state.active) throw new Error("Lead Hunt is stopped");
+    const response = await fetchWithTimeout(API_URL, {
       method: "POST",
       headers: internalHeaders(),
       body: JSON.stringify({ posts, searchPhrase, runId: state?.runId || "" }),
@@ -1551,6 +1701,7 @@
   button.addEventListener("click", sendVisible);
   document.body.appendChild(button);
   parseLeadHuntLaunch();
+  ensureLeadHuntControlPoller();
   if (getLeadHuntState()?.active) {
     ensureLeadHuntRunner("active state detected");
   }

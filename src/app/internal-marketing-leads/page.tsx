@@ -39,23 +39,45 @@ type InternalMarketingLeadResponse = {
   skipped: InternalMarketingLead[];
 };
 
+type LeadHuntStatus = {
+  active: boolean;
+  paused: boolean;
+  recoveryNeeded?: boolean;
+  status: string;
+  imported: number;
+  skipped: number;
+  failed: number;
+  updatedAt: string;
+};
+
 export default function InternalMarketingLeadsPage() {
   const [data, setData] = useState<InternalMarketingLeadResponse | null>(null);
+  const [huntStatus, setHuntStatus] = useState<LeadHuntStatus | null>(null);
   const [showSkipped, setShowSkipped] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [replyNotice, setReplyNotice] = useState("");
 
   async function load() {
-    const response = await fetch("/api/internal-marketing-leads", { cache: "no-store" });
-    setData(await response.json());
+    const [leadsResponse, statusResponse] = await Promise.all([
+      fetch("/api/internal-marketing-leads", { cache: "no-store" }),
+      fetch("/api/internal-marketing-leads/hunt-status", { cache: "no-store" }),
+    ]);
+    setData(await leadsResponse.json());
+    if (statusResponse.ok) setHuntStatus(await statusResponse.json());
   }
 
   useEffect(() => {
     let ignore = false;
 
-    void fetch("/api/internal-marketing-leads", { cache: "no-store" })
-      .then((response) => response.json())
-      .then((nextData: InternalMarketingLeadResponse) => {
-        if (!ignore) setData(nextData);
+    void Promise.all([
+      fetch("/api/internal-marketing-leads", { cache: "no-store" }).then((response) => response.json()),
+      fetch("/api/internal-marketing-leads/hunt-status", { cache: "no-store" }).then((response) => response.ok ? response.json() : null),
+    ])
+      .then(([nextData, nextStatus]: [InternalMarketingLeadResponse, LeadHuntStatus | null]) => {
+        if (!ignore) {
+          setData(nextData);
+          if (nextStatus) setHuntStatus(nextStatus);
+        }
       });
 
     return () => {
@@ -76,6 +98,15 @@ export default function InternalMarketingLeadsPage() {
       body: JSON.stringify({ status, outreachStatus: status }),
     });
     await load();
+  }
+
+  function openReplyLink(url?: string) {
+    if (!url) {
+      setReplyNotice("No reply link available");
+      window.setTimeout(() => setReplyNotice(""), 1800);
+      return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
   }
 
   const cards = [...(data?.results || []), ...(showSkipped ? data?.skipped || [] : [])];
@@ -103,6 +134,11 @@ export default function InternalMarketingLeadsPage() {
             <a href="/lead-hunt-autopilot" className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-5 py-3 font-bold text-cyan-100">Back to Lead Hunt</a>
           </div>
           {copied && <p className="mt-4 text-sm font-semibold text-emerald-300">Copied.</p>}
+          {replyNotice && <p className="mt-4 text-sm font-semibold text-amber-200">{replyNotice}</p>}
+          <p className="mt-4 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4 text-sm font-semibold text-cyan-50">
+            Automation status: {huntStatus?.recoveryNeeded ? "Recovery needed" : huntStatus?.paused ? "Paused" : huntStatus?.active ? "Running" : huntStatus?.status?.includes("Stopped") ? "Stopped" : "Queued/imported"}.
+            Imported {huntStatus?.imported || data?.counts.imported || 0}, skipped {huntStatus?.skipped || 0}, failed {huntStatus?.failed || 0}.
+          </p>
         </div>
 
         <div className="mt-6 grid gap-4">
@@ -122,7 +158,7 @@ export default function InternalMarketingLeadsPage() {
                 <p><strong className="text-white">Pain point:</strong> {card.painPoint || card.analysis.intent.replace(/-/g, " ")}</p>
                 {card.queryUsed && <p><strong className="text-white">Query:</strong> {card.queryUsed}</p>}
                 {card.sourceUsed && <p><strong className="text-white">Source:</strong> {card.sourceUsed}</p>}
-                <p><strong className="text-white">Follow-up status:</strong> {card.status || card.outreachStatus || "new"}</p>
+                <p><strong className="text-white">Follow-up status:</strong> {card.status || card.outreachStatus || "queued/imported"}</p>
               </div>
               <p className="mt-4 text-sm leading-6 text-slate-300"><strong className="text-white">Why:</strong> {card.analysis.reason}</p>
               <p className="mt-4 rounded-2xl border border-white/10 bg-slate-950/40 p-4 leading-7 text-slate-100"><strong className="text-white">Post:</strong> {card.text || "Facebook post imported"}</p>
@@ -142,7 +178,7 @@ export default function InternalMarketingLeadsPage() {
                   <option value="not_fit">not_fit</option>
                   <option value="closed">closed</option>
                 </select>
-                <a href={card.url || "https://www.facebook.com"} target="_blank" rel="noreferrer" className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-3 text-center font-bold text-cyan-100"><ExternalLink className="mr-2 inline h-4 w-4" />Open source</a>
+                <button onClick={() => openReplyLink(card.url)} className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-3 text-center font-bold text-cyan-100"><ExternalLink className="mr-2 inline h-4 w-4" />Reply link</button>
               </div>
             </article>
           )) : (

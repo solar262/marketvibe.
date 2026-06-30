@@ -13,6 +13,8 @@ export type ImportedFacebookPost = {
   painPoint?: string;
   replyDraft?: string;
   outreachMode?: string;
+  status?: string;
+  outreachStatus?: string;
 };
 
 export type ScoredFacebookPost = ImportedFacebookPost & {

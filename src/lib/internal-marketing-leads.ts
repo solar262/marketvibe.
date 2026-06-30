@@ -29,14 +29,19 @@ export type InternalMarketingLeadStatus = {
   runId?: string;
   active: boolean;
   paused: boolean;
+  recoveryNeeded?: boolean;
   query: string;
   source: string;
   currentUrl: string;
+  currentItem: number;
+  totalQueued: number;
+  completed: number;
   imported: number;
   skipped: number;
   duplicates: number;
   failed: number;
   status: string;
+  lastError: string;
   errors: string[];
   updatedAt: string;
   extensionVersion?: string;
@@ -74,14 +79,20 @@ export let latestInternalMarketingLeadStatus: InternalMarketingLeadStatus = {
   query: "Not started",
   source: "Not started",
   currentUrl: "",
+  currentItem: 0,
+  totalQueued: 0,
+  completed: 0,
   imported: 0,
   skipped: 0,
   duplicates: 0,
   failed: 0,
   status: "Ready.",
+  lastError: "",
   errors: [],
   updatedAt: "",
 };
+
+const RUN_STALE_MS = 120000;
 
 function allowMemoryStore() {
   return process.env.NODE_ENV !== "production" || process.env.ALLOW_INTERNAL_MEMORY_STORE === "true";
@@ -151,6 +162,8 @@ function fromRow(row: Record<string, unknown>): ScoredFacebookPost {
     painPoint: row.pain_point ? String(row.pain_point) : raw.painPoint,
     replyDraft: row.reply_draft ? String(row.reply_draft) : raw.replyDraft,
     outreachMode: row.outreach_mode ? String(row.outreach_mode) : raw.outreachMode,
+    status: row.status ? String(row.status) : raw.status,
+    outreachStatus: row.outreach_status ? String(row.outreach_status) : raw.outreachStatus,
     fitRank: Number(row.fit_rank || row.score || raw.fitRank || 0),
     label: row.label === "Good" || row.label === "ManualOnly" || row.label === "Skip" || row.label === "Bad fit" ? row.label : raw.label || "ManualOnly",
     analysis: row.analysis && typeof row.analysis === "object" ? row.analysis as ScoredFacebookPost["analysis"] : raw.analysis as ScoredFacebookPost["analysis"],
@@ -251,14 +264,19 @@ export async function updateInternalMarketingLeadStatus(payload: Partial<Interna
     runId: clean(payload.runId, 80) || latestInternalMarketingLeadStatus.runId,
     active: Boolean(payload.active),
     paused: Boolean(payload.paused),
+    recoveryNeeded: Boolean(payload.recoveryNeeded),
     query: clean(payload.query || "Not started", 180),
     source: clean(payload.source || "Not started", 120),
     currentUrl: clean(payload.currentUrl, 700),
+    currentItem: asNumber(payload.currentItem),
+    totalQueued: asNumber(payload.totalQueued),
+    completed: asNumber(payload.completed),
     imported: asNumber(payload.imported),
     skipped: asNumber(payload.skipped),
     duplicates: asNumber(payload.duplicates),
     failed: asNumber(payload.failed),
     status: clean(payload.status, 300),
+    lastError: clean(payload.lastError, 180),
     errors: Array.isArray(payload.errors) ? payload.errors.map((item) => clean(item, 180)).slice(0, 8) : [],
     updatedAt: clean(payload.updatedAt || new Date().toISOString(), 80),
     extensionVersion: clean(payload.extensionVersion, 40),
@@ -300,20 +318,34 @@ export async function getInternalMarketingLeadStatus() {
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) return latestInternalMarketingLeadStatus;
+  const updatedAt = String(data.updated_at || "");
+  const updatedAtMs = updatedAt ? Date.parse(updatedAt) : 0;
+  const recoveryNeeded = Boolean(data.active) && (!updatedAtMs || Date.now() - updatedAtMs > RUN_STALE_MS);
+  const cachedSameRun = latestInternalMarketingLeadStatus.runId === String(data.id || "");
+  const errors = Array.isArray(data.errors) ? data.errors.map(String).slice(0, 8) : [];
+  const imported = Number(data.imported_count || 0);
+  const skipped = Number(data.skipped_count || 0);
+  const duplicates = Number(data.duplicate_count || 0);
+  const failed = Number(data.failed_count || 0);
   return {
     runId: String(data.id || ""),
-    active: Boolean(data.active),
-    paused: Boolean(data.paused),
+    active: recoveryNeeded ? false : Boolean(data.active),
+    paused: recoveryNeeded ? false : Boolean(data.paused),
+    recoveryNeeded,
     query: String(data.current_query || "Not started"),
     source: String(data.current_source || "Not started"),
     currentUrl: String(data.current_url || ""),
-    imported: Number(data.imported_count || 0),
-    skipped: Number(data.skipped_count || 0),
-    duplicates: Number(data.duplicate_count || 0),
-    failed: Number(data.failed_count || 0),
-    status: String(data.status || "Ready."),
-    errors: Array.isArray(data.errors) ? data.errors.map(String).slice(0, 8) : [],
-    updatedAt: String(data.updated_at || ""),
+    currentItem: cachedSameRun ? latestInternalMarketingLeadStatus.currentItem : imported + skipped + duplicates + failed,
+    totalQueued: cachedSameRun ? latestInternalMarketingLeadStatus.totalQueued : 0,
+    completed: cachedSameRun ? latestInternalMarketingLeadStatus.completed : imported + skipped + duplicates + failed,
+    imported,
+    skipped,
+    duplicates,
+    failed,
+    status: recoveryNeeded ? "Recovery needed. The previous run stopped updating before it was marked stopped." : String(data.status || "Ready."),
+    lastError: cachedSameRun ? latestInternalMarketingLeadStatus.lastError : errors[0] || "",
+    errors,
+    updatedAt,
     extensionVersion: data.extension_version ? String(data.extension_version) : "",
   };
 }

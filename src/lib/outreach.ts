@@ -17,6 +17,8 @@ type QueueInput = {
   metadata?: Record<string, unknown>;
 };
 
+const MESSAGE_SEND_TIMEOUT_MS = 15000;
+
 export function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
@@ -77,6 +79,16 @@ export function outreachConfig() {
 
 function appendComplianceFooter(bodyText: string, email: string) {
   return `${bodyText.trim()}\n\nYou are receiving this because this address appears as a public business contact. If you do not want further emails, unsubscribe here: ${unsubscribeUrl(email)}`;
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = MESSAGE_SEND_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function addSuppression(email: string, reason = "unsubscribe", source = "api") {
@@ -177,7 +189,7 @@ async function sendViaProvider({
   const from = `${config.fromName} <${config.fromEmail}>`;
 
   if (provider === "resend") {
-    const response = await fetch("https://api.resend.com/emails", {
+    const response = await fetchWithTimeout("https://api.resend.com/emails", {
       method: "POST",
       headers: { authorization: `Bearer ${process.env.RESEND_API_KEY}`, "content-type": "application/json" },
       body: JSON.stringify({ from, to, subject, text, reply_to: config.replyTo }),
@@ -188,7 +200,7 @@ async function sendViaProvider({
   }
 
   if (provider === "brevo") {
-    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+    const response = await fetchWithTimeout("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
       headers: { "api-key": process.env.BREVO_API_KEY || "", "content-type": "application/json" },
       body: JSON.stringify({
@@ -204,7 +216,7 @@ async function sendViaProvider({
     return String(data?.messageId || "");
   }
 
-  const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
+  const response = await fetchWithTimeout("https://api.sendgrid.com/v3/mail/send", {
     method: "POST",
     headers: { authorization: `Bearer ${process.env.SENDGRID_API_KEY}`, "content-type": "application/json" },
     body: JSON.stringify({

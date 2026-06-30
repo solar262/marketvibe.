@@ -258,6 +258,11 @@ assert.match(pageSource, /setPostText\(PASTE_PROMPT\)/, "Mark Good should prefil
 assert.match(pageSource, /setCurrentSearchIndex\(0\)/, "Reset should clear progress to the first search");
 assert.match(pageSource, /Previous Search/, "Previous Search button should exist");
 assert.match(pageSource, /Open Posts/, "Open Posts primary button should exist");
+assert.match(pageSource, /Group Welcome/, "Facebook Radar should include a manual group welcome mode");
+assert.match(pageSource, /Clear link/, "Facebook Radar should provide a clear/reset link button");
+assert.match(pageSource, /No reply link available/, "Facebook Radar should show a safe missing reply-link message");
+assert.match(pageSource, /Confirmation required before send\/post/, "Facebook welcome mode should require operator confirmation");
+assert.match(pageSource, /Do not auto-spam groups/, "Facebook welcome mode should warn against group spam");
 
 assert.match(leadHuntPageSource, /Run Lead Hunt/, "Lead Hunt Autopilot should have one main run button");
 assert.match(leadHuntPageSource, /Facebook Search/, "Lead Hunt Autopilot should include Facebook source toggle");
@@ -275,12 +280,21 @@ assert.match(leadHuntPageSource, /Current URL/, "Lead Hunt Autopilot should show
 assert.match(leadHuntPageSource, /Runtime/, "Lead Hunt Autopilot should show runtime");
 assert.match(leadHuntPageSource, /Duplicates/, "Lead Hunt Autopilot should show duplicate count");
 assert.match(leadHuntPageSource, /Failed/, "Lead Hunt Autopilot should show failed count");
+assert.match(leadHuntPageSource, /Current item/, "Lead Hunt Autopilot should show current item progress");
+assert.match(leadHuntPageSource, /Completed/, "Lead Hunt Autopilot should show completed count");
+assert.match(leadHuntPageSource, /Last error/, "Lead Hunt Autopilot should show last error");
+assert.match(leadHuntPageSource, /Skip Current/, "Lead Hunt Autopilot should include a Skip Current control");
+assert.match(leadHuntPageSource, /updateHuntControl/, "Lead Hunt dashboard controls should write to the status API");
+assert.match(leadHuntPageSource, /Recovery needed/, "Lead Hunt page should show recovery needed state");
 assert.match(leadHuntPageSource, /\/api\/internal-marketing-leads\/hunt-status/, "Lead Hunt page should poll internal marketing lead status counters");
 assert.match(leadHuntPageSource, /\/api\/internal-marketing-leads/, "Lead Hunt page should read internal marketing leads only");
 assert.doesNotMatch(leadHuntPageSource, /\/api\/facebook-radar\/import/, "Lead Hunt page must not read the old Facebook Radar import endpoint");
 assert.match(huntStatusSource, /INTERNAL_CORS_HEADERS/, "Lead Hunt status API should allow extension CORS updates");
 assert.match(internalMarketingLeadsSource, /skipped/, "Lead Hunt status store should keep skipped counters");
 assert.match(internalMarketingLeadsSource, /duplicates/, "Lead Hunt status store should keep duplicate counters");
+assert.match(internalMarketingLeadsSource, /RUN_STALE_MS/, "Lead Hunt status store should detect stale active runs");
+assert.match(internalMarketingLeadsSource, /currentItem/, "Lead Hunt status store should keep current item progress");
+assert.match(internalMarketingLeadsSource, /lastError/, "Lead Hunt status store should keep last error progress");
 assert.match(internalMarketingLeadsApiSource, /importInternalMarketingLeads/, "Internal marketing lead API should import Lead Hunt posts");
 assert.match(internalMarketingLeadsSource, /internal_marketing_leads/, "Internal marketing lead store should use the internal_marketing_leads table");
 assert.doesNotMatch(internalMarketingLeadsSource, /\.from\("leads"\)|\.from\("audits"\)|\.from\("search_runs"\)/, "Internal marketing lead store must not use customer lead tables");
@@ -302,6 +316,9 @@ assert.match(internalMarketingLeadsPageSource, /Internal Marketing Leads/, "Inte
 assert.match(internalMarketingLeadsPageSource, /\/api\/internal-marketing-leads/, "Internal marketing leads UI should read the internal API");
 assert.match(internalMarketingLeadsPageSource, /Export CSV/, "Internal marketing leads UI should export CSV");
 assert.match(internalMarketingLeadsPageSource, /follow_up/, "Internal marketing leads UI should support follow-up status");
+assert.match(internalMarketingLeadsPageSource, /Automation status/, "Internal marketing leads UI should show automation status");
+assert.match(internalMarketingLeadsPageSource, /Reply link/, "Internal marketing leads UI should include a reply/contact link button");
+assert.match(internalMarketingLeadsPageSource, /No reply link available/, "Internal marketing leads UI should handle missing reply links safely");
 assert.match(leadHuntPageSource, /Outreach engine mode/, "Lead Hunt Autopilot should include outreach mode architecture");
 assert.match(leadHuntPageSource, /Autopilot for allowed adapters only/, "Lead Hunt Autopilot should include allowed-adapter outreach mode");
 assert.match(leadHuntPageSource, /Create test internal lead/, "Lead Hunt page should include test lead verification control");
@@ -377,7 +394,7 @@ assert.match(extensionSource, /leadHuntIntervalId/, "Autopilot should guard agai
 assert.match(extensionSource, /leadHuntTickRunning/, "Autopilot should guard against overlapping ticks");
 assert.match(extensionSource, /ensureLeadHuntRunner\("hunt started"\)/, "Run Lead Hunt should start the runner immediately");
 assert.match(extensionSource, /ensureLeadHuntRunner\("state restored"\)/, "Restored hunts should restart the runner immediately after navigation");
-assert.match(extensionSource, /setTimeout\(\(\) => void runLeadHuntTick\(reason\), 250\)/, "Runner should fire an immediate tick instead of waiting for manual buttons");
+assert.match(extensionSource, /scheduleLeadHuntAction\(\(\) => void runLeadHuntTick\(reason\), 250, reason\)/, "Runner should fire a tracked immediate tick instead of waiting for manual buttons");
 assert.match(extensionSource, /const MAX_SCROLL_ATTEMPTS = 4/, "Autopilot should have a bounded scroll/rescan loop");
 assert.match(extensionSource, /function scrollAndRescan/, "Autopilot should scroll and rescan without manual buttons");
 assert.match(extensionSource, /function advanceAfterFacebookPage/, "Autopilot should advance to next result or query by itself");
@@ -408,6 +425,11 @@ assert.match(extensionSource, /marketvibeLeadHuntState/, "Autopilot should resto
 assert.match(extensionSource, /function pauseLeadHunt/, "Extension should include Pause Lead Hunt control");
 assert.match(extensionSource, /function resumeLeadHunt/, "Extension should include Resume Lead Hunt control");
 assert.match(extensionSource, /function stopLeadHunt/, "Extension should include Stop Lead Hunt control");
+assert.match(extensionSource, /function clearLeadHuntTimers/, "Stop should clear active Lead Hunt timers");
+assert.match(extensionSource, /function pollLeadHuntControl/, "Extension should poll dashboard control state");
+assert.match(extensionSource, /fetchWithTimeout/, "Extension should wrap external actions in safe timeouts");
+assert.match(extensionSource, /currentLock/, "Extension should keep a per-run current task lock");
+assert.match(extensionSource, /skip current requested/i, "Extension should accept dashboard Skip Current requests");
 assert.match(extensionSource, /function recoverCurrentLeadHuntItem/, "Skip current should force stuck modal recovery");
 assert.match(extensionSource, /function forceCloseModalOrBack/, "Recovery should close modal or navigate back");
 assert.match(extensionSource, /STUCK_RECOVERY/, "Extension should log stuck recovery");

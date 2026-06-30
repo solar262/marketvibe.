@@ -18,7 +18,7 @@ import {
 } from "@/lib/facebook-radar";
 
 type ReplyMode = "quick" | "deeper";
-type ToolMode = "find" | "analyze";
+type ToolMode = "find" | "analyze" | "welcome";
 type MainTab = "Search" | "Presets" | "Results" | "Sent Leads" | "Logs" | "Settings";
 
 const DEFAULT_BUYER = "web designers, SEO freelancers, local marketers, small agencies";
@@ -55,6 +55,7 @@ export default function FacebookRadarPage() {
   const [doneCount, setDoneCount] = useState(0);
   const [skippedCount, setSkippedCount] = useState(0);
   const [resetNotice, setResetNotice] = useState("");
+  const [linkNotice, setLinkNotice] = useState("");
   const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
   const [customQueries, setCustomQueries] = useState<string[]>([]);
   const [queryDraft, setQueryDraft] = useState("");
@@ -91,6 +92,19 @@ export default function FacebookRadarPage() {
     if (!result) return "";
     return replyMode === "deeper" && result.deeperReply ? result.deeperReply : result.quickReply;
   }, [replyMode, result]);
+  const welcomeTargets = useMemo(() => {
+    const text = postText.trim();
+    if (!text) return [];
+    return text
+      .split(/\n+/)
+      .map((line) => line.trim())
+      .filter((line) => /\b(new member|welcome|joined|introduced|introduction|say hello|new here)\b/i.test(line))
+      .slice(0, 8);
+  }, [postText]);
+  const welcomeMessage = useMemo(() => {
+    const groupName = sourceUrl ? "the group" : "this community";
+    return `Welcome in. I saw your intro in ${groupName} and hope the group is useful. If you are working on getting more clients or leads, happy to point you toward a few public resources.`;
+  }, [sourceUrl]);
 
   function addLog(message: string) {
     const stamped = `${new Date().toLocaleString()} - ${message}`;
@@ -135,6 +149,28 @@ export default function FacebookRadarPage() {
     setSearched((current) => current.includes(link.phrase) ? current : [...current, link.phrase]);
     addLog(`Search marked good: ${link.phrase}`);
     track("Facebook Radar Mark Search", { phrase: link.phrase });
+  }
+
+  function clearSourceUrl() {
+    setSourceUrl("");
+    setLinkNotice("");
+    setResetNotice("Link field cleared.");
+  }
+
+  function openReplyLink() {
+    if (!sourceUrl.trim()) {
+      setLinkNotice("No reply link available");
+      window.setTimeout(() => setLinkNotice(""), 1800);
+      return;
+    }
+    window.open(sourceUrl.trim(), "_blank", "noopener,noreferrer");
+  }
+
+  async function copyWelcomeMessage() {
+    await navigator.clipboard.writeText(welcomeMessage);
+    setCopied(true);
+    addLog("Facebook welcome message copied for manual review.");
+    window.setTimeout(() => setCopied(false), 1600);
   }
 
   function skipSearch(link: FacebookRadarSearchLink) {
@@ -317,10 +353,11 @@ export default function FacebookRadarPage() {
           </div>
 
           <div className="mt-8 rounded-[2rem] border border-white/15 bg-slate-950/85 p-4 shadow-2xl shadow-black/35 ring-1 ring-white/10 backdrop-blur">
-            <div className="mb-4 grid gap-2 sm:grid-cols-2">
+            <div className="mb-4 grid gap-2 sm:grid-cols-3">
               {[
                 ["find", "Find Facebook Posts"],
                 ["analyze", "Analyze Pasted Post"],
+                ["welcome", "Group Welcome"],
               ].map(([value, label]) => (
                 <button
                   key={value}
@@ -354,8 +391,12 @@ export default function FacebookRadarPage() {
               <>
                 <label className="mt-3 grid gap-2 text-sm font-semibold text-slate-200">
                   Group, page, post, or Facebook search URL
-                  <input value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} placeholder="Paste a Facebook URL, or leave blank to open Facebook search from your inputs" className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/40" />
+                  <span className="flex flex-col gap-2 sm:flex-row">
+                    <input value={sourceUrl} onChange={(event) => { setSourceUrl(event.target.value); setLinkNotice(""); }} placeholder="Paste a Facebook URL, or leave blank to open Facebook search from your inputs" className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/40" />
+                    <button type="button" onClick={clearSourceUrl} className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-bold text-white hover:bg-white/15">Clear link</button>
+                  </span>
                 </label>
+                {linkNotice && <p className="mt-2 text-sm font-semibold text-amber-200">{linkNotice}</p>}
                 <label className="mt-3 grid gap-2 text-sm font-semibold text-slate-200">
                   Manual paste area
                   <textarea value={postText} onChange={(event) => setPostText(event.target.value)} rows={7} placeholder="Paste Facebook post text here. Public or permitted posts only; do not paste private group content you are not allowed to use." className="min-h-44 rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm leading-6 text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/40" />
@@ -363,6 +404,25 @@ export default function FacebookRadarPage() {
                 <button onClick={analyze} className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-emerald-400 to-cyan-300 px-6 py-4 text-base font-bold text-slate-950 shadow-xl shadow-emerald-950/30 transition hover:brightness-105">
                   <Search className="h-5 w-5" /> Analyze Manual Post
                 </button>
+              </>
+            )}
+            {mode === "welcome" && (
+              <>
+                <label className="mt-3 grid gap-2 text-sm font-semibold text-slate-200">
+                  Group or welcome thread link
+                  <span className="flex flex-col gap-2 sm:flex-row">
+                    <input value={sourceUrl} onChange={(event) => { setSourceUrl(event.target.value); setLinkNotice(""); }} placeholder="Paste the public group, post, or profile URL" className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/40" />
+                    <button type="button" onClick={clearSourceUrl} className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-bold text-white hover:bg-white/15">Clear link</button>
+                  </span>
+                </label>
+                {linkNotice && <p className="mt-2 text-sm font-semibold text-amber-200">{linkNotice}</p>}
+                <label className="mt-3 grid gap-2 text-sm font-semibold text-slate-200">
+                  Welcome/new-member text
+                  <textarea value={postText} onChange={(event) => setPostText(event.target.value)} rows={7} placeholder="Paste permitted welcome/new-member posts or intro text. Keep private group rules and platform rules in mind." className="min-h-44 rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm leading-6 text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/40" />
+                </label>
+                <div className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm leading-6 text-amber-50">
+                  Facebook welcome outreach must follow platform rules and group rules. This mode prepares manual drafts only; confirm context before posting or sending anything.
+                </div>
               </>
             )}
           </div>
@@ -373,7 +433,7 @@ export default function FacebookRadarPage() {
         <div className="mb-5 grid gap-3 sm:grid-cols-3">
           <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 text-center">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Mode</p>
-            <p className="mt-2 text-2xl font-semibold text-white">{mode === "find" ? "Find" : "Analyze"}</p>
+            <p className="mt-2 text-2xl font-semibold text-white">{mode === "find" ? "Find" : mode === "welcome" ? "Welcome" : "Analyze"}</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 text-center">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{mode === "find" ? "Good" : "Done"}</p>
@@ -645,6 +705,35 @@ export default function FacebookRadarPage() {
               )}
             </div>
           </div>
+        ) : mode === "welcome" ? (
+          <article className="rounded-[2rem] border border-white/10 bg-white/[0.06] p-5 shadow-2xl shadow-black/20">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1 text-xs font-semibold text-cyan-100">Manual mode</span>
+              <span className="rounded-full border border-amber-300/25 bg-amber-300/10 px-3 py-1 text-xs font-semibold text-amber-100">Confirmation required before send/post</span>
+            </div>
+            <h2 className="mt-4 text-2xl font-semibold text-white">Facebook group welcome outreach</h2>
+            <p className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm leading-6 text-amber-50">
+              Use only where you are allowed to participate. Do not auto-spam groups, mass-DM members, or bypass privacy settings.
+            </p>
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+                <p className="text-sm font-bold text-cyan-100">Possible welcome targets</p>
+                <div className="mt-3 grid gap-2">
+                  {welcomeTargets.length ? welcomeTargets.map((target) => (
+                    <p key={target} className="rounded-2xl border border-white/10 bg-white/[0.06] p-3 text-sm leading-6 text-slate-100">{target}</p>
+                  )) : <p className="text-sm text-slate-400">Paste welcome/new-member text above to identify targets.</p>}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-4">
+                <p className="text-sm font-bold text-emerald-100">Prepared manual message</p>
+                <p className="mt-3 whitespace-pre-line text-sm leading-6 text-emerald-50">{welcomeMessage}</p>
+                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                  <button onClick={copyWelcomeMessage} className="rounded-full bg-white px-4 py-3 text-sm font-bold text-slate-950">Copy draft</button>
+                  <button onClick={openReplyLink} className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-3 text-sm font-bold text-cyan-100">Open reply link</button>
+                </div>
+              </div>
+            </div>
+          </article>
         ) : result ? (
           <article className="rounded-[2rem] border border-white/10 bg-white/[0.06] p-5 shadow-2xl shadow-black/20">
             <div className="flex flex-wrap items-center gap-2">
@@ -704,7 +793,7 @@ export default function FacebookRadarPage() {
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-slate-950/95 px-4 py-3 shadow-2xl shadow-black/40 backdrop-blur">
         <div className="mx-auto flex max-w-5xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="min-w-0 truncate text-sm font-semibold text-slate-200">
-            {mode === "find" ? activeSearchLink?.phrase || "Search queue complete" : "Back to Radar / Next Search"}
+            {mode === "find" ? activeSearchLink?.phrase || "Search queue complete" : mode === "welcome" ? "Manual welcome mode - confirm before any send/post" : "Back to Radar / Next Search"}
           </p>
           <div className="grid grid-cols-2 gap-2 sm:flex">
             <button onClick={() => setMode("find")} className="rounded-full border border-white/15 bg-white/10 px-4 py-3 text-sm font-bold text-white hover:bg-white/15">
