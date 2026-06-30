@@ -349,6 +349,11 @@ assert.match(extensionSource, /setTimeout\(\(\) => void runLeadHuntTick\(reason\
 assert.match(extensionSource, /const MAX_SCROLL_ATTEMPTS = 4/, "Autopilot should have a bounded scroll/rescan loop");
 assert.match(extensionSource, /function scrollAndRescan/, "Autopilot should scroll and rescan without manual buttons");
 assert.match(extensionSource, /function advanceAfterFacebookPage/, "Autopilot should advance to next result or query by itself");
+assert.match(extensionSource, /function closeOpenFacebookModal/, "Autopilot should close Facebook modal posts after successful import");
+assert.match(extensionSource, /close-modal-after-import|escape-modal-after-import/, "Autopilot should close modal or use Escape after import");
+assert.match(extensionSource, /post-import continuation/, "Autopilot should schedule a continuation tick after successful import");
+assert.match(extensionSource, /Continuing Lead Hunt/, "Successful import status should not imply the hunt has stopped");
+assert.match(extensionSource, /nextActionAt: Date\.now\(\) \+ continuationDelay/, "Successful import should wait a randomized delay before continuing");
 assert.match(extensionSource, /ensureLeadHuntRunner\("active state detected"\)/, "Autopilot should run from active localStorage state without manual Send/Next/Skip");
 assert.match(extensionSource, /LEAD_HUNT_START/, "Autopilot should log LEAD_HUNT_START");
 assert.match(extensionSource, /LEAD_HUNT_SCAN_TICK/, "Autopilot should log LEAD_HUNT_SCAN_TICK");

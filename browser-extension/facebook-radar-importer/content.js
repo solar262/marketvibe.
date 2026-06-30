@@ -866,6 +866,24 @@
     return true;
   }
 
+  function closeOpenFacebookModal() {
+    const dialog = document.querySelector('[role="dialog"], [aria-modal="true"]');
+    if (!dialog) return false;
+    const closeButton = Array.from(dialog.querySelectorAll('[aria-label], [role="button"], button'))
+      .find((item) => {
+        const label = clean(item.getAttribute("aria-label") || item.textContent || "");
+        return /^(close|dismiss|back)$/i.test(label) || /\b(close|dismiss)\b/i.test(label);
+      });
+    if (closeButton instanceof HTMLElement) {
+      closeButton.click();
+      logLeadHunt("next match", { action: "close-modal-after-import" });
+      return true;
+    }
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
+    logLeadHunt("next match", { action: "escape-modal-after-import" });
+    return true;
+  }
+
   function advanceAfterFacebookPage(state, reason) {
     const urls = state.currentResultUrls || [];
     const nextResultIndex = Number(state.currentResultIndex || 0) + 1;
@@ -943,7 +961,8 @@
           });
           const importedCount = Number(state.importedCount || 0) + sentPosts.length;
           const seen = Array.from(new Set([...(state.seen || []), ...sentPosts.map(getPostKey)]));
-          saveLeadHuntState({
+          const continuationDelay = leadHuntDelay(state);
+          const nextState = {
             ...state,
             importedCount,
             duplicateCount,
@@ -951,12 +970,16 @@
             seen,
             scrollAttempts: 0,
             importedLeads: [...sentPosts, ...(state.importedLeads || [])].slice(0, 30),
-            status: `Imported ${sentPosts.length} high-intent lead(s). Good: ${data.counts?.good || 0}.`,
-            nextActionAt: Date.now() + Math.min(900, leadHuntDelay(state)),
-          });
+            status: `Imported ${sentPosts.length} high-intent lead(s). Good: ${data.counts?.good || 0}. Continuing Lead Hunt.`,
+            nextActionAt: Date.now() + continuationDelay,
+          };
+          saveLeadHuntState(nextState);
           logLeadHunt("LEAD_HUNT_IMPORT", { count: sentPosts.length, importedCount, query: search.query });
           if (importedCount >= Number(state.caps?.maxImportedLeads || 10)) {
             stopLeadHunt(`Daily import cap reached. Imported ${importedCount} lead(s).`);
+          } else {
+            closeOpenFacebookModal();
+            window.setTimeout(() => ensureLeadHuntRunner("post-import continuation"), continuationDelay + 150);
           }
           return;
         }
