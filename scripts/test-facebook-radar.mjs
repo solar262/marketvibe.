@@ -284,10 +284,14 @@ assert.match(internalMarketingLeadsSource, /duplicates/, "Lead Hunt status store
 assert.match(internalMarketingLeadsApiSource, /importInternalMarketingLeads/, "Internal marketing lead API should import Lead Hunt posts");
 assert.match(internalMarketingLeadsSource, /internal_marketing_leads/, "Internal marketing lead store should use the internal_marketing_leads table");
 assert.doesNotMatch(internalMarketingLeadsSource, /\.from\("leads"\)|\.from\("audits"\)|\.from\("search_runs"\)/, "Internal marketing lead store must not use customer lead tables");
-assert.match(internalMarketingLeadsMigration, /create table if not exists internal_marketing_leads/, "Migration should create the internal_marketing_leads table");
-assert.match(leadHuntPipelineMigration, /create table if not exists lead_hunt_runs/, "Pipeline migration should create lead_hunt_runs");
-assert.match(leadHuntPipelineMigration, /create table if not exists lead_hunt_events/, "Pipeline migration should create lead_hunt_events");
-assert.match(leadHuntPipelineMigration, /create table if not exists lead_hunt_processed_urls/, "Pipeline migration should create processed URL table");
+assert.match(internalMarketingLeadsMigration, /create table if not exists public\.internal_marketing_leads/, "Migration should create the internal_marketing_leads table");
+assert.match(internalMarketingLeadsMigration, /public\.internal_marketing_leads/, "Internal marketing migration should schema-qualify the expected table");
+assert.match(internalMarketingLeadsMigration, /add column if not exists run_id/, "Internal marketing migration should be idempotent for Lead Hunt columns");
+assert.match(internalMarketingLeadsMigration, /internal_marketing_leads_status_check/, "Internal marketing migration should add the follow-up status constraint idempotently");
+assert.match(leadHuntPipelineMigration, /create table if not exists public\.internal_marketing_leads/, "Pipeline migration should self-heal if internal_marketing_leads is missing");
+assert.match(leadHuntPipelineMigration, /create table if not exists public\.lead_hunt_runs/, "Pipeline migration should create lead_hunt_runs");
+assert.match(leadHuntPipelineMigration, /create table if not exists public\.lead_hunt_events/, "Pipeline migration should create lead_hunt_events");
+assert.match(leadHuntPipelineMigration, /create table if not exists public\.lead_hunt_processed_urls/, "Pipeline migration should create processed URL table");
 assert.match(internalMarketingLeadsSource, /No memory-store fallback is allowed/, "Production internal lead storage should not silently fall back to memory");
 assert.match(internalAccessSource, /X-MarketVibe-Internal-Key/, "Internal APIs should support extension auth headers");
 assert.match(internalMarketingLeadsPageSource, /Internal Marketing Leads/, "Internal marketing leads UI should exist under its own route");
