@@ -85,12 +85,12 @@ export default function LeadHuntAutopilotPage() {
   }, [sources]);
 
   async function refreshImports() {
-    const response = await fetch("/api/facebook-radar/import", { cache: "no-store" });
+    const response = await fetch("/api/internal-marketing-leads", { cache: "no-store" });
     setImportData(await response.json());
   }
 
   async function refreshHuntStatus() {
-    const response = await fetch("/api/facebook-radar/hunt-status", { cache: "no-store" });
+    const response = await fetch("/api/internal-marketing-leads/hunt-status", { cache: "no-store" });
     if (!response.ok) return;
     const next = (await response.json()) as LeadHuntStatus;
     setLiveProgress({
@@ -109,7 +109,7 @@ export default function LeadHuntAutopilotPage() {
   useEffect(() => {
     let ignore = false;
 
-    void fetch("/api/facebook-radar/import", { cache: "no-store" })
+    void fetch("/api/internal-marketing-leads", { cache: "no-store" })
       .then((response) => response.json())
       .then((nextData: ImportResponse) => {
         if (!ignore) setImportData(nextData);

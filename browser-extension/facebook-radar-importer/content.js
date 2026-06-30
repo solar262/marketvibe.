@@ -1,6 +1,6 @@
 (() => {
-  const API_URL = "https://www.marketvibe1.com/api/facebook-radar/import";
-  const STATUS_API_URL = "https://www.marketvibe1.com/api/facebook-radar/hunt-status";
+  const API_URL = "https://www.marketvibe1.com/api/internal-marketing-leads";
+  const STATUS_API_URL = "https://www.marketvibe1.com/api/internal-marketing-leads/hunt-status";
   const CACHE_KEY = "marketvibe_recent_facebook_imports";
   const MAX_RECENT_IMPORTS = 20;
   const SCAN_INTERVAL_MS = 1500;

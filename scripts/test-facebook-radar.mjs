@@ -8,7 +8,11 @@ const importSource = fs.readFileSync("src/lib/facebook-radar-import.ts", "utf8")
 const pageSource = fs.readFileSync("src/app/facebook-radar/page.tsx", "utf8");
 const leadHuntPageSource = fs.readFileSync("src/app/lead-hunt-autopilot/page.tsx", "utf8");
 const importedPageSource = fs.readFileSync("src/app/facebook-radar/imported/page.tsx", "utf8");
-const huntStatusSource = fs.readFileSync("src/app/api/facebook-radar/hunt-status/route.ts", "utf8");
+const internalMarketingLeadsPageSource = fs.readFileSync("src/app/internal-marketing-leads/page.tsx", "utf8");
+const internalMarketingLeadsApiSource = fs.readFileSync("src/app/api/internal-marketing-leads/route.ts", "utf8");
+const huntStatusSource = fs.readFileSync("src/app/api/internal-marketing-leads/hunt-status/route.ts", "utf8");
+const internalMarketingLeadsSource = fs.readFileSync("src/lib/internal-marketing-leads.ts", "utf8");
+const internalMarketingLeadsMigration = fs.readFileSync("supabase/migrations/0004_internal_marketing_leads.sql", "utf8");
 const extensionSource = fs.readFileSync("browser-extension/facebook-radar-importer/content.js", "utf8");
 const extensionManifest = fs.readFileSync("browser-extension/facebook-radar-importer/manifest.json", "utf8");
 const transpiled = ts.transpileModule(source, {
@@ -269,10 +273,18 @@ assert.match(leadHuntPageSource, /Current URL/, "Lead Hunt Autopilot should show
 assert.match(leadHuntPageSource, /Runtime/, "Lead Hunt Autopilot should show runtime");
 assert.match(leadHuntPageSource, /Duplicates/, "Lead Hunt Autopilot should show duplicate count");
 assert.match(leadHuntPageSource, /Failed/, "Lead Hunt Autopilot should show failed count");
-assert.match(leadHuntPageSource, /\/api\/facebook-radar\/hunt-status/, "Lead Hunt page should poll extension status counters");
+assert.match(leadHuntPageSource, /\/api\/internal-marketing-leads\/hunt-status/, "Lead Hunt page should poll internal marketing lead status counters");
+assert.match(leadHuntPageSource, /\/api\/internal-marketing-leads/, "Lead Hunt page should read internal marketing leads only");
+assert.doesNotMatch(leadHuntPageSource, /\/api\/facebook-radar\/import/, "Lead Hunt page must not read the old Facebook Radar import endpoint");
 assert.match(huntStatusSource, /Access-Control-Allow-Origin/, "Lead Hunt status API should allow extension CORS updates");
-assert.match(huntStatusSource, /skipped/, "Lead Hunt status API should store skipped counters");
-assert.match(huntStatusSource, /duplicates/, "Lead Hunt status API should store duplicate counters");
+assert.match(internalMarketingLeadsSource, /skipped/, "Lead Hunt status store should keep skipped counters");
+assert.match(internalMarketingLeadsSource, /duplicates/, "Lead Hunt status store should keep duplicate counters");
+assert.match(internalMarketingLeadsApiSource, /importInternalMarketingLeads/, "Internal marketing lead API should import Lead Hunt posts");
+assert.match(internalMarketingLeadsSource, /internal_marketing_leads/, "Internal marketing lead store should use the internal_marketing_leads table");
+assert.doesNotMatch(internalMarketingLeadsSource, /\.from\("leads"\)|\.from\("audits"\)|\.from\("search_runs"\)/, "Internal marketing lead store must not use customer lead tables");
+assert.match(internalMarketingLeadsMigration, /create table if not exists internal_marketing_leads/, "Migration should create the internal_marketing_leads table");
+assert.match(internalMarketingLeadsPageSource, /Internal Marketing Leads/, "Internal marketing leads UI should exist under its own route");
+assert.match(internalMarketingLeadsPageSource, /\/api\/internal-marketing-leads/, "Internal marketing leads UI should read the internal API");
 assert.match(leadHuntPageSource, /Outreach engine mode/, "Lead Hunt Autopilot should include outreach mode architecture");
 assert.match(leadHuntPageSource, /Autopilot for allowed adapters only/, "Lead Hunt Autopilot should include allowed-adapter outreach mode");
 
@@ -368,6 +380,8 @@ assert.match(extensionSource, /function scanVisibleLeadHuntCards/, "Autopilot sh
 assert.match(extensionSource, /decisions\.skipped \+= 1/, "Autopilot should increment skipped decisions for rejected cards");
 assert.match(extensionSource, /\[role="dialog"\]/, "Autopilot should scan Facebook modal post text");
 assert.match(extensionSource, /STATUS_API_URL/, "Autopilot should sync live counters back to MarketVibe");
+assert.match(extensionSource, /api\/internal-marketing-leads/, "Lead Hunt extension should send imports to the internal marketing lead API");
+assert.doesNotMatch(extensionSource, /api\/facebook-radar\/import/, "Lead Hunt extension must not send imports to old Facebook Radar import API");
 assert.match(extensionSource, /syncLeadHuntStatus/, "Autopilot should update MarketVibe hunt status counters");
 assert.match(extensionSource, /function withLeadHuntStateHash/, "Autopilot should preserve queue state while moving across Facebook, Google, and Bing");
 assert.match(extensionSource, /marketvibeLeadHuntState/, "Autopilot should restore cross-domain queue state from URL hash");
