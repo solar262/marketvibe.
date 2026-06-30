@@ -6,8 +6,8 @@ export const ADMIN_COOKIE = "marketvibe_admin";
 
 export function adminCredentials() {
   return {
-    email: process.env.ADMIN_EMAIL || "",
-    password: process.env.ADMIN_PASSWORD || "",
+    email: (process.env.ADMIN_EMAIL || "").trim().toLowerCase(),
+    password: (process.env.ADMIN_PASSWORD || "").trim(),
   };
 }
 
@@ -17,7 +17,7 @@ export function isAdminLoginConfigured() {
 }
 
 function adminSessionSecret() {
-  return process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_PASSWORD || "";
+  return (process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_PASSWORD || "").trim();
 }
 
 export function adminSessionValue() {
@@ -26,7 +26,7 @@ export function adminSessionValue() {
   if (!credentials.email || !secret) return "";
 
   return createHmac("sha256", secret)
-    .update(`marketvibe-admin:${credentials.email.toLowerCase()}`)
+    .update(`marketvibe-admin:${credentials.email}`)
     .digest("hex");
 }
 
