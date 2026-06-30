@@ -38,6 +38,7 @@ export type InternalMarketingLeadStatus = {
   completed: number;
   imported: number;
   skipped: number;
+  ignoredLowConfidence?: number;
   duplicates: number;
   failed: number;
   status: string;
@@ -88,6 +89,7 @@ export let latestInternalMarketingLeadStatus: InternalMarketingLeadStatus = {
   completed: 0,
   imported: 0,
   skipped: 0,
+  ignoredLowConfidence: 0,
   duplicates: 0,
   failed: 0,
   status: "Ready.",
@@ -277,6 +279,7 @@ export async function updateInternalMarketingLeadStatus(payload: Partial<Interna
     completed: asNumber(payload.completed),
     imported: asNumber(payload.imported),
     skipped: asNumber(payload.skipped),
+    ignoredLowConfidence: asNumber(payload.ignoredLowConfidence),
     duplicates: asNumber(payload.duplicates),
     failed: asNumber(payload.failed),
     status: clean(payload.status, 300),
@@ -331,6 +334,7 @@ export async function getInternalMarketingLeadStatus() {
   const skipped = Number(data.skipped_count || 0);
   const duplicates = Number(data.duplicate_count || 0);
   const failed = Number(data.failed_count || 0);
+  const cachedIgnoredLowConfidence = latestInternalMarketingLeadStatus.runId === String(data.id || "") ? Number(latestInternalMarketingLeadStatus.ignoredLowConfidence || 0) : 0;
   return {
     runId: String(data.id || ""),
     active: recoveryNeeded ? false : Boolean(data.active),
@@ -339,11 +343,12 @@ export async function getInternalMarketingLeadStatus() {
     query: String(data.current_query || "Not started"),
     source: String(data.current_source || "Not started"),
     currentUrl: String(data.current_url || ""),
-    currentItem: cachedSameRun ? latestInternalMarketingLeadStatus.currentItem : imported + skipped + duplicates + failed,
+    currentItem: cachedSameRun ? latestInternalMarketingLeadStatus.currentItem : imported + skipped + cachedIgnoredLowConfidence + duplicates + failed,
     totalQueued: cachedSameRun ? latestInternalMarketingLeadStatus.totalQueued : 0,
-    completed: cachedSameRun ? latestInternalMarketingLeadStatus.completed : imported + skipped + duplicates + failed,
+    completed: cachedSameRun ? latestInternalMarketingLeadStatus.completed : imported + skipped + cachedIgnoredLowConfidence + duplicates + failed,
     imported,
     skipped,
+    ignoredLowConfidence: cachedIgnoredLowConfidence,
     duplicates,
     failed,
     status: recoveryNeeded ? "Recovery needed. The previous run stopped updating before it was marked stopped." : String(data.status || "Ready."),

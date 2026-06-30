@@ -12,7 +12,7 @@
   const MAX_HANDLED_POSTS = 500;
   const LEAD_HUNT_KEY = "marketvibe_lead_hunt_autopilot";
   const MAX_SCROLL_ATTEMPTS = 4;
-  const HIGH_INTENT_IMPORT_THRESHOLD = 55;
+  const HIGH_INTENT_IMPORT_THRESHOLD = 78;
   const STUCK_RECOVERY_MS = 60000;
   const LOADING_RECOVERY_MS = 30000;
   const ACTION_TIMEOUT_MS = 15000;
@@ -120,6 +120,12 @@
         ...payload,
       }),
     }).catch((error) => logLeadHunt("processed-url sync failed", { status, message: error?.message || "unknown" }));
+  }
+
+  function confidenceThreshold(state = getLeadHuntState()) {
+    const configured = Number(state?.caps?.confidenceThreshold || HIGH_INTENT_IMPORT_THRESHOLD);
+    if (!Number.isFinite(configured)) return HIGH_INTENT_IMPORT_THRESHOLD;
+    return Math.max(50, Math.min(95, configured));
   }
 
   function clean(value) {
@@ -239,6 +245,14 @@
     /how do i get booking system clients/i,
   ];
 
+  const SERVICE_CONTEXT_PATTERN = /\b(web designers?|website designers?|web design(?:ers?| agencies| services?)?|website services?|seo freelancers?|seo agencies?|seo consultants?|seo services?|local marketers?|local marketing agencies?|marketing agencies?|agencies|agency owners?|freelancers?|freelance services?|booking system sellers?|booking systems?|automation consultants?|social media managers?|social media marketing agencies?|smma|service providers?|lead gen agencies?|lead generation agencies?|web design agency|website agency|appointment setting|appointment-setting)\b/i;
+  const SPECIFIC_INTENT_PATTERN = /\b(web design clients?|website clients?|seo clients?|marketing clients?|agency leads?|agency clients?|local marketing clients?|local business prospecting|local business leads?|finding clients?|find clients?|client acquisition|smma clients?|lead generation|appointment setting leads?|appointment-setting leads?|selling websites?|sell websites?|selling seo|sell seo|selling services to local businesses|prospecting|prospects?|outreach)\b/i;
+  const EXACT_BUYER_INTENT_PATTERN = /\b(web design clients?|seo clients?|agency leads?|local business leads?|local business prospecting|selling websites?|sell websites?|selling seo|sell seo|marketing clients?|smma clients?|client acquisition|appointment setting leads?|appointment-setting leads?|lead generation)\b/i;
+  const WEAK_GENERIC_CLIENT_PATTERN = /\b(need clients|get clients|more clients|new clients|general clients|closing clients|close clients|sales calls?|business growth)\b/i;
+  const OFF_TOPIC_PATTERN = /\b(real estate|realtor|realtors|realty|mortgage|escrow|closing costs?|property closing|insurance|life insurance|policy|policies|mlm|multi level|network marketing|dating|tinder|relationship advice|single moms?|sports?|football|nba|nfl|soccer|fan page|motivation|motivational|mindset|inspirational|side hustles?|passive income|dropshipping|affiliate|marketplace|for sale|selling my|garage sale|job seeker|resume|cv|looking for work|open to work)\b/i;
+  const QUESTION_OR_DISCUSSION_PATTERN = /\b(how do i|how can i|where do i|where can i|any advice|what should i|struggling|not working|no one replies|comments?|thoughts|recommendations?)\b|\?/i;
+  const IMAGE_OR_MEME_PATTERN = /\b(meme|funny|photo dump|caption this|image only|reel|watch this|viral)\b/i;
+
   const SUPPORTING_BUYER_SIGNALS = [
     /any advice/i,
     /would love advice/i,
@@ -262,7 +276,6 @@
     /\$ ?50 per website/i,
     /commission only/i,
     /commission based/i,
-    /setter/i,
     /closer/i,
     /proposal writer/i,
     /we are expanding/i,
@@ -304,11 +317,37 @@
     /7 days free/i,
   ];
 
-  function scorePost(text) {
+  function countPatternMatches(text, patterns) {
+    return patterns.reduce((count, pattern) => count + (pattern.test(text) ? 1 : 0), 0);
+  }
+
+  function detectMatchReason(text, score, meta = {}) {
+    const reasons = [];
+    if (SERVICE_CONTEXT_PATTERN.test(text)) reasons.push("service-seller context");
+    if (EXACT_BUYER_INTENT_PATTERN.test(text)) reasons.push("specific client-acquisition phrase");
+    else if (SPECIFIC_INTENT_PATTERN.test(text)) reasons.push("prospecting/client-acquisition context");
+    if (QUESTION_OR_DISCUSSION_PATTERN.test(text)) reasons.push("discussion/question signal");
+    if (Number(meta.commentCount || 0) >= 2) reasons.push(`${meta.commentCount} comments`);
+    if (OFF_TOPIC_PATTERN.test(text)) reasons.push("off-topic category penalty");
+    if (WEAK_GENERIC_CLIENT_PATTERN.test(text) && !EXACT_BUYER_INTENT_PATTERN.test(text)) reasons.push("generic client language only");
+    return reasons.length ? `${score}/100 confidence: ${reasons.join(", ")}` : `${score}/100 confidence: no strong buyer-radar reason`;
+  }
+
+  function extractCommentCount(node) {
+    const text = clean(node?.innerText || node?.textContent || "");
+    const matches = Array.from(text.matchAll(/\b(\d{1,4})\s+comments?\b/gi));
+    const values = matches.map((match) => Number(match[1])).filter(Number.isFinite);
+    return values.length ? Math.max(...values) : 0;
+  }
+
+  function scorePost(text, meta = {}) {
     let score = 0;
     let strongMatches = 0;
-    const serviceSeller = /\b(web designers?|website designers?|web design services?|website services?|seo freelancers?|seo agencies?|seo consultants?|seo services?|local marketers?|local marketing agencies?|marketing agencies?|agency owners?|freelancers?|booking system sellers?|booking systems?|automation consultants?|social media managers?|service providers?|lead gen agencies?|lead generation agencies?|web design agency|website agency)\b/i.test(text);
+    const serviceSeller = SERVICE_CONTEXT_PATTERN.test(text);
+    const specificIntent = SPECIFIC_INTENT_PATTERN.test(text);
+    const exactBuyerIntent = EXACT_BUYER_INTENT_PATTERN.test(text);
     const genericLocalBusiness = /\b(my business|our business|business owner|small business owner|restaurant|cafe|clinic|salon|contractor|roofer|plumber|law firm|gym|dentist|shopify store|ecommerce store|online store|my website gets no traffic|my business has no leads|store not converting)\b/i.test(text);
+    const offTopicMatches = countPatternMatches(text, [OFF_TOPIC_PATTERN]);
 
     for (const pattern of HARD_SKIP_SIGNALS) {
       if (pattern.test(text)) return -999;
@@ -331,13 +370,23 @@
 
     if (/\?/.test(text)) score += 8;
     if (/\b(i|my|we|our)\b/i.test(text) && /\b(struggling|stuck|need|looking|can't|cannot|no|help|advice)\b/i.test(text)) score += 15;
+    if (specificIntent) score += 30;
+    if (exactBuyerIntent) score += 24;
     if (serviceSeller && /\b(leads|clients|prospects|outreach|prospecting|cold calling|client acquisition)\b/i.test(text)) score += 24;
+    if (QUESTION_OR_DISCUSSION_PATTERN.test(text)) score += 10;
+    if (Number(meta.commentCount || 0) >= 2) score += Math.min(12, Number(meta.commentCount || 0) * 2);
+    if (IMAGE_OR_MEME_PATTERN.test(text) || (!QUESTION_OR_DISCUSSION_PATTERN.test(text) && text.length < 160)) score -= 20;
+    if (WEAK_GENERIC_CLIENT_PATTERN.test(text) && !exactBuyerIntent && !serviceSeller) score -= 45;
+    if (WEAK_GENERIC_CLIENT_PATTERN.test(text) && !exactBuyerIntent) score -= 20;
+    score -= offTopicMatches * 70;
     if (genericLocalBusiness && !serviceSeller) score -= 80;
-    if (!serviceSeller && !/\b(sell websites?|sell seo|local business leads|find prospects|prospecting|client acquisition|agency clients)\b/i.test(text)) score -= 35;
+    if (!serviceSeller) score -= 35;
+    if (!specificIntent) score -= 45;
+    if (!serviceSeller && !specificIntent) score -= 60;
     if (!strongMatches) score -= 28;
     if (text.length < 80) score -= 20;
 
-    return score;
+    return Math.max(-999, Math.min(100, score));
   }
 
   function scoreFacebookUrl(url) {
@@ -400,14 +449,18 @@
     const text = getPostText(node);
     const painPoint = meta.painPoint || detectPainPoint(text);
     const draft = createContextualReply({ text, painPoint, score });
+    const commentCount = Number(meta.commentCount ?? extractCommentCount(node) ?? 0);
+    const matchReason = meta.matchReason || detectMatchReason(text, score, { commentCount });
     return {
       text,
       score,
+      confidenceScore: score,
+      matchReason,
       sourceName: extractGroupName(),
       author: extractAuthorName(node),
       dateText: extractTimestamp(node),
       reactions: "",
-      comments: "",
+      comments: commentCount || "",
       url: extractPostUrl(node),
       queryUsed: meta.queryUsed || "",
       sourceUsed: meta.sourceUsed || "",
@@ -565,7 +618,7 @@
     const qualified = [];
     for (const node of nodes) {
       const text = getPostText(node);
-      const score = scorePost(text);
+      const score = scorePost(text, { commentCount: extractCommentCount(node) });
       if (score < 25) continue;
       const key = getNodeKey(node, score);
       if (!includeHandled && isHandledPostKey(key)) continue;
@@ -735,6 +788,7 @@
         maxSearches: 10,
         maxImportedLeads: 10,
         delayMs: 3500,
+        confidenceThreshold: HIGH_INTENT_IMPORT_THRESHOLD,
       },
       outreach: {
         mode: OUTREACH_MODES[1],
@@ -804,9 +858,10 @@
         currentUrl: location.href,
         currentItem: Number(nextState.currentSearchIndex || 0) + 1,
         totalQueued: Math.min((nextState.searches || []).length, Number(nextState.caps?.maxSearches || 10)),
-        completed: Number(nextState.importedCount || 0) + Number(nextState.skippedCount || 0) + Number(nextState.duplicateCount || 0) + Number(nextState.failedCount || 0),
+        completed: Number(nextState.importedCount || 0) + Number(nextState.skippedCount || 0) + Number(nextState.ignoredLowConfidenceCount || 0) + Number(nextState.duplicateCount || 0) + Number(nextState.failedCount || 0),
         imported: Number(nextState.importedCount || 0),
         skipped: Number(nextState.skippedCount || 0),
+        ignoredLowConfidence: Number(nextState.ignoredLowConfidenceCount || 0),
         duplicates: Number(nextState.duplicateCount || 0),
         failed: Number(nextState.failedCount || 0),
         status: nextState.status || "",
@@ -931,6 +986,7 @@
       currentResultUrls: [],
       importedCount: 0,
       skippedCount: 0,
+      ignoredLowConfidenceCount: 0,
       duplicateCount: 0,
       failedCount: 0,
       resultNumber: 0,
@@ -1060,6 +1116,7 @@
     const decisions = {
       importItems: [],
       skipped: 0,
+      ignoredLowConfidence: 0,
       duplicates: 0,
       scanned: 0,
     };
@@ -1068,8 +1125,10 @@
     for (const node of getVisibleCandidateNodes()) {
       if (node.getAttribute("data-marketvibe-auto-importing") === "true") continue;
       const text = getPostText(node);
-      const score = scorePost(text);
-      const post = buildPostFromNode(node, score, { queryUsed: search?.query || "", sourceUsed: search?.source || "", outreachMode: state.outreach?.mode || "draft-only" });
+      const commentCount = extractCommentCount(node);
+      const score = scorePost(text, { commentCount });
+      const matchReason = detectMatchReason(text, score, { commentCount });
+      const post = buildPostFromNode(node, score, { queryUsed: search?.query || "", sourceUsed: search?.source || "", outreachMode: state.outreach?.mode || "draft-only", commentCount, matchReason });
       const key = getPostKey(post);
       if (!key || seenThisTick.has(key)) continue;
       seenThisTick.add(key);
@@ -1082,16 +1141,18 @@
         continue;
       }
 
-      if (score >= HIGH_INTENT_IMPORT_THRESHOLD) {
+      if (score >= confidenceThreshold(state)) {
         decisions.importItems.push({ node, score, post, key });
-        logLeadHunt("score decision", { decision: "import", score, text: text.slice(0, 80) });
+        logLeadHunt("score decision", { decision: "import", score, threshold: confidenceThreshold(state), reason: matchReason, text: text.slice(0, 80) });
         continue;
       }
 
       decisions.skipped += 1;
+      decisions.ignoredLowConfidence += 1;
       saveHandledPostKey(key);
-      recordProcessedUrl(post.url || key, "skipped", { reason: "low-intent", query: search?.query || "", score });
-      logLeadHunt("LEAD_HUNT_SKIP", { reason: "low-intent", score, text: text.slice(0, 80) });
+      recordProcessedUrl(post.url || key, "skipped", { reason: `ignored low-confidence below ${confidenceThreshold(state)}: ${matchReason}`, query: search?.query || "", score });
+      postLeadHuntEvent("LEAD_HUNT_SKIP", { message: `Ignored low-confidence (${score}/${confidenceThreshold(state)})`, reason: matchReason, sourceUrl: post.url || key, query: search?.query || "", score });
+      logLeadHunt("LEAD_HUNT_SKIP", { reason: "ignored-low-confidence", score, threshold: confidenceThreshold(state), matchReason, text: text.slice(0, 80) });
     }
 
     return decisions;
@@ -1133,14 +1194,16 @@
 
   async function autoImportLeadHuntNode(node, score, reason = "highlighted-modal") {
     const state = getLeadHuntState();
-    if (!state?.active || state.paused || score < HIGH_INTENT_IMPORT_THRESHOLD) return false;
+    if (!state?.active || state.paused || score < confidenceThreshold(state)) return false;
     if (await pollLeadHuntControl("before auto import")) return false;
     const search = currentLeadHuntSearch(state);
-    const post = buildPostFromNode(node, score, { queryUsed: search?.query || "", sourceUsed: search?.source || "", outreachMode: state.outreach?.mode || "draft-only" });
+    const commentCount = extractCommentCount(node);
+    const matchReason = detectMatchReason(getPostText(node), score, { commentCount });
+    const post = buildPostFromNode(node, score, { queryUsed: search?.query || "", sourceUsed: search?.source || "", outreachMode: state.outreach?.mode || "draft-only", commentCount, matchReason });
     const key = getPostKey(post);
     if (!key || isHandledPostKey(key) || (state.seen || []).includes(key) || node.getAttribute("data-marketvibe-auto-importing") === "true") return false;
     if (state.currentLock && state.currentLock !== key) return false;
-    saveLeadHuntState({ ...state, currentLock: key, status: "Saving high-intent lead." });
+    saveLeadHuntState({ ...state, currentLock: key, status: `Saving high-confidence buyer item. ${matchReason}` });
 
     node.setAttribute("data-marketvibe-auto-importing", "true");
     try {
@@ -1171,7 +1234,8 @@
         lastActiveSignature: "",
         nextActionAt: Date.now() + continuationDelay,
       });
-      logLeadHunt("LEAD_HUNT_IMPORT", { count: 1, importedCount, query: search?.query || "", reason });
+      postLeadHuntEvent("LEAD_HUNT_IMPORT", { message: `Imported buyer item (${score}/${confidenceThreshold(latest)})`, reason: matchReason, sourceUrl: post.url || key, query: search?.query || "", score });
+      logLeadHunt("LEAD_HUNT_IMPORT", { count: 1, importedCount, query: search?.query || "", reason, matchReason });
       if (importedCount >= Number(latest.caps?.maxImportedLeads || 10)) {
         stopLeadHunt(`Daily import cap reached. Imported ${importedCount} buyer-intent item(s).`);
       } else {
@@ -1209,6 +1273,7 @@
         resultNumber: nextResultIndex + 1,
         scrollAttempts: 0,
         skippedCount: (state.skippedCount || 0) + 1,
+        ignoredLowConfidenceCount: Number(state.ignoredLowConfidenceCount || 0),
         visitedUrls: Array.from(new Set([...(state.visitedUrls || []), location.href])).slice(-50),
         lastProgressAt: Date.now(),
       }, `${reason} Opening result ${nextResultIndex + 1}.`);
@@ -1218,6 +1283,7 @@
       ...state,
       scrollAttempts: 0,
       skippedCount: (state.skippedCount || 0) + 1,
+      ignoredLowConfidenceCount: Number(state.ignoredLowConfidenceCount || 0),
       visitedUrls: Array.from(new Set([...(state.visitedUrls || []), location.href])).slice(-50),
       lastProgressAt: Date.now(),
     }, reason);
@@ -1280,14 +1346,15 @@
       }
 
       if (/google\.com|bing\.com/i.test(location.hostname)) {
-        const resultUrls = collectIndexedFacebookResultUrls();
+        const visited = new Set([...(state.visitedUrls || []), ...(state.currentResultUrls || []).slice(0, Number(state.currentResultIndex || 0) + 1)].map((url) => normalizeFacebookUrl(url)));
+        const resultUrls = collectIndexedFacebookResultUrls().filter((url) => !visited.has(normalizeFacebookUrl(url)));
         logLeadHunt("score decision", { source: search.source, resultUrls: resultUrls.length });
         if (!resultUrls.length) {
           if (scrollAndRescan(state, "No indexed Facebook results found yet.")) return;
           nextLeadHuntSearch({ ...state, skippedCount: (state.skippedCount || 0) + 1 }, "No indexed Facebook results found.");
           return;
         }
-        const nextState = { ...state, currentResultUrls: resultUrls, currentResultIndex: 0, resultNumber: 1, scrollAttempts: 0 };
+        const nextState = { ...state, currentResultUrls: resultUrls, currentResultIndex: 0, resultNumber: 1, scrollAttempts: 0, visitedUrls: Array.from(new Set([...(state.visitedUrls || []), location.href])).slice(-75) };
         navigateWithDelay(resultUrls[0], nextState, `Opening indexed Facebook result 1 of ${resultUrls.length}.`);
         return;
       }
@@ -1297,7 +1364,8 @@
         const decisions = scanVisibleLeadHuntCards(state, search);
         const duplicateCount = Number(state.duplicateCount || 0) + decisions.duplicates;
         const skippedCount = Number(state.skippedCount || 0) + decisions.skipped;
-        logLeadHunt("score decision", { source: search.source, query: search.query, scanned: decisions.scanned, matches: decisions.importItems.length, skipped: decisions.skipped, duplicateCount });
+        const ignoredLowConfidenceCount = Number(state.ignoredLowConfidenceCount || 0) + decisions.ignoredLowConfidence;
+        logLeadHunt("score decision", { source: search.source, query: search.query, scanned: decisions.scanned, matches: decisions.importItems.length, skipped: decisions.skipped, ignoredLowConfidence: decisions.ignoredLowConfidence, duplicateCount, threshold: confidenceThreshold(state) });
         if (decisions.importItems.length) {
           if (state.currentLock) return;
           const sentPosts = decisions.importItems.map(({ post }) => post);
@@ -1325,6 +1393,7 @@
             importedCount,
             duplicateCount,
             skippedCount,
+            ignoredLowConfidenceCount,
             seen,
             currentLock: "",
             scrollAttempts: 0,
@@ -1345,7 +1414,7 @@
           return;
         }
 
-        const stateWithDuplicates = { ...state, duplicateCount, skippedCount };
+        const stateWithDuplicates = { ...state, duplicateCount, skippedCount, ignoredLowConfidenceCount };
         if (scrollAndRescan(stateWithDuplicates, "No high-intent match on loaded posts yet.")) return;
         logLeadHunt("next match", { reason: "no match after scroll attempts" });
         advanceAfterFacebookPage(stateWithDuplicates, "No high-intent match after scanning visible page.");
@@ -1391,9 +1460,11 @@
         <div>Current URL: ${clean(state?.currentUrl || location.href).slice(0, 72)}</div>
         <div>Runtime: ${state?.startedAt ? Math.round((Date.now() - state.startedAt) / 1000) : 0}s</div>
         <div>Current item: ${Number(state?.currentSearchIndex || 0) + (state ? 1 : 0)} / ${Math.min((state?.searches || []).length || 0, Number(state?.caps?.maxSearches || 10))}</div>
-        <div>Completed: ${Number(state?.importedCount || 0) + Number(state?.skippedCount || 0) + Number(state?.duplicateCount || 0) + Number(state?.failedCount || 0)}</div>
+        <div>Completed: ${Number(state?.importedCount || 0) + Number(state?.skippedCount || 0) + Number(state?.ignoredLowConfidenceCount || 0) + Number(state?.duplicateCount || 0) + Number(state?.failedCount || 0)}</div>
         <div>Buyer items: ${state?.importedCount || 0}</div>
         <div>Skipped: ${state?.skippedCount || 0}</div>
+        <div>Ignored low-confidence: ${state?.ignoredLowConfidenceCount || 0}</div>
+        <div>Min confidence: ${confidenceThreshold(state)}</div>
         <div>Duplicates: ${state?.duplicateCount || 0}</div>
         <div>Failed: ${state?.failedCount || 0}</div>
       </div>
@@ -1561,7 +1632,7 @@
       const nodes = getVisibleCandidateNodes();
       for (const node of nodes) {
         const text = getPostText(node);
-        const score = scorePost(text);
+        const score = scorePost(text, { commentCount: extractCommentCount(node) });
         node.style.opacity = "";
         node.style.filter = "";
 
@@ -1581,7 +1652,7 @@
             node.prepend(badge);
           }
           injectSingleImportButton(node, score);
-          if (score >= HIGH_INTENT_IMPORT_THRESHOLD && getLeadHuntState()?.active) {
+          if (score >= confidenceThreshold() && getLeadHuntState()?.active) {
             void autoImportLeadHuntNode(node, score, "buyer-intent-badge");
           }
         } else {
@@ -1614,7 +1685,7 @@
       const box = node.getBoundingClientRect();
       if (box.bottom < 0 || box.top > window.innerHeight * 2) continue;
       const text = getPostText(node);
-      const score = scorePost(text);
+      const score = scorePost(text, { commentCount: extractCommentCount(node) });
       if (score < 25) continue;
       const post = buildPostFromNode(node, score);
       const key = getPostKey(post);

@@ -13,6 +13,8 @@ export type ImportedFacebookPost = {
   painPoint?: string;
   replyDraft?: string;
   outreachMode?: string;
+  confidenceScore?: number;
+  matchReason?: string;
   status?: string;
   outreachStatus?: string;
 };
@@ -153,6 +155,8 @@ export function scoreImportedFacebookPosts(input: {
         painPoint: clean(post.painPoint || analysis.intent.replace(/-/g, " "), 120),
         replyDraft: clean(post.replyDraft, 600),
         outreachMode: clean(post.outreachMode, 80),
+        confidenceScore: Number(post.confidenceScore || fitRank || 0),
+        matchReason: clean(post.matchReason || analysis.reason, 300),
         analysis,
         fitRank,
         label: classify(analysis, fitRank),

@@ -18,6 +18,8 @@ type ImportedLead = {
   painPoint?: string;
   replyDraft?: string;
   outreachMode?: string;
+  confidenceScore?: number;
+  matchReason?: string;
   fitRank: number;
   analysis: { score: string; intent: string; reason: string };
 };
@@ -41,6 +43,7 @@ type LeadHuntStatus = {
   completed: number;
   imported: number;
   skipped: number;
+  ignoredLowConfidence?: number;
   duplicates: number;
   failed: number;
   status: string;
@@ -79,6 +82,7 @@ export default function LeadHuntAutopilotPage() {
   const [maxSearches, setMaxSearches] = useState(10);
   const [maxImportedLeads, setMaxImportedLeads] = useState(10);
   const [delayMs, setDelayMs] = useState(3500);
+  const [confidenceThreshold, setConfidenceThreshold] = useState(78);
   const [outreachMode, setOutreachMode] = useState<OutreachMode>("draft-only");
   const [status, setStatus] = useState("Ready. Click Run Buyer Radar to launch the browser extension workflow.");
   const [internalKey, setInternalKey] = useState("");
@@ -98,6 +102,7 @@ export default function LeadHuntAutopilotPage() {
     completed: 0,
     imported: 0,
     skipped: 0,
+    ignoredLowConfidence: 0,
     duplicates: 0,
     failed: 0,
     lastError: "",
@@ -143,6 +148,7 @@ export default function LeadHuntAutopilotPage() {
       completed: next.completed || 0,
       imported: next.imported || 0,
       skipped: next.skipped || 0,
+      ignoredLowConfidence: next.ignoredLowConfidence || 0,
       duplicates: next.duplicates || 0,
       failed: next.failed || 0,
       lastError: next.lastError || next.errors?.[0] || "",
@@ -167,6 +173,7 @@ export default function LeadHuntAutopilotPage() {
         completed: liveProgress.completed,
         imported: liveProgress.imported,
         skipped: liveProgress.skipped,
+        ignoredLowConfidence: liveProgress.ignoredLowConfidence,
         duplicates: liveProgress.duplicates,
         failed: liveProgress.failed,
         errors: liveProgress.errors,
@@ -217,6 +224,7 @@ export default function LeadHuntAutopilotPage() {
       completed: 0,
       imported: 0,
       skipped: 0,
+      ignoredLowConfidence: 0,
       duplicates: 0,
       failed: 0,
       lastError: "",
@@ -229,7 +237,7 @@ export default function LeadHuntAutopilotPage() {
       runId,
       queries: LEAD_HUNT_QUERIES,
       sources,
-      caps: { maxSearches, maxImportedLeads, delayMs },
+      caps: { maxSearches, maxImportedLeads, delayMs, confidenceThreshold },
       outreach: { mode: outreachMode, adapters: [] as string[] },
       internalKey: internalKey.trim(),
     };
@@ -284,6 +292,7 @@ export default function LeadHuntAutopilotPage() {
       completed: 0,
       imported: 0,
       skipped: 0,
+      ignoredLowConfidence: 0,
       duplicates: 0,
       failed: 0,
       lastError: "",
@@ -386,12 +395,13 @@ export default function LeadHuntAutopilotPage() {
           </div>
           <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4"><p className="text-xs uppercase tracking-[0.16em] text-cyan-200">Current item</p><p className="mt-2 text-2xl font-black text-cyan-100">{liveProgress.currentItem || 0}/{liveProgress.totalQueued || Math.max(liveProgress.currentItem, liveProgress.completed, 0)}</p></div>
-            <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4"><p className="text-xs uppercase tracking-[0.16em] text-slate-400">Completed</p><p className="mt-2 text-2xl font-black text-white">{liveProgress.completed || liveProgress.imported + liveProgress.skipped + liveProgress.duplicates + liveProgress.failed}</p></div>
+            <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4"><p className="text-xs uppercase tracking-[0.16em] text-slate-400">Completed</p><p className="mt-2 text-2xl font-black text-white">{liveProgress.completed || liveProgress.imported + liveProgress.skipped + liveProgress.ignoredLowConfidence + liveProgress.duplicates + liveProgress.failed}</p></div>
             <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-4"><p className="text-xs uppercase tracking-[0.16em] text-emerald-200">Imported</p><p className="mt-2 text-2xl font-black text-emerald-100">{importData?.counts.good || liveProgress.imported}</p></div>
             <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4"><p className="text-xs uppercase tracking-[0.16em] text-amber-200">Skipped</p><p className="mt-2 text-2xl font-black text-amber-100">{liveProgress.skipped}</p></div>
             <div className="rounded-2xl border border-rose-300/20 bg-rose-300/10 p-4"><p className="text-xs uppercase tracking-[0.16em] text-rose-200">Failed</p><p className="mt-2 text-2xl font-black text-rose-100">{liveProgress.failed}</p></div>
           </div>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-violet-300/20 bg-violet-300/10 p-4"><p className="text-xs uppercase tracking-[0.16em] text-violet-200">Ignored low-confidence</p><p className="mt-2 text-2xl font-black text-violet-100">{liveProgress.ignoredLowConfidence}</p></div>
             <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4"><p className="text-xs uppercase tracking-[0.16em] text-slate-400">Duplicates</p><p className="mt-2 text-2xl font-black text-white">{liveProgress.duplicates}</p></div>
             <div className="rounded-2xl border border-rose-300/20 bg-rose-300/10 p-4"><p className="text-xs uppercase tracking-[0.16em] text-rose-200">Last error</p><p className="mt-2 min-w-0 break-words text-sm font-bold text-rose-50">{liveProgress.lastError || liveProgress.errors[0] || "None"}</p></div>
           </div>
@@ -421,7 +431,7 @@ export default function LeadHuntAutopilotPage() {
               ))}
             </div>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <div className="mt-5 grid gap-3 sm:grid-cols-4">
               <label className="grid gap-2 text-sm font-bold text-slate-200">
                 Max searches
                 <input type="number" min={1} max={30} value={maxSearches} onChange={(event) => setMaxSearches(Number(event.target.value))} className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white" />
@@ -433,6 +443,10 @@ export default function LeadHuntAutopilotPage() {
               <label className="grid gap-2 text-sm font-bold text-slate-200">
                 Delay between actions
                 <input type="number" min={1500} step={500} value={delayMs} onChange={(event) => setDelayMs(Number(event.target.value))} className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white" />
+              </label>
+              <label className="grid gap-2 text-sm font-bold text-slate-200">
+                Minimum confidence
+                <input type="number" min={50} max={95} step={1} value={confidenceThreshold} onChange={(event) => setConfidenceThreshold(Number(event.target.value))} className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white" />
               </label>
             </div>
             <label className="mt-5 grid gap-2 text-sm font-bold text-slate-200">
@@ -448,7 +462,7 @@ export default function LeadHuntAutopilotPage() {
             <div className="mt-5 rounded-2xl border border-white/10 bg-slate-950/40 p-4">
               <p className="text-sm font-bold text-emerald-200">Queue system</p>
               <p className="mt-2 text-sm leading-6 text-slate-300">
-                Tracks current target, result number, imported count, skipped count, duplicate count, run caps, and extension errors in the floating panel.
+                Tracks current target, result number, imported count, ignored low-confidence count, skipped count, duplicate count, run caps, and extension errors in the floating panel.
               </p>
               <p className="mt-2 text-sm text-slate-400">Enabled sources: {enabledSourceLabels.join(", ") || "none"}</p>
             </div>
@@ -482,7 +496,7 @@ export default function LeadHuntAutopilotPage() {
               <article key={`${log.createdAt || index}-${log.eventType}`} className="rounded-2xl border border-white/10 bg-slate-950/40 p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1 text-xs font-black text-cyan-100">{log.eventType || "event"}</span>
-                  {log.score ? <span className="rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1 text-xs font-bold text-emerald-100">Score {log.score}</span> : null}
+                  {log.score ? <span className="rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1 text-xs font-bold text-emerald-100">Confidence {log.score}</span> : null}
                   <span className="text-xs font-semibold text-slate-400">{log.createdAt ? new Date(log.createdAt).toLocaleString() : "Just now"}</span>
                 </div>
                 <p className="mt-2 text-sm font-semibold text-white">{log.message || log.reason || "Runner event recorded."}</p>
@@ -508,11 +522,12 @@ export default function LeadHuntAutopilotPage() {
             {importData?.results?.length ? importData.results.map((lead) => (
               <article key={lead.id} className="rounded-3xl border border-white/10 bg-slate-950/40 p-4">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1 text-xs font-bold text-emerald-100">Score {lead.fitRank}</span>
+                  <span className="rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1 text-xs font-bold text-emerald-100">Confidence {lead.confidenceScore || lead.fitRank}</span>
                   <span className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1 text-xs font-bold text-cyan-100">{lead.painPoint || lead.analysis.intent}</span>
                   <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-bold text-slate-100">{lead.sourceUsed || "Imported"}</span>
                 </div>
                 <p className="mt-3 text-sm text-slate-300"><strong className="text-white">Group/Page:</strong> {lead.sourceName || "Facebook source"} · <strong className="text-white">Author:</strong> {lead.author || "Unknown"} · <strong className="text-white">Timestamp:</strong> {lead.dateText || "Not available"}</p>
+                <p className="mt-3 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4 text-sm font-semibold leading-6 text-cyan-50"><strong>Matched because:</strong> {lead.matchReason || lead.analysis.reason}</p>
                 <p className="mt-3 rounded-2xl border border-white/10 bg-white/[0.06] p-4 leading-7 text-slate-100">{lead.text}</p>
                 {lead.replyDraft && <p className="mt-3 rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-4 leading-7 text-emerald-50"><strong>Reply draft:</strong> {lead.replyDraft}</p>}
                 <div className="mt-3 flex flex-wrap gap-2">

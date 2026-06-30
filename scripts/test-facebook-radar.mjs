@@ -120,6 +120,22 @@ const outreachPain = analyzeFacebookLead({
 });
 assert.equal(outreachPain.score, "High", "Cold outreach not working should be High fit");
 
+const genericNeedClients = analyzeFacebookLead({
+  postText: "Need clients and sales this month. Any tips for closing more clients?",
+  targetBuyer: "agencies",
+  painKeywords: "need clients",
+  sourceUrl: "",
+});
+assert.equal(genericNeedClients.action, "Skip", "Generic need-clients posts without service context should be skipped");
+
+const realEstateClosing = analyzeFacebookLead({
+  postText: "Real estate closing clients keep asking about escrow and mortgage insurance. Any advice?",
+  targetBuyer: "web designers",
+  painKeywords: "web design clients",
+  sourceUrl: "",
+});
+assert.equal(realEstateClosing.action, "Skip", "Real estate closing posts should be off-topic for buyer radar");
+
 const skippedAgencyExample = analyzeFacebookLead({
   postText: "I'm running a web development agency and struggling on generating more leads. I find cold calling is too time consuming and I am looking for alternatives.",
   targetBuyer: "web designers, SEO freelancers, local marketers, small agencies",
@@ -298,6 +314,10 @@ assert.match(leadHuntPageSource, /Current URL/, "Lead Hunt Autopilot should show
 assert.match(leadHuntPageSource, /Runtime/, "Lead Hunt Autopilot should show runtime");
 assert.match(leadHuntPageSource, /Duplicates/, "Lead Hunt Autopilot should show duplicate count");
 assert.match(leadHuntPageSource, /Failed/, "Lead Hunt Autopilot should show failed count");
+assert.match(leadHuntPageSource, /Ignored low-confidence/, "Lead Hunt Autopilot should show ignored low-confidence count");
+assert.match(leadHuntPageSource, /Minimum confidence/, "Lead Hunt Autopilot should include a minimum confidence setting");
+assert.match(leadHuntPageSource, /Matched because/, "Lead Hunt Autopilot should show why an item matched");
+assert.match(leadHuntPageSource, /Confidence \{lead\.confidenceScore/, "Lead Hunt Autopilot should show visible confidence score for saved items");
 assert.match(leadHuntPageSource, /Current item/, "Lead Hunt Autopilot should show current item progress");
 assert.match(leadHuntPageSource, /Completed/, "Lead Hunt Autopilot should show completed count");
 assert.match(leadHuntPageSource, /Last error/, "Lead Hunt Autopilot should show last error");
@@ -376,6 +396,9 @@ assert.match(extensionSource, /looking for alternatives\? to cold calling/, "Fac
 assert.match(extensionSource, /where \(\?:do\|can\) i find \(\?:prospects\|local business leads\|business leads\)/, "Facebook importer should highlight prospect sourcing pain");
 assert.match(extensionSource, /looking for \(\?:a \)\?tool to find leads/, "Facebook importer should highlight tool-buying intent");
 assert.doesNotMatch(extensionSource, /need more customers/, "Facebook importer should not target generic customer-need posts");
+assert.match(extensionSource, /OFF_TOPIC_PATTERN/, "Facebook importer should penalize off-topic categories");
+assert.match(extensionSource, /WEAK_GENERIC_CLIENT_PATTERN/, "Facebook importer should penalize generic client language");
+assert.match(extensionSource, /SPECIFIC_INTENT_PATTERN/, "Facebook importer should require specific client-acquisition context");
 assert.match(extensionSource, /cheap website/, "Facebook importer should reject cheap-work posts");
 assert.match(extensionSource, /guaranteed clients/, "Facebook importer should reject guaranteed-client spam");
 assert.match(extensionSource, /group directory/, "Facebook importer should reject directory noise");
@@ -464,9 +487,11 @@ assert.match(extensionSource, /postLeadHuntEvent/, "Extension should sync runner
 assert.match(extensionSource, /function collectIndexedFacebookResultUrls/, "Extension should collect indexed public Facebook result URLs");
 assert.match(extensionSource, /function scanVisibleLeadHuntCards/, "Extension should scan visible posts for autopilot");
 assert.match(extensionSource, /decisions\.duplicates \+= 1/, "Autopilot should count duplicate/handled posts");
-assert.match(extensionSource, /HIGH_INTENT_IMPORT_THRESHOLD = 55/, "Autopilot should keep the high-intent import threshold explicit");
-assert.match(extensionSource, /score >= HIGH_INTENT_IMPORT_THRESHOLD/, "Autopilot should only import higher-intent matches by default");
+assert.match(extensionSource, /HIGH_INTENT_IMPORT_THRESHOLD = 78/, "Autopilot should keep the high-intent import threshold explicit");
+assert.match(extensionSource, /confidenceThreshold/, "Autopilot should use the configured minimum confidence threshold");
+assert.match(extensionSource, /score >= confidenceThreshold\(state\)/, "Autopilot should only import matches above the configured threshold");
 assert.match(extensionSource, /isHandledPostKey/, "Autopilot should skip duplicate or handled posts");
+assert.match(extensionSource, /ignoredLowConfidenceCount/, "Autopilot should count ignored low-confidence items");
 assert.match(extensionSource, /maxImportedLeads/, "Autopilot should stop at imported lead cap");
 assert.match(extensionSource, /maxSearches/, "Autopilot should stop at search cap");
 assert.match(extensionSource, /No auto-DM or auto-comment/, "Extension panel should show no messaging/commenting safety");
