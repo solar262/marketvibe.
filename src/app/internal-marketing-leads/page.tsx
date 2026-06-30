@@ -15,6 +15,8 @@ type InternalMarketingLead = {
   painPoint?: string;
   replyDraft?: string;
   outreachMode?: string;
+  status?: string;
+  outreachStatus?: string;
   fitRank: number;
   label: string;
   analysis: {
@@ -67,6 +69,15 @@ export default function InternalMarketingLeadsPage() {
     window.setTimeout(() => setCopied(false), 1400);
   }
 
+  async function updateStatus(id: string, status: string) {
+    await fetch(`/api/internal-marketing-leads/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status, outreachStatus: status }),
+    });
+    await load();
+  }
+
   const cards = [...(data?.results || []), ...(showSkipped ? data?.skipped || [] : [])];
 
   return (
@@ -88,6 +99,7 @@ export default function InternalMarketingLeadsPage() {
           <div className="mt-5 flex flex-wrap gap-3">
             <button onClick={load} className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 font-bold text-slate-950"><RefreshCw className="h-4 w-4" /> Refresh</button>
             <button onClick={() => setShowSkipped((value) => !value)} className="rounded-full border border-white/15 bg-white/10 px-5 py-3 font-bold text-white">{showSkipped ? "Hide skipped" : "Show skipped"}</button>
+            <button onClick={() => { window.location.href = "/api/internal-marketing-leads/export"; }} className="rounded-full border border-emerald-300/25 bg-emerald-300/10 px-5 py-3 font-bold text-emerald-100">Export CSV</button>
             <a href="/lead-hunt-autopilot" className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-5 py-3 font-bold text-cyan-100">Back to Lead Hunt</a>
           </div>
           {copied && <p className="mt-4 text-sm font-semibold text-emerald-300">Copied.</p>}
@@ -110,6 +122,7 @@ export default function InternalMarketingLeadsPage() {
                 <p><strong className="text-white">Pain point:</strong> {card.painPoint || card.analysis.intent.replace(/-/g, " ")}</p>
                 {card.queryUsed && <p><strong className="text-white">Query:</strong> {card.queryUsed}</p>}
                 {card.sourceUsed && <p><strong className="text-white">Source:</strong> {card.sourceUsed}</p>}
+                <p><strong className="text-white">Follow-up status:</strong> {card.status || card.outreachStatus || "new"}</p>
               </div>
               <p className="mt-4 text-sm leading-6 text-slate-300"><strong className="text-white">Why:</strong> {card.analysis.reason}</p>
               <p className="mt-4 rounded-2xl border border-white/10 bg-slate-950/40 p-4 leading-7 text-slate-100"><strong className="text-white">Post:</strong> {card.text || "Facebook post imported"}</p>
@@ -121,6 +134,14 @@ export default function InternalMarketingLeadsPage() {
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
                 <button onClick={() => copy(card.analysis.quickReply)} className="rounded-full bg-white px-4 py-3 font-bold text-slate-950"><Copy className="mr-2 inline h-4 w-4" />Copy reply</button>
                 <button onClick={() => copy(card.analysis.deeperReply)} className="rounded-full border border-white/15 bg-white/10 px-4 py-3 font-bold text-white">Copy deeper</button>
+                <select defaultValue={card.status || "new"} onChange={(event) => void updateStatus(card.id, event.target.value)} className="rounded-full border border-white/15 bg-slate-950 px-4 py-3 font-bold text-white">
+                  <option value="new">new</option>
+                  <option value="reviewed">reviewed</option>
+                  <option value="replied">replied</option>
+                  <option value="follow_up">follow_up</option>
+                  <option value="not_fit">not_fit</option>
+                  <option value="closed">closed</option>
+                </select>
                 <a href={card.url || "https://www.facebook.com"} target="_blank" rel="noreferrer" className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-3 text-center font-bold text-cyan-100"><ExternalLink className="mr-2 inline h-4 w-4" />Open source</a>
               </div>
             </article>

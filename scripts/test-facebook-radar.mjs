@@ -13,6 +13,8 @@ const internalMarketingLeadsApiSource = fs.readFileSync("src/app/api/internal-ma
 const huntStatusSource = fs.readFileSync("src/app/api/internal-marketing-leads/hunt-status/route.ts", "utf8");
 const internalMarketingLeadsSource = fs.readFileSync("src/lib/internal-marketing-leads.ts", "utf8");
 const internalMarketingLeadsMigration = fs.readFileSync("supabase/migrations/0004_internal_marketing_leads.sql", "utf8");
+const leadHuntPipelineMigration = fs.readFileSync("supabase/migrations/0005_lead_hunt_pipeline.sql", "utf8");
+const internalAccessSource = fs.readFileSync("src/lib/internal-access.ts", "utf8");
 const extensionSource = fs.readFileSync("browser-extension/facebook-radar-importer/content.js", "utf8");
 const extensionManifest = fs.readFileSync("browser-extension/facebook-radar-importer/manifest.json", "utf8");
 const transpiled = ts.transpileModule(source, {
@@ -276,17 +278,27 @@ assert.match(leadHuntPageSource, /Failed/, "Lead Hunt Autopilot should show fail
 assert.match(leadHuntPageSource, /\/api\/internal-marketing-leads\/hunt-status/, "Lead Hunt page should poll internal marketing lead status counters");
 assert.match(leadHuntPageSource, /\/api\/internal-marketing-leads/, "Lead Hunt page should read internal marketing leads only");
 assert.doesNotMatch(leadHuntPageSource, /\/api\/facebook-radar\/import/, "Lead Hunt page must not read the old Facebook Radar import endpoint");
-assert.match(huntStatusSource, /Access-Control-Allow-Origin/, "Lead Hunt status API should allow extension CORS updates");
+assert.match(huntStatusSource, /INTERNAL_CORS_HEADERS/, "Lead Hunt status API should allow extension CORS updates");
 assert.match(internalMarketingLeadsSource, /skipped/, "Lead Hunt status store should keep skipped counters");
 assert.match(internalMarketingLeadsSource, /duplicates/, "Lead Hunt status store should keep duplicate counters");
 assert.match(internalMarketingLeadsApiSource, /importInternalMarketingLeads/, "Internal marketing lead API should import Lead Hunt posts");
 assert.match(internalMarketingLeadsSource, /internal_marketing_leads/, "Internal marketing lead store should use the internal_marketing_leads table");
 assert.doesNotMatch(internalMarketingLeadsSource, /\.from\("leads"\)|\.from\("audits"\)|\.from\("search_runs"\)/, "Internal marketing lead store must not use customer lead tables");
 assert.match(internalMarketingLeadsMigration, /create table if not exists internal_marketing_leads/, "Migration should create the internal_marketing_leads table");
+assert.match(leadHuntPipelineMigration, /create table if not exists lead_hunt_runs/, "Pipeline migration should create lead_hunt_runs");
+assert.match(leadHuntPipelineMigration, /create table if not exists lead_hunt_events/, "Pipeline migration should create lead_hunt_events");
+assert.match(leadHuntPipelineMigration, /create table if not exists lead_hunt_processed_urls/, "Pipeline migration should create processed URL table");
+assert.match(internalMarketingLeadsSource, /No memory-store fallback is allowed/, "Production internal lead storage should not silently fall back to memory");
+assert.match(internalAccessSource, /X-MarketVibe-Internal-Key/, "Internal APIs should support extension auth headers");
 assert.match(internalMarketingLeadsPageSource, /Internal Marketing Leads/, "Internal marketing leads UI should exist under its own route");
 assert.match(internalMarketingLeadsPageSource, /\/api\/internal-marketing-leads/, "Internal marketing leads UI should read the internal API");
+assert.match(internalMarketingLeadsPageSource, /Export CSV/, "Internal marketing leads UI should export CSV");
+assert.match(internalMarketingLeadsPageSource, /follow_up/, "Internal marketing leads UI should support follow-up status");
 assert.match(leadHuntPageSource, /Outreach engine mode/, "Lead Hunt Autopilot should include outreach mode architecture");
 assert.match(leadHuntPageSource, /Autopilot for allowed adapters only/, "Lead Hunt Autopilot should include allowed-adapter outreach mode");
+assert.match(leadHuntPageSource, /Create test internal lead/, "Lead Hunt page should include test lead verification control");
+assert.match(leadHuntPageSource, /Extension version warning/, "Lead Hunt page should warn about old extension versions");
+assert.match(leadHuntPageSource, /internalKey/, "Lead Hunt launch should pass an optional internal key to the extension");
 
 assert.match(extensionSource, /function extractPostUrl/, "Facebook importer should extract exact post URLs");
 assert.match(extensionSource, /function cleanLeadText/, "Extension should clean imported lead text");
@@ -388,6 +400,14 @@ assert.match(extensionSource, /marketvibeLeadHuntState/, "Autopilot should resto
 assert.match(extensionSource, /function pauseLeadHunt/, "Extension should include Pause Lead Hunt control");
 assert.match(extensionSource, /function resumeLeadHunt/, "Extension should include Resume Lead Hunt control");
 assert.match(extensionSource, /function stopLeadHunt/, "Extension should include Stop Lead Hunt control");
+assert.match(extensionSource, /function recoverCurrentLeadHuntItem/, "Skip current should force stuck modal recovery");
+assert.match(extensionSource, /function forceCloseModalOrBack/, "Recovery should close modal or navigate back");
+assert.match(extensionSource, /STUCK_RECOVERY/, "Extension should log stuck recovery");
+assert.match(extensionSource, /const STUCK_RECOVERY_MS = 60000/, "Stuck watchdog should recover after 60 seconds");
+assert.match(extensionSource, /const LOADING_RECOVERY_MS = 30000/, "Loading watchdog should recover after 30 seconds");
+assert.match(extensionSource, /isFacebookLoadingScreen/, "Extension should detect Facebook loading screens");
+assert.match(extensionSource, /recordProcessedUrl/, "Extension should persist processed URL decisions");
+assert.match(extensionSource, /postLeadHuntEvent/, "Extension should sync runner events");
 assert.match(extensionSource, /function collectIndexedFacebookResultUrls/, "Extension should collect indexed public Facebook result URLs");
 assert.match(extensionSource, /function scanVisibleLeadHuntCards/, "Extension should scan visible posts for autopilot");
 assert.match(extensionSource, /decisions\.duplicates \+= 1/, "Autopilot should count duplicate/handled posts");

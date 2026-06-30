@@ -1,28 +1,29 @@
 import { NextResponse } from "next/server";
-import { latestInternalMarketingLeadStatus, updateInternalMarketingLeadStatus, type InternalMarketingLeadStatus } from "@/lib/internal-marketing-leads";
-
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-};
+import { getInternalMarketingLeadStatus, updateInternalMarketingLeadStatus, type InternalMarketingLeadStatus } from "@/lib/internal-marketing-leads";
+import { hasInternalApiAccess, INTERNAL_CORS_HEADERS } from "@/lib/internal-access";
 
 export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+  return new NextResponse(null, { status: 204, headers: INTERNAL_CORS_HEADERS });
 }
 
-export async function GET() {
-  return NextResponse.json(latestInternalMarketingLeadStatus, { headers: CORS_HEADERS });
+export async function GET(request: Request) {
+  if (!(await hasInternalApiAccess(request))) {
+    return NextResponse.json({ error: "Internal access required" }, { status: 401, headers: INTERNAL_CORS_HEADERS });
+  }
+  return NextResponse.json(await getInternalMarketingLeadStatus(), { headers: INTERNAL_CORS_HEADERS });
 }
 
 export async function POST(request: Request) {
   try {
+    if (!(await hasInternalApiAccess(request))) {
+      return NextResponse.json({ error: "Internal access required" }, { status: 401, headers: INTERNAL_CORS_HEADERS });
+    }
     const payload = (await request.json()) as Partial<InternalMarketingLeadStatus>;
-    return NextResponse.json(updateInternalMarketingLeadStatus(payload), { headers: CORS_HEADERS });
+    return NextResponse.json(await updateInternalMarketingLeadStatus(payload), { headers: INTERNAL_CORS_HEADERS });
   } catch (error) {
     return NextResponse.json(
-      { ...latestInternalMarketingLeadStatus, error: error instanceof Error ? error.message : "Status update failed" },
-      { status: 400, headers: CORS_HEADERS },
+      { error: error instanceof Error ? error.message : "Status update failed" },
+      { status: 400, headers: INTERNAL_CORS_HEADERS },
     );
   }
 }

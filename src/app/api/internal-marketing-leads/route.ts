@@ -1,24 +1,25 @@
 import { NextResponse } from "next/server";
 import { getInternalMarketingLeads, importInternalMarketingLeads, type InternalMarketingLeadPayload } from "@/lib/internal-marketing-leads";
-
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-};
+import { hasInternalApiAccess, INTERNAL_CORS_HEADERS } from "@/lib/internal-access";
 
 export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+  return new NextResponse(null, { status: 204, headers: INTERNAL_CORS_HEADERS });
 }
 
-export async function GET() {
-  return NextResponse.json(await getInternalMarketingLeads(), { headers: CORS_HEADERS });
+export async function GET(request: Request) {
+  if (!(await hasInternalApiAccess(request))) {
+    return NextResponse.json({ error: "Internal access required" }, { status: 401, headers: INTERNAL_CORS_HEADERS });
+  }
+  return NextResponse.json(await getInternalMarketingLeads(), { headers: INTERNAL_CORS_HEADERS });
 }
 
 export async function POST(request: Request) {
   try {
+    if (!(await hasInternalApiAccess(request))) {
+      return NextResponse.json({ error: "Internal access required" }, { status: 401, headers: INTERNAL_CORS_HEADERS });
+    }
     const payload = (await request.json()) as InternalMarketingLeadPayload;
-    return NextResponse.json(await importInternalMarketingLeads(payload), { headers: CORS_HEADERS });
+    return NextResponse.json(await importInternalMarketingLeads(payload), { headers: INTERNAL_CORS_HEADERS });
   } catch (error) {
     return NextResponse.json(
       {
@@ -28,9 +29,9 @@ export async function POST(request: Request) {
         results: [],
         skipped: [],
         importedAt: new Date().toISOString(),
-        storage: "memory",
+        storage: "unavailable",
       },
-      { status: 400, headers: CORS_HEADERS },
+      { status: 400, headers: INTERNAL_CORS_HEADERS },
     );
   }
 }

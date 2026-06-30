@@ -1,6 +1,9 @@
 (() => {
   const API_URL = "https://www.marketvibe1.com/api/internal-marketing-leads";
   const STATUS_API_URL = "https://www.marketvibe1.com/api/internal-marketing-leads/hunt-status";
+  const EVENT_API_URL = "https://www.marketvibe1.com/api/internal-marketing-leads/events";
+  const PROCESSED_URL_API_URL = "https://www.marketvibe1.com/api/internal-marketing-leads/processed-url";
+  const EXTENSION_VERSION = "0.1.1";
   const CACHE_KEY = "marketvibe_recent_facebook_imports";
   const MAX_RECENT_IMPORTS = 20;
   const SCAN_INTERVAL_MS = 1500;
@@ -10,6 +13,8 @@
   const LEAD_HUNT_KEY = "marketvibe_lead_hunt_autopilot";
   const MAX_SCROLL_ATTEMPTS = 4;
   const HIGH_INTENT_IMPORT_THRESHOLD = 55;
+  const STUCK_RECOVERY_MS = 60000;
+  const LOADING_RECOVERY_MS = 30000;
   const OUTREACH_MODES = ["off", "draft-only", "manual-approval", "allowed-adapters"];
   const LEAD_HUNT_PRESETS = [
     "I need leads",
@@ -29,6 +34,50 @@
 
   function logLeadHunt(event, details = {}) {
     console.log(`[MarketVibe Lead Hunt] ${event}`, details);
+  }
+
+  function newRunId() {
+    if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+    return `hunt-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+
+  function internalApiKey() {
+    return clean(localStorage.getItem("marketvibe_internal_key") || "");
+  }
+
+  function internalHeaders(extra = {}) {
+    const headers = { "Content-Type": "application/json", ...extra };
+    const key = internalApiKey();
+    if (key) headers["X-MarketVibe-Internal-Key"] = key;
+    return headers;
+  }
+
+  function postLeadHuntEvent(eventType, payload = {}) {
+    const state = getLeadHuntState();
+    fetch(EVENT_API_URL, {
+      method: "POST",
+      headers: internalHeaders(),
+      body: JSON.stringify({
+        runId: state?.runId || "",
+        eventType,
+        ...payload,
+      }),
+    }).catch((error) => logLeadHunt("event sync failed", { eventType, message: error?.message || "unknown" }));
+  }
+
+  function recordProcessedUrl(sourceUrl, status, payload = {}) {
+    const state = getLeadHuntState();
+    if (!sourceUrl) return;
+    fetch(PROCESSED_URL_API_URL, {
+      method: "POST",
+      headers: internalHeaders(),
+      body: JSON.stringify({
+        runId: state?.runId || "",
+        sourceUrl,
+        status,
+        ...payload,
+      }),
+    }).catch((error) => logLeadHunt("processed-url sync failed", { status, message: error?.message || "unknown" }));
   }
 
   function clean(value) {
@@ -529,15 +578,83 @@
     scrollToQualifiedNode(below || qualified.find((item) => item.node !== afterNode) || qualified[0]);
   }
 
-  function skipCurrentQualifiedPost() {
-    const current = getCurrentQualifiedNode();
-    if (!current) {
-      moveToNextQualifiedPost();
-      return;
+  function hasOpenFacebookModal() {
+    return Boolean(document.querySelector('[role="dialog"], [aria-modal="true"]'));
+  }
+
+  function dispatchEscape() {
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
+  }
+
+  function clickModalCloseButton() {
+    const dialog = document.querySelector('[role="dialog"], [aria-modal="true"]');
+    if (!dialog) return false;
+    const closeButton = Array.from(dialog.querySelectorAll('[aria-label], [role="button"], button'))
+      .find((item) => {
+        const label = clean(item.getAttribute("aria-label") || item.textContent || "");
+        return /^(close|dismiss|back|done)$/i.test(label) || /\b(close|dismiss|back|done)\b/i.test(label);
+      });
+    if (closeButton instanceof HTMLElement) {
+      closeButton.click();
+      return true;
     }
-    markNodeHandled(current.node, current.score);
-    showStatus("Skipped this post. Moving to the next match.");
-    window.setTimeout(() => moveToNextQualifiedPost(current.node), 250);
+    return false;
+  }
+
+  function forceCloseModalOrBack(reason = "recovery") {
+    dispatchEscape();
+    window.setTimeout(() => {
+      if (hasOpenFacebookModal()) clickModalCloseButton();
+    }, 500);
+    window.setTimeout(() => {
+      if (hasOpenFacebookModal()) {
+        logLeadHunt("STUCK_RECOVERY", { action: "history.back", reason });
+        history.back();
+      }
+    }, 3000);
+  }
+
+  function activeLeadHuntSignature() {
+    const dialog = document.querySelector('[role="dialog"], [aria-modal="true"]');
+    const node = dialog || getCurrentQualifiedNode()?.node || document.body;
+    return `${location.href}|${cleanLeadText(node.textContent || "", 220)}`;
+  }
+
+  function isFacebookLoadingScreen() {
+    if (!/facebook\.com/i.test(location.hostname)) return false;
+    const text = clean(document.body?.innerText || "").slice(0, 500);
+    const articleCount = document.querySelectorAll('[role="article"], div[aria-posinset]').length;
+    return articleCount === 0 && /\b(loading|please wait|temporarily unavailable|this content isn't available)\b/i.test(text);
+  }
+
+  function recoverCurrentLeadHuntItem(reason = "Skip current") {
+    const state = getLeadHuntState();
+    const current = getCurrentQualifiedNode();
+    const key = current ? getNodeKey(current.node, current.score) : location.href;
+    if (current) markNodeHandled(current.node, current.score);
+    if (key) saveHandledPostKey(key);
+    recordProcessedUrl(location.href, "skipped", { reason, query: currentLeadHuntSearch(state || {})?.query || "", score: current?.score || 0 });
+    postLeadHuntEvent("STUCK_RECOVERY", { message: reason, reason, sourceUrl: location.href, score: current?.score || 0 });
+    if (state) {
+      saveLeadHuntState({
+        ...state,
+        skippedCount: Number(state.skippedCount || 0) + 1,
+        status: `${reason}. Closing current post and continuing.`,
+        lastProgressAt: Date.now(),
+        nextActionAt: Date.now() + 1200,
+      });
+    }
+    showStatus(`${reason}. Moving to the next result.`);
+    forceCloseModalOrBack(reason);
+    window.setTimeout(() => {
+      if (state?.active && !state.paused) ensureLeadHuntRunner("skip current recovery");
+      moveToNextQualifiedPost(current?.node || null);
+    }, 3600);
+  }
+
+  function skipCurrentQualifiedPost() {
+    recoverCurrentLeadHuntItem("Skip current");
   }
 
   function renderQueueControls() {
@@ -632,8 +749,9 @@
     const search = currentLeadHuntSearch(nextState);
     fetch(STATUS_API_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: internalHeaders(),
       body: JSON.stringify({
+        runId: nextState.runId || "",
         active: Boolean(nextState.active),
         paused: Boolean(nextState.paused),
         query: search?.query || "Not started",
@@ -646,6 +764,7 @@
         status: nextState.status || "",
         errors: Array.isArray(nextState.errors) ? nextState.errors.slice(0, 8) : [],
         updatedAt: new Date().toISOString(),
+        extensionVersion: EXTENSION_VERSION,
       }),
     }).catch((error) => logLeadHunt("status sync failed", { message: error?.message || "unknown" }));
   }
@@ -681,6 +800,7 @@
       leadHuntIntervalId = 0;
     }
     logLeadHunt("hunt completed", { message });
+    postLeadHuntEvent("LEAD_HUNT_STOP", { message, sourceUrl: location.href });
     showStatus(message);
   }
 
@@ -704,8 +824,10 @@
   }
 
   function startLeadHunt(config = defaultLeadHuntConfig()) {
+    if (config.internalKey) localStorage.setItem("marketvibe_internal_key", clean(config.internalKey));
     const searches = buildLeadHuntSearches(config);
     const state = {
+      runId: config.runId || newRunId(),
       active: true,
       paused: false,
       currentSearchIndex: 0,
@@ -725,10 +847,15 @@
       currentUrl: location.href,
       scrollAttempts: 0,
       visitedUrls: [],
+      lastProgressAt: Date.now(),
+      lastActiveSignature: "",
+      loadingSince: 0,
+      loadingReloaded: false,
       status: "Lead Hunt starting.",
     };
     saveLeadHuntState(state);
     logLeadHunt("LEAD_HUNT_START", { searches: searches.length, caps: state.caps });
+    postLeadHuntEvent("LEAD_HUNT_START", { message: "Lead Hunt started", metadata: { searches: searches.length, caps: state.caps, extensionVersion: EXTENSION_VERSION } });
     ensureLeadHuntRunner("hunt started");
     const first = currentLeadHuntSearch(state);
     if (first && location.href !== first.url) navigateWithDelay(first.url, { ...state, nextActionAt: Date.now() + 250 }, "Opening first buyer-intent search.");
@@ -762,7 +889,10 @@
 
   function pauseLeadHunt() {
     const state = getLeadHuntState();
-    if (state) saveLeadHuntState({ ...state, paused: true, status: "Paused. Resume when ready." });
+    if (state) {
+      saveLeadHuntState({ ...state, paused: true, status: "Paused. Resume when ready.", nextActionAt: Date.now() + 3600000 });
+      postLeadHuntEvent("LEAD_HUNT_PAUSE", { message: "Lead Hunt paused", sourceUrl: location.href });
+    }
   }
 
   function resumeLeadHunt() {
@@ -770,6 +900,7 @@
     if (state) {
       saveLeadHuntState({ ...state, active: true, paused: false, status: "Resuming Lead Hunt.", nextActionAt: Date.now() + 250 });
       logLeadHunt("hunt resumed");
+      postLeadHuntEvent("LEAD_HUNT_RESUME", { message: "Lead Hunt resumed", sourceUrl: location.href });
       ensureLeadHuntRunner("resume");
     }
   }
@@ -835,6 +966,7 @@
 
       if (isHandledPostKey(key) || (state.seen || []).includes(key)) {
         decisions.duplicates += 1;
+        recordProcessedUrl(post.url || key, "duplicate", { reason: "duplicate", query: search?.query || "", score });
         logLeadHunt("LEAD_HUNT_SKIP", { reason: "duplicate", score, key });
         continue;
       }
@@ -847,6 +979,7 @@
 
       decisions.skipped += 1;
       saveHandledPostKey(key);
+      recordProcessedUrl(post.url || key, "skipped", { reason: "low-intent", query: search?.query || "", score });
       logLeadHunt("LEAD_HUNT_SKIP", { reason: "low-intent", score, text: text.slice(0, 80) });
     }
 
@@ -862,6 +995,7 @@
       ...state,
       scrollAttempts: attempts,
       status: `${message} Scrolling visible results (${attempts}/${MAX_SCROLL_ATTEMPTS}).`,
+      lastProgressAt: Date.now(),
       nextActionAt: Date.now() + leadHuntDelay(state),
     });
     return true;
@@ -898,6 +1032,7 @@
       const data = await sendPosts([post], search?.query || "");
       saveRecentImport(post);
       saveHandledPostKey(key);
+      recordProcessedUrl(post.url || key, "imported", { reason, query: search?.query || "", score });
       markNodeHandled(node, score);
 
       const importedCount = Number(state.importedCount || 0) + 1;
@@ -910,6 +1045,8 @@
         scrollAttempts: 0,
         importedLeads: [post, ...(state.importedLeads || [])].slice(0, 30),
         status: `Auto-imported high-intent lead. Good: ${data.counts?.good || 0}. Continuing Lead Hunt.`,
+        lastProgressAt: Date.now(),
+        lastActiveSignature: "",
         nextActionAt: Date.now() + continuationDelay,
       });
       logLeadHunt("LEAD_HUNT_IMPORT", { count: 1, importedCount, query: search?.query || "", reason });
@@ -927,6 +1064,7 @@
         failedCount,
         errors: [`${new Date().toLocaleTimeString()} ${error && error.message ? error.message : "Auto-import failed"}`, ...(state.errors || [])].slice(0, 8),
         status: "Auto-import failed. Continuing Lead Hunt.",
+        lastProgressAt: Date.now(),
         nextActionAt: Date.now() + leadHuntDelay(state),
       });
       logLeadHunt("auto import failed", { message: error?.message || "unknown", score });
@@ -947,6 +1085,7 @@
         scrollAttempts: 0,
         skippedCount: (state.skippedCount || 0) + 1,
         visitedUrls: Array.from(new Set([...(state.visitedUrls || []), location.href])).slice(-50),
+        lastProgressAt: Date.now(),
       }, `${reason} Opening result ${nextResultIndex + 1}.`);
       return;
     }
@@ -955,6 +1094,7 @@
       scrollAttempts: 0,
       skippedCount: (state.skippedCount || 0) + 1,
       visitedUrls: Array.from(new Set([...(state.visitedUrls || []), location.href])).slice(-50),
+      lastProgressAt: Date.now(),
     }, reason);
   }
 
@@ -974,6 +1114,7 @@
         resultIndex: state.currentResultIndex || 0,
         imported: state.importedCount || 0,
       });
+      postLeadHuntEvent("LEAD_HUNT_SCAN_TICK", { message: "Scan tick", sourceUrl: location.href, query: search?.query || "", metadata: { trigger } });
 
       if (!search) {
         stopLeadHunt("Lead Hunt complete. No searches left.");
@@ -981,6 +1122,33 @@
       }
       if (Number(state.importedCount || 0) >= Number(state.caps?.maxImportedLeads || 10)) {
         stopLeadHunt(`Daily import cap reached. Imported ${state.importedCount} lead(s).`);
+        return;
+      }
+
+      if (isFacebookLoadingScreen()) {
+        const loadingSince = Number(state.loadingSince || Date.now());
+        const loadingState = { ...state, loadingSince, status: "Facebook is still loading. Watchdog is active.", nextActionAt: Date.now() + 2500 };
+        if (Date.now() - loadingSince > LOADING_RECOVERY_MS) {
+          if (!state.loadingReloaded) {
+            saveLeadHuntState({ ...loadingState, loadingReloaded: true, status: "Facebook loading watchdog reloading once." });
+            logLeadHunt("STUCK_RECOVERY", { reason: "loading watchdog reload" });
+            postLeadHuntEvent("STUCK_RECOVERY", { message: "Loading watchdog reload", reason: "loading-timeout", sourceUrl: location.href });
+            location.reload();
+            return;
+          }
+          nextLeadHuntSearch({ ...state, failedCount: Number(state.failedCount || 0) + 1, loadingSince: 0, loadingReloaded: false }, "Facebook loading watchdog skipped a stuck page.");
+          return;
+        }
+        saveLeadHuntState(loadingState);
+        return;
+      }
+
+      const signature = activeLeadHuntSignature();
+      if (signature !== state.lastActiveSignature) {
+        saveLeadHuntState({ ...state, lastActiveSignature: signature, lastProgressAt: Date.now(), loadingSince: 0, loadingReloaded: false });
+      } else if (Date.now() - Number(state.lastProgressAt || state.startedAt || Date.now()) > STUCK_RECOVERY_MS) {
+        logLeadHunt("STUCK_RECOVERY", { reason: "same modal/url for 60 seconds", href: location.href });
+        recoverCurrentLeadHuntItem("Stuck watchdog recovered current post");
         return;
       }
 
@@ -1009,6 +1177,7 @@
           decisions.importItems.forEach(({ node, score, post }) => {
             saveRecentImport(post);
             saveHandledPostKey(getPostKey(post));
+            recordProcessedUrl(post.url || getPostKey(post), "imported", { reason: "auto-import", query: search.query, score });
             markNodeHandled(node, score);
           });
           const importedCount = Number(state.importedCount || 0) + sentPosts.length;
@@ -1023,6 +1192,8 @@
             scrollAttempts: 0,
             importedLeads: [...sentPosts, ...(state.importedLeads || [])].slice(0, 30),
             status: `Imported ${sentPosts.length} high-intent lead(s). Good: ${data.counts?.good || 0}. Continuing Lead Hunt.`,
+            lastProgressAt: Date.now(),
+            lastActiveSignature: "",
             nextActionAt: Date.now() + continuationDelay,
           };
           saveLeadHuntState(nextState);
@@ -1217,8 +1388,7 @@
     skipButton.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      markNodeHandled(node, score);
-      window.setTimeout(() => moveToNextQualifiedPost(node), 250);
+      recoverCurrentLeadHuntItem("Skip current");
     });
 
     const nextButton = document.createElement("button");
@@ -1322,10 +1492,11 @@
   }
 
   async function sendPosts(posts, searchPhrase = new URLSearchParams(location.search).get("q") || "") {
+    const state = getLeadHuntState();
     const response = await fetch(API_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ posts, searchPhrase }),
+      headers: internalHeaders(),
+      body: JSON.stringify({ posts, searchPhrase, runId: state?.runId || "" }),
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.json();

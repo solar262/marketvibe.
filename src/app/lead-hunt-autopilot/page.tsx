@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ExternalLink, Pause, Play, RefreshCw, Square } from "lucide-react";
+import { Download, ExternalLink, Pause, Play, RefreshCw, Square } from "lucide-react";
 
 type SourceKey = "facebook" | "google" | "bing";
 type OutreachMode = "off" | "draft-only" | "manual-approval" | "allowed-adapters";
@@ -41,6 +41,7 @@ type LeadHuntStatus = {
   status: string;
   errors: string[];
   updatedAt: string;
+  extensionVersion?: string;
 };
 
 const LEAD_HUNT_QUERIES = [
@@ -63,6 +64,7 @@ export default function LeadHuntAutopilotPage() {
   const [delayMs, setDelayMs] = useState(3500);
   const [outreachMode, setOutreachMode] = useState<OutreachMode>("draft-only");
   const [status, setStatus] = useState("Ready. Click Run Lead Hunt to launch the browser extension workflow.");
+  const [internalKey, setInternalKey] = useState("");
   const [importData, setImportData] = useState<ImportResponse | null>(null);
   const [runtimeSeconds, setRuntimeSeconds] = useState(0);
   const [liveProgress, setLiveProgress] = useState({
@@ -74,6 +76,7 @@ export default function LeadHuntAutopilotPage() {
     duplicates: 0,
     failed: 0,
     errors: [] as string[],
+    extensionVersion: "",
   });
 
   const enabledSourceLabels = useMemo(() => {
@@ -102,6 +105,7 @@ export default function LeadHuntAutopilotPage() {
       duplicates: next.duplicates || 0,
       failed: next.failed || 0,
       errors: next.errors || [],
+      extensionVersion: next.extensionVersion || "",
     });
     if (next.status) setStatus(next.status);
   }
@@ -120,41 +124,60 @@ export default function LeadHuntAutopilotPage() {
     };
   }, []);
 
-  function buildLaunchUrl() {
-    const config = {
-      queries: LEAD_HUNT_QUERIES,
-      sources,
-      caps: {
-        maxSearches,
-        maxImportedLeads,
-        delayMs,
-      },
-      outreach: {
-        mode: outreachMode,
-        adapters: [] as string[],
-      },
-    };
-    return `https://www.facebook.com/search/posts/?q=${encodeURIComponent(LEAD_HUNT_QUERIES[0])}#marketvibeLeadHunt=${encodeURIComponent(JSON.stringify(config))}`;
-  }
-
   function runLeadHunt() {
+    const runId = globalThis.crypto?.randomUUID?.() || `hunt-${Date.now()}`;
     setRuntimeSeconds(0);
     setLiveProgress({
       query: LEAD_HUNT_QUERIES[0],
       source: enabledSourceLabels[0] || "No source enabled",
-      currentUrl: buildLaunchUrl(),
+      currentUrl: "",
       imported: 0,
       skipped: 0,
       duplicates: 0,
       failed: 0,
       errors: [],
+      extensionVersion: "",
     });
     setStatus("Lead Hunt launched. The extension will open searches, scan visible public pages, import High Intent matches, and stop at your caps.");
-    window.open(buildLaunchUrl(), "_blank", "noopener,noreferrer");
+    const config = {
+      runId,
+      queries: LEAD_HUNT_QUERIES,
+      sources,
+      caps: { maxSearches, maxImportedLeads, delayMs },
+      outreach: { mode: outreachMode, adapters: [] as string[] },
+      internalKey: internalKey.trim(),
+    };
+    window.open(`https://www.facebook.com/search/posts/?q=${encodeURIComponent(LEAD_HUNT_QUERIES[0])}#marketvibeLeadHunt=${encodeURIComponent(JSON.stringify(config))}`, "_blank", "noopener,noreferrer");
   }
 
   function passiveControl(label: string) {
     setStatus(`${label} is controlled from the floating extension panel on Facebook/Google/Bing so you can stop immediately while pages are opening.`);
+  }
+
+  async function createTestLead() {
+    const response = await fetch("/api/internal-marketing-leads/test", { method: "POST" });
+    if (!response.ok) {
+      setStatus("Test internal lead did not save. Check Supabase service role/internal auth before marking complete.");
+      return;
+    }
+    await refreshImports();
+    setStatus("Test internal lead saved. Refresh the page and confirm it remains visible before marking complete.");
+  }
+
+  function clearLocalProgressHint() {
+    setRuntimeSeconds(0);
+    setLiveProgress({
+      query: "Not started",
+      source: "Not started",
+      currentUrl: "",
+      imported: 0,
+      skipped: 0,
+      duplicates: 0,
+      failed: 0,
+      errors: [],
+      extensionVersion: "",
+    });
+    setStatus("Local dashboard progress cleared. Use Stop in the extension panel to stop an active browser tab.");
   }
 
   useEffect(() => {
@@ -182,6 +205,17 @@ export default function LeadHuntAutopilotPage() {
             One button launches an automated public-source buyer-intent hunt. No auto-DM, no auto-comment, no private data, and no spam actions.
           </p>
 
+          <label className="mt-5 grid max-w-xl gap-2 text-sm font-bold text-slate-200">
+            Internal API key for extension imports
+            <input
+              type="password"
+              value={internalKey}
+              onChange={(event) => setInternalKey(event.target.value)}
+              placeholder="Only needed when INTERNAL_MARKETING_API_KEY is enabled"
+              className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white"
+            />
+          </label>
+
           <div className="mt-6 grid gap-3 sm:grid-cols-4">
             <button onClick={runLeadHunt} className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-emerald-300 to-cyan-200 px-6 py-4 text-base font-black text-slate-950 shadow-xl shadow-emerald-950/30">
               <Play className="h-5 w-5" /> Run Lead Hunt
@@ -198,6 +232,11 @@ export default function LeadHuntAutopilotPage() {
           </div>
 
           <p className="mt-4 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4 text-sm font-semibold text-cyan-50">{status}</p>
+          {liveProgress.extensionVersion && liveProgress.extensionVersion !== "0.1.1" && (
+            <p className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm font-semibold text-amber-50">
+              Extension version warning: loaded extension reports {liveProgress.extensionVersion}. Reload the unpacked extension if the latest runner is not active.
+            </p>
+          )}
           <div className="mt-5 grid gap-3 sm:grid-cols-4">
             <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4"><p className="text-xs uppercase tracking-[0.16em] text-slate-400">Live query</p><p className="mt-2 min-w-0 break-words text-sm font-bold text-white">{liveProgress.query}</p></div>
             <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4"><p className="text-xs uppercase tracking-[0.16em] text-slate-400">Live source</p><p className="mt-2 text-sm font-bold text-white">{liveProgress.source}</p></div>
@@ -209,6 +248,14 @@ export default function LeadHuntAutopilotPage() {
             <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4"><p className="text-xs uppercase tracking-[0.16em] text-amber-200">Skipped</p><p className="mt-2 text-2xl font-black text-amber-100">{liveProgress.skipped}</p></div>
             <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4"><p className="text-xs uppercase tracking-[0.16em] text-slate-400">Duplicates</p><p className="mt-2 text-2xl font-black text-white">{liveProgress.duplicates}</p></div>
             <div className="rounded-2xl border border-rose-300/20 bg-rose-300/10 p-4"><p className="text-xs uppercase tracking-[0.16em] text-rose-200">Failed</p><p className="mt-2 text-2xl font-black text-rose-100">{liveProgress.failed}</p></div>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button onClick={createTestLead} className="rounded-full border border-emerald-300/25 bg-emerald-300/10 px-5 py-3 text-sm font-bold text-emerald-100">Create test internal lead</button>
+            <button onClick={() => { window.location.href = "/api/internal-marketing-leads/export"; }} className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-5 py-3 text-sm font-bold text-white">
+              <Download className="h-4 w-4" /> Export CSV
+            </button>
+            <button onClick={clearLocalProgressHint} className="rounded-full border border-white/15 bg-white/10 px-5 py-3 text-sm font-bold text-white">Clear local dashboard</button>
+            <a href="/internal-marketing-leads" className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-5 py-3 text-sm font-bold text-cyan-100">View internal leads</a>
           </div>
         </div>
 
