@@ -796,10 +796,10 @@ export default function FacebookRadarPage() {
             {mode === "find" ? activeSearchLink?.phrase || "Search queue complete" : mode === "welcome" ? "Manual welcome mode - confirm before any send/post" : "Back to Radar / Next Search"}
           </p>
           <div className="grid grid-cols-2 gap-2 sm:flex">
-            <button onClick={() => setMode("find")} className="rounded-full border border-white/15 bg-white/10 px-4 py-3 text-sm font-bold text-white hover:bg-white/15">
+            <button onClick={() => { setMode("find"); setActiveTab("Search"); }} className="rounded-full border border-white/15 bg-white/10 px-4 py-3 text-sm font-bold text-white hover:bg-white/15">
               Back to Radar
             </button>
-            <button onClick={() => markBadNext(activeSearchLink)} disabled={mode !== "find" || !activeSearchLink} className="rounded-full border border-amber-300/25 bg-amber-300/10 px-4 py-3 text-sm font-bold text-amber-100 hover:bg-amber-300/15 disabled:cursor-not-allowed disabled:opacity-50">
+            <button onClick={() => { setMode("find"); setActiveTab("Search"); nextSearch(); }} disabled={!activeSearchLink} className="rounded-full border border-amber-300/25 bg-amber-300/10 px-4 py-3 text-sm font-bold text-amber-100 hover:bg-amber-300/15 disabled:cursor-not-allowed disabled:opacity-50">
               Next Search
             </button>
           </div>
@@ -808,3 +808,4 @@ export default function FacebookRadarPage() {
     </main>
   );
 }
+
