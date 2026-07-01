@@ -3,7 +3,7 @@
   const STATUS_API_URL = "https://www.marketvibe1.com/api/internal-marketing-leads/hunt-status";
   const EVENT_API_URL = "https://www.marketvibe1.com/api/internal-marketing-leads/events";
   const PROCESSED_URL_API_URL = "https://www.marketvibe1.com/api/internal-marketing-leads/processed-url";
-  const EXTENSION_VERSION = "0.1.3";
+  const EXTENSION_VERSION = "0.1.4";
   const CACHE_KEY = "marketvibe_recent_facebook_imports";
   const MAX_RECENT_IMPORTS = 20;
   const SCAN_INTERVAL_MS = 1500;
@@ -2059,6 +2059,7 @@
   markFeed();
   setInterval(markFeed, SCAN_INTERVAL_MS);
 })();
+
 
 
 
