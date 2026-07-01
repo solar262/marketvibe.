@@ -1992,7 +1992,7 @@
     });
     if (!response.ok) {
       const message = response.status === 401 || response.status === 403 ? `MarketVibe import auth required (HTTP ${response.status})` : `HTTP ${response.status}`;
-      throw new Error(message);
+      throw new Error(`${message} ${await response.text()}`);
     }
     return response.json();
   }
@@ -2059,4 +2059,7 @@
   markFeed();
   setInterval(markFeed, SCAN_INTERVAL_MS);
 })();
+
+
+
 
