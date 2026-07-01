@@ -66,8 +66,8 @@ const audiences = [
 const previewCards = [
   {
     label: "Opportunity Found",
-    title: "Website consultant needs better leads",
-    body: "Business operator asking how to find clients for website and visibility services.",
+    title: "Business owner needs help finding clients",
+    body: "A business owner is asking how to attract more customers and improve online visibility.",
     meta: "Pain: customer acquisition",
   },
   {
@@ -78,22 +78,22 @@ const previewCards = [
   },
   {
     label: "Outreach Angle",
-    title: "Lead with the growth bottleneck",
-    body: "Reference the stated prospecting challenge and offer a practical path to better opportunity flow.",
+    title: "Start with the customer acquisition problem",
+    body: "Reference the stated growth challenge and offer a practical path to finding better customers.",
     meta: "Context-first suggestion",
   },
   {
     label: "Audit Summary",
-    title: "Weak CTA and missing contact flow",
-    body: "Example observations include poor visibility, unclear next step, and conversion friction.",
-    meta: "Sample business review",
+    title: "Unclear next step and weak contact path",
+    body: "Review visible issues such as poor visibility, unclear calls to action, and conversion friction.",
+    meta: "Business opportunity review",
   },
 ];
 
 const trustSignals = [
   "Premium opportunity workflow",
   "Context before outreach",
-  "Sample opportunity previews",
+  "Opportunity previews",
   "Practical prospect research",
 ];
 
@@ -146,7 +146,7 @@ export default function Home() {
                     <div className="min-w-0">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-200">Opportunity dashboard</p>
                       <h2 className="mt-2 text-lg font-semibold">Growth Services Pipeline</h2>
-                      <p className="mt-1 text-xs text-slate-400">Sample data · opportunity intelligence preview</p>
+                      <p className="mt-1 text-xs text-slate-400">Opportunity intelligence preview</p>
                     </div>
                     <div className="rounded-2xl border border-emerald-300/30 bg-emerald-300/10 p-3 text-center shadow-lg shadow-emerald-950/20">
                       <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-200">Score</p>
@@ -171,7 +171,7 @@ export default function Home() {
                     <div className="rounded-2xl border border-white/10 bg-white/[0.97] p-4 text-slate-950 shadow-xl shadow-black/15">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-sm font-semibold">Opportunity Found</p>
-                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">Sample</span>
+                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">Example</span>
                       </div>
                       <p className="mt-2 text-sm leading-6 text-slate-700">
                         &ldquo;We help local businesses improve visibility, but finding qualified prospects takes too long.&rdquo;
@@ -277,12 +277,12 @@ export default function Home() {
               <p className="text-sm font-semibold text-emerald-300">See MarketVibe In Action</p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight">Review opportunity context before you spend time pursuing it.</h2>
               <p className="mt-4 leading-7 text-slate-300">
-                The preview uses fictional sample data to show how MarketVibe organizes intent, context, outreach angles, and audit observations.
+                This example shows how MarketVibe organizes opportunity context, intent signals, outreach angles, and audit observations before you spend time prospecting.
               </p>
               <div className="mt-6 rounded-2xl border border-white/10 bg-slate-950/55 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Opportunity brief</p>
                 <p className="mt-3 text-sm leading-6 text-slate-200">
-                  A growth-focused service provider is trying to improve prospecting, prioritize the right accounts, and understand where to lead the conversation.
+                  A business owner is trying to improve customer acquisition, prioritize the right opportunities, and understand where to lead the conversation.
                 </p>
               </div>
             </div>
