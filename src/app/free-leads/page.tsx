@@ -6,10 +6,10 @@ import { track } from "@vercel/analytics";
 
 const serviceTypes = ["Web Design", "SEO", "Social Media", "Booking Systems", "Reviews"];
 const checklist = [
-  "Get 3 local business opportunity previews",
+  "Get 3 free business opportunity previews",
   "Review website, contact, booking, and trust signals",
-  "Open Lead Search after signup",
-  "Upgrade only when you need more volume or full reports",
+  "See opportunity scores and outreach angles",
+  "Find prospects faster without manual research",
 ];
 
 export default function FreeLeadsPage() {
@@ -47,13 +47,13 @@ export default function FreeLeadsPage() {
       <section className="mx-auto grid max-w-7xl gap-8 px-4 py-12 sm:px-6 lg:grid-cols-[1fr_440px] lg:items-start lg:px-8 lg:py-16">
         <div className="min-w-0">
           <p className="inline-flex flex-wrap items-center gap-2 rounded-full border border-emerald-200 bg-white px-3 py-1 text-sm font-semibold text-emerald-900 shadow-sm">
-            <Sparkles className="h-4 w-4" /> Free lead onboarding
+            <Sparkles className="h-4 w-4" /> Free lead search
           </p>
           <h1 className="mt-5 max-w-3xl text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">
-            Try MarketVibe with free business lead previews.
+            Find your first business opportunities free.
           </h1>
           <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-700">
-            Enter your email, choose the service you sell, and move straight into a lead-search workspace built around public business signals.
+            Enter your email, choose the service you sell, and start discovering businesses that may need your help.
           </p>
 
           <div className="mt-8 grid gap-3 sm:grid-cols-2">
@@ -68,9 +68,9 @@ export default function FreeLeadsPage() {
           <div className="mt-8 rounded-[2rem] border border-slate-200 bg-slate-950 p-5 text-white shadow-2xl shadow-slate-950/20">
             <div className="grid gap-4 sm:grid-cols-3">
               {[
-                [SearchCheck, "Lead Search", "Open after signup"],
-                [ShieldCheck, "Public signals", "Visible website gaps"],
-                [Mail, "Opted-in email", "Subscriber follow-up"],
+                [SearchCheck, "Lead Search", "Review opportunities after signup"],
+                [ShieldCheck, "Business signals", "Website and trust gaps"],
+                [Mail, "Outreach context", "Clearer angles before contact"],
               ].map(([Icon, title, body]) => (
                 <div key={title as string} className="rounded-2xl border border-white/10 bg-white/5 p-4">
                   <Icon className="h-5 w-5 text-emerald-300" />
@@ -85,8 +85,8 @@ export default function FreeLeadsPage() {
         <form onSubmit={submit} className="min-w-0 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-2xl shadow-slate-950/10">
           <div className="rounded-2xl bg-slate-50 p-4">
             <p className="text-sm font-semibold text-emerald-700">Start free</p>
-            <h2 className="mt-1 text-2xl font-semibold text-slate-950">Send my previews</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">No manual delivery needed. You will be sent to Lead Search after signup.</p>
+            <h2 className="mt-1 text-2xl font-semibold text-slate-950">Get my free lead previews</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">We’ll take you straight to Lead Search after signup so you can review your first opportunities.</p>
           </div>
           <div className="mt-5 grid gap-4">
             <label className="grid gap-2 text-sm font-semibold text-slate-700">
@@ -110,7 +110,7 @@ export default function FreeLeadsPage() {
           </div>
           <button disabled={loading} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-950/15 transition hover:bg-slate-800 disabled:opacity-70">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Get free previews
+            Get my free lead previews
           </button>
           {success && <p className="mt-4 rounded-2xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-900">{success}</p>}
           {error && <p className="mt-4 rounded-2xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
