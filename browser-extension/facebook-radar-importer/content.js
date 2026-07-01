@@ -33,6 +33,7 @@
   let leadHuntIntervalId = 0;
   let leadHuntControlPollId = 0;
   let leadHuntTickRunning = false;
+  let extensionReloadRequired = false;
   const leadHuntTimeoutIds = new Set();
   if (document.getElementById("marketvibe-import-button")) return;
 
@@ -50,19 +51,72 @@
   }
 
   function extensionStorageAvailable() {
-    return Boolean(globalThis.chrome?.storage?.local);
+    try {
+      return Boolean(globalThis.chrome?.storage?.local && globalThis.chrome?.runtime?.id);
+    } catch (error) {
+      handleExtensionContextInvalidated(error, "storage availability check");
+      return false;
+    }
+  }
+
+  function isExtensionContextError(error) {
+    return /extension context invalidated|context invalidated|extension context was invalidated|extension (?:has been )?reloaded/i.test(String(error?.message || error || ""));
+  }
+
+  function stopLeadHuntControlPoller() {
+    if (leadHuntControlPollId) {
+      window.clearInterval(leadHuntControlPollId);
+      leadHuntControlPollId = 0;
+    }
+  }
+
+  function handleExtensionContextInvalidated(error, source = "extension api") {
+    if (!isExtensionContextError(error)) return false;
+    const message = "Extension reloaded. Please refresh the Facebook page.";
+    extensionReloadRequired = true;
+    clearLeadHuntTimers();
+    stopLeadHuntControlPoller();
+    leadHuntTickRunning = false;
+    const state = getLeadHuntState();
+    if (state) {
+      localStorage.setItem(LEAD_HUNT_KEY, JSON.stringify({
+        ...state,
+        active: false,
+        paused: false,
+        currentLock: "",
+        extensionReloadRequired: true,
+        stoppedAt: Date.now(),
+        status: message,
+        nextActionAt: 0,
+        errors: [`${new Date().toLocaleTimeString()} Extension Reload Required`, ...(state.errors || [])].slice(0, 8),
+      }));
+      renderLeadHuntPanel();
+    }
+    logLeadHunt("Extension Reload Required", { source, message: error?.message || "context invalidated" });
+    showStatus(message);
+    return true;
   }
 
   async function internalApiKey() {
     if (!extensionStorageAvailable()) return "";
-    const stored = await chrome.storage.local.get("marketvibe_internal_key");
-    return clean(stored.marketvibe_internal_key || "");
+    try {
+      const stored = await chrome.storage.local.get("marketvibe_internal_key");
+      return clean(stored.marketvibe_internal_key || "");
+    } catch (error) {
+      if (handleExtensionContextInvalidated(error, "read internal key")) return "";
+      throw error;
+    }
   }
 
   async function setInternalApiKey(key) {
     if (!extensionStorageAvailable()) return false;
-    await chrome.storage.local.set({ marketvibe_internal_key: clean(key) });
-    return true;
+    try {
+      await chrome.storage.local.set({ marketvibe_internal_key: clean(key) });
+      return true;
+    } catch (error) {
+      if (handleExtensionContextInvalidated(error, "save internal key")) return false;
+      throw error;
+    }
   }
 
   async function internalHeaders(extra = {}) {
@@ -88,13 +142,17 @@
 
   function installStoredKeyResumeListener() {
     if (!extensionStorageAvailable()) return;
-    chrome.storage.onChanged.addListener((changes, areaName) => {
-      if (areaName !== "local" || !changes.marketvibe_internal_key?.newValue) return;
-      const state = getLeadHuntState();
-      if (state?.active && state.paused && /key|auth/i.test(`${state.importAuthStatus || ""} ${state.status || ""}`)) {
-        resumeLeadHunt("Internal API key connected. Resuming Buyer Radar.");
-      }
-    });
+    try {
+      chrome.storage.onChanged.addListener((changes, areaName) => {
+        if (areaName !== "local" || !changes.marketvibe_internal_key?.newValue) return;
+        const state = getLeadHuntState();
+        if (state?.active && state.paused && /key|auth/i.test(`${state.importAuthStatus || ""} ${state.status || ""}`)) {
+          resumeLeadHunt("Internal API key connected. Resuming Buyer Radar.");
+        }
+      });
+    } catch (error) {
+      handleExtensionContextInvalidated(error, "storage change listener");
+    }
   }
 
   if (isMarketVibeHost()) {
@@ -125,6 +183,7 @@
   function scheduleLeadHuntAction(callback, delay, reason = "scheduled action") {
     const timerId = window.setTimeout(() => {
       leadHuntTimeoutIds.delete(timerId);
+      if (extensionReloadRequired) return;
       const state = getLeadHuntState();
       if (!state?.active || state.paused) {
         logLeadHunt("scheduled action blocked", { reason, active: Boolean(state?.active), paused: Boolean(state?.paused) });
@@ -137,7 +196,7 @@
   }
 
   function leadHuntIsRunnable(state = getLeadHuntState()) {
-    return Boolean(state?.active && !state.paused);
+    return Boolean(!extensionReloadRequired && state?.active && !state.paused);
   }
 
   async function postLeadHuntEvent(eventType, payload = {}) {
@@ -254,7 +313,8 @@
       .map((item) => cleanLeadText(item.textContent || "", 900))
       .filter((text) => text.length >= 30 && !/^facebook$/i.test(text))
       .sort((a, b) => b.length - a.length);
-    return candidates[0] || cleanLeadText(clone.textContent || "", 900) || "Facebook post imported";
+    const combined = Array.from(new Set(candidates.slice(0, 5))).join(" ");
+    return cleanLeadText(combined || candidates[0] || clone.textContent || "", 900) || "Facebook post imported";
   }
 
   function getBestVisibleText(node, selectors, fallback = "") {
@@ -291,9 +351,15 @@
     /where (?:do|can) i find (?:prospects|local business leads|business leads)/i,
     /how do i get leads?/i,
     /struggling (?:on |with |to )?(?:generat(?:e|ing)|get(?:ting)?) (?:more )?leads?/i,
+    /struggling to find clients?/i,
     /struggling to get clients?/i,
+    /need help (?:getting|finding|generating) (?:more )?(?:leads?|clients?|customers?)/i,
     /need more leads?/i,
+    /need more (?:customers?)/i,
     /looking for leads?/i,
+    /looking for marketing help/i,
+    /how to market websites?/i,
+    /how do i grow my business/i,
     /looking for alternatives? to cold calling/i,
     /no clients? this month/i,
     /need appointments?/i,
@@ -323,6 +389,8 @@
   const SERVICE_CONTEXT_PATTERN = /\b(web designers?|website designers?|web design(?:ers?| agencies| services?)?|website services?|seo freelancers?|seo agencies?|seo consultants?|seo services?|local marketers?|local marketing agencies?|marketing agencies?|agenc(?:y|ies)|agency owners?|freelancers?|freelance services?|booking system sellers?|booking systems?|automation consultants?|social media managers?|social media marketing agencies?|smma|service providers?|lead gen agencies?|lead generation agencies?|web design agency|website agency|appointment setting|appointment-setting|shopify stores?|shopify services?|shopify setup services?|coaches?|consultants?|local services?)\b/i;
   const SPECIFIC_INTENT_PATTERN = /\b(web design clients?|website clients?|seo clients?|marketing clients?|agency leads?|agency clients?|local marketing clients?|local business prospecting|local business leads?|finding clients?|find clients?|how to get clients?|how do i get clients?|client acquisition|smma clients?|lead generation|appointment setting leads?|appointment-setting leads?|selling websites?|sell websites?|selling seo|sell seo|selling services to local businesses|prospecting|prospects?|outreach)\b/i;
   const EXACT_BUYER_INTENT_PATTERN = /\b(web design clients?|website clients?|seo clients?|agency leads?|local business leads?|local business prospecting|selling websites?|sell websites?|selling seo|sell seo|marketing clients?|smma clients?|client acquisition|appointment setting leads?|appointment-setting leads?|lead generation)\b/i;
+  const GROWTH_PAIN_PATTERN = /\b(struggling to find clients?|need help (?:getting|finding|generating) (?:more )?(?:leads?|clients?|customers?)|need more (?:customers?)|need more leads?|looking for marketing help|how to market websites?|how do i grow my business|visibility|traffic|sales|growth)\b/i;
+  const HELP_REQUEST_PATTERN = /\b(how do i|how can i|where do i|where can i|need help|looking for help|any advice|what should i|struggling|stuck|not working|recommendations?)\b|\?/i;
   const WEAK_GENERIC_CLIENT_PATTERN = /\b(need clients|get clients|more clients|new clients|general clients|closing clients|close clients|sales calls?|business growth)\b/i;
   const OFF_TOPIC_PATTERN = /\b(real estate|realtor|realtors|realty|mortgage|escrow|closing costs?|property closing|insurance|life insurance|policy|policies|mlm|multi level|network marketing|dating|tinder|relationship advice|single moms?|sports?|football|nba|nfl|soccer|fan page|motivation|motivational|mindset|inspirational|side hustles?|passive income|dropshipping|affiliate|marketplace|for sale|selling my|garage sale|job seeker|resume|cv|looking for work|open to work)\b/i;
   const QUESTION_OR_DISCUSSION_PATTERN = /\b(how do i|how can i|where do i|where can i|any advice|what should i|struggling|not working|no one replies|comments?|thoughts|recommendations?)\b|\?/i;
@@ -402,6 +470,7 @@
     if (SERVICE_CONTEXT_PATTERN.test(text) || (WEBSITE_SERVICE_PATTERN.test(text) && CLIENT_ACQUISITION_PAIN_PATTERN.test(text))) reasons.push("service-seller context");
     if (EXACT_BUYER_INTENT_PATTERN.test(text)) reasons.push("specific client-acquisition phrase");
     else if (SPECIFIC_INTENT_PATTERN.test(text)) reasons.push("prospecting/client-acquisition context");
+    if (GROWTH_PAIN_PATTERN.test(text) && HELP_REQUEST_PATTERN.test(text)) reasons.push("growth or lead pain request");
     if (QUESTION_OR_DISCUSSION_PATTERN.test(text)) reasons.push("discussion/question signal");
     if (Number(meta.commentCount || 0) >= 2) reasons.push(`${meta.commentCount} comments`);
     if (OFF_TOPIC_PATTERN.test(text)) reasons.push("off-topic category penalty");
@@ -425,6 +494,7 @@
     const serviceSeller = SERVICE_CONTEXT_PATTERN.test(text) || serviceIntentCombination;
     const specificIntent = SPECIFIC_INTENT_PATTERN.test(text) || serviceIntentCombination;
     const exactBuyerIntent = EXACT_BUYER_INTENT_PATTERN.test(text) || serviceIntentCombination;
+    const growthPainRequest = GROWTH_PAIN_PATTERN.test(text) && HELP_REQUEST_PATTERN.test(text);
     const genericLocalBusiness = /\b(my business|our business|business owner|small business owner|restaurant|cafe|clinic|salon|contractor|roofer|plumber|law firm|gym|dentist|shopify store|ecommerce store|online store|my website gets no traffic|my business has no leads|store not converting)\b/i.test(text);
     const offTopicMatches = countPatternMatches(text, [OFF_TOPIC_PATTERN]);
 
@@ -452,6 +522,8 @@
     if (websiteServiceSeller) score += 28;
     if (clientAcquisitionPain) score += 22;
     if (serviceIntentCombination) score += 48;
+    if (growthPainRequest) score += 32;
+    if (growthPainRequest && /\b(leads?|clients?|customers?|marketing help|visibility|traffic|sales|growth)\b/i.test(text)) score += 18;
     if (specificIntent) score += 30;
     if (exactBuyerIntent) score += 24;
     if (serviceSeller && /\b(leads|clients|prospects|outreach|prospecting|cold calling|client acquisition)\b/i.test(text)) score += 24;
@@ -461,11 +533,12 @@
     if (WEAK_GENERIC_CLIENT_PATTERN.test(text) && !exactBuyerIntent && !serviceSeller) score -= 45;
     if (WEAK_GENERIC_CLIENT_PATTERN.test(text) && !exactBuyerIntent) score -= 20;
     score -= offTopicMatches * 70;
-    if (genericLocalBusiness && !serviceSeller) score -= 80;
-    if (!serviceSeller) score -= 35;
-    if (!specificIntent) score -= 45;
-    if (!serviceSeller && !specificIntent) score -= 60;
-    if (!strongMatches) score -= 28;
+    if (genericLocalBusiness && !serviceSeller && !growthPainRequest) score -= 80;
+    if (genericLocalBusiness && !serviceSeller && growthPainRequest) score -= 25;
+    if (!serviceSeller && !growthPainRequest) score -= 35;
+    if (!specificIntent && !growthPainRequest) score -= 45;
+    if (!serviceSeller && !specificIntent && !growthPainRequest) score -= 60;
+    if (!strongMatches && !growthPainRequest) score -= 28;
     if (text.length < 80) score -= 20;
 
     return Math.max(-999, Math.min(100, score));
@@ -838,12 +911,76 @@
     recoverCurrentLeadHuntItem("Skip current");
   }
 
+  function savedOverlayPosition(key) {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(key) || "null");
+      return parsed && Number.isFinite(parsed.left) && Number.isFinite(parsed.top) ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function clampOverlayPosition(element, left, top) {
+    const rect = element.getBoundingClientRect();
+    return {
+      left: Math.max(8, Math.min(left, window.innerWidth - rect.width - 8)),
+      top: Math.max(8, Math.min(top, window.innerHeight - rect.height - 8)),
+    };
+  }
+
+  function applyOverlayPosition(element, key, fallback = { left: 18, bottom: 92 }) {
+    const saved = savedOverlayPosition(key);
+    element.style.right = "auto";
+    if (saved) {
+      const position = clampOverlayPosition(element, saved.left, saved.top);
+      element.style.left = `${position.left}px`;
+      element.style.top = `${position.top}px`;
+      element.style.bottom = "auto";
+      return;
+    }
+    element.style.left = `${fallback.left}px`;
+    element.style.top = "auto";
+    element.style.bottom = `${fallback.bottom}px`;
+  }
+
+  function makeOverlayDraggable(element, handle, key) {
+    if (element.dataset.marketvibeDraggable === "true") return;
+    element.dataset.marketvibeDraggable = "true";
+    handle.style.cursor = "move";
+    handle.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      const rect = element.getBoundingClientRect();
+      const offsetX = event.clientX - rect.left;
+      const offsetY = event.clientY - rect.top;
+      handle.setPointerCapture?.(event.pointerId);
+      const onMove = (moveEvent) => {
+        const position = clampOverlayPosition(element, moveEvent.clientX - offsetX, moveEvent.clientY - offsetY);
+        element.style.left = `${position.left}px`;
+        element.style.top = `${position.top}px`;
+        element.style.right = "auto";
+        element.style.bottom = "auto";
+        localStorage.setItem(key, JSON.stringify(position));
+      };
+      const onUp = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+      };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp, { once: true });
+    });
+  }
+
   function renderQueueControls() {
     let panel = document.getElementById("marketvibe-queue-controls");
     if (!panel) {
       panel = document.createElement("div");
       panel.id = "marketvibe-queue-controls";
-      panel.style.cssText = "position:fixed;right:16px;bottom:82px;z-index:2147483647;display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;max-width:min(420px,calc(100vw - 32px));font:12px Arial,sans-serif;";
+      panel.style.cssText = "position:fixed;left:18px;bottom:92px;z-index:2147483647;display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-start;align-items:center;max-width:min(420px,calc(100vw - 32px));font:12px Arial,sans-serif;";
+      const handle = document.createElement("button");
+      handle.type = "button";
+      handle.textContent = "Move";
+      handle.title = "Drag Buyer Radar controls";
+      handle.style.cssText = "border:1px solid rgba(148,163,184,.42);border-radius:999px;background:rgba(7,17,31,.88);color:#cbd5e1;font-weight:800;padding:9px 10px;box-shadow:0 10px 28px rgba(0,0,0,.28);cursor:move;";
       const next = document.createElement("button");
       next.type = "button";
       next.textContent = "Next match";
@@ -854,8 +991,12 @@
       skip.textContent = "Skip current";
       skip.style.cssText = "border:1px solid rgba(251,191,36,.55);border-radius:999px;background:#07111f;color:white;font-weight:800;padding:9px 11px;box-shadow:0 10px 28px rgba(0,0,0,.28);cursor:pointer;";
       skip.addEventListener("click", skipCurrentQualifiedPost);
-      panel.append(next, skip);
+      panel.append(handle, next, skip);
       document.body.appendChild(panel);
+      applyOverlayPosition(panel, "marketvibe_queue_controls_position", { left: 18, bottom: 92 });
+      makeOverlayDraggable(panel, handle, "marketvibe_queue_controls_position");
+    } else {
+      applyOverlayPosition(panel, "marketvibe_queue_controls_position", { left: 18, bottom: 92 });
     }
   }
 
@@ -957,6 +1098,7 @@
   }
 
   async function pollLeadHuntControl(reason = "poll") {
+    if (extensionReloadRequired) return true;
     const state = getLeadHuntState();
     if (!state?.runId) return false;
     try {
@@ -993,6 +1135,7 @@
   }
 
   function ensureLeadHuntControlPoller() {
+    if (extensionReloadRequired) return;
     if (leadHuntControlPollId) return;
     leadHuntControlPollId = window.setInterval(() => {
       void pollLeadHuntControl("interval");
@@ -1000,6 +1143,10 @@
   }
 
   function ensureLeadHuntRunner(reason = "runner ensure") {
+    if (extensionReloadRequired) {
+      showStatus("Extension reloaded. Please refresh the Facebook page.");
+      return;
+    }
     ensureLeadHuntControlPoller();
     if (!leadHuntIntervalId) {
       leadHuntIntervalId = window.setInterval(() => {
@@ -1024,8 +1171,9 @@
   function stopLeadHunt(message = "Buyer Radar stopped.", options = {}) {
     const state = getLeadHuntState();
     clearLeadHuntTimers();
+    stopLeadHuntControlPoller();
     if (state) {
-      const stoppedState = { ...state, active: false, paused: false, currentLock: "", status: message, nextActionAt: 0 };
+      const stoppedState = { ...state, active: false, paused: false, currentLock: "", status: message, stoppedAt: Date.now(), nextActionAt: 0 };
       if (options.sync === false) {
         localStorage.setItem(LEAD_HUNT_KEY, JSON.stringify(stoppedState));
         renderLeadHuntPanel();
@@ -1058,6 +1206,11 @@
   }
 
   function startLeadHunt(config = defaultLeadHuntConfig()) {
+    if (extensionReloadRequired) {
+      showStatus("Extension reloaded. Please refresh the Facebook page.");
+      renderLeadHuntPanel();
+      return;
+    }
     const searches = buildLeadHuntSearches(config);
     const state = {
       runId: config.runId || newRunId(),
@@ -1140,6 +1293,11 @@
   }
 
   function resumeLeadHunt(message = "Resuming Buyer Radar.", options = {}) {
+    if (extensionReloadRequired) {
+      showStatus("Extension reloaded. Please refresh the Facebook page.");
+      renderLeadHuntPanel();
+      return;
+    }
     const state = getLeadHuntState();
     if (state) {
       const resumedState = { ...state, active: true, paused: false, currentLock: "", importAuthStatus: /key connected|internal api key/i.test(message) ? "Connected" : state.importAuthStatus || "", status: message, nextActionAt: Date.now() + 250 };
@@ -1327,6 +1485,7 @@
       }
       return true;
     } catch (error) {
+      if (handleExtensionContextInvalidated(error, "auto import")) return false;
       if (await handleImportAuthError(error, state)) return false;
       const failedCount = Number(state.failedCount || 0) + 1;
       saveLeadHuntState({
@@ -1374,6 +1533,7 @@
   }
 
   async function runLeadHuntTick(trigger = "manual") {
+    if (extensionReloadRequired) return;
     if (leadHuntTickRunning) return;
     const state = getLeadHuntState();
     if (!state?.active || state.paused) return;
@@ -1504,6 +1664,7 @@
         advanceAfterFacebookPage(stateWithDuplicates, "No high-intent match after scanning visible page.");
       }
     } catch (error) {
+      if (handleExtensionContextInvalidated(error, `scan tick:${trigger}`)) return;
       if (await handleImportAuthError(error, state)) return;
       const failedCount = Number(state.failedCount || 0) + 1;
       const failedState = {
@@ -1534,16 +1695,40 @@
       document.body.appendChild(panel);
     }
     const search = state ? currentLeadHuntSearch(state) : null;
-    const runLabel = state?.paused ? "Paused" : state?.active ? "Running" : state ? "Stopped" : "Ready";
+    const statusText = state?.status || "";
+    const runLabel = state?.extensionReloadRequired || extensionReloadRequired
+      ? "Extension Reload Required"
+      : state?.paused
+        ? "Paused"
+        : state?.active && /recover/i.test(statusText)
+          ? "Recovering"
+          : state?.active
+            ? "Running"
+            : /complete|cap reached/i.test(statusText)
+              ? "Scan Complete"
+              : state
+                ? "Stopped"
+                : "Ready";
+    const runtimeEnd = state?.active && !state?.extensionReloadRequired && !extensionReloadRequired ? Date.now() : Number(state?.stoppedAt || Date.now());
+    const runtimeSeconds = state?.startedAt ? Math.max(0, Math.round((runtimeEnd - state.startedAt) / 1000)) : 0;
+    const badgeColor = runLabel === "Extension Reload Required"
+      ? "rgba(251,113,133,.22)"
+      : runLabel === "Paused"
+        ? "rgba(103,232,249,.18)"
+        : runLabel === "Recovering"
+          ? "rgba(251,191,36,.20)"
+          : runLabel === "Running"
+            ? "rgba(16,185,129,.18)"
+            : "rgba(148,163,184,.18)";
     panel.innerHTML = `
       <div style="font-weight:900;color:#a7f3d0;margin-bottom:6px;">MarketVibe Buyer Radar</div>
-      <div style="display:inline-block;border-radius:999px;background:${state?.paused ? "rgba(103,232,249,.18)" : state?.active ? "rgba(16,185,129,.18)" : "rgba(148,163,184,.18)"};color:white;padding:4px 8px;font-weight:900;margin-bottom:8px;">${runLabel}</div>
+      <div style="display:inline-block;border-radius:999px;background:${badgeColor};color:white;padding:4px 8px;font-weight:900;margin-bottom:8px;">${runLabel}</div>
       <div style="line-height:1.45;color:#e5eef9;margin-bottom:8px;">${state?.status || "Ready. Internal buyer discovery only. No auto-DM or auto-comment."}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;color:#cbd5e1;">
         <div>Query: ${search?.query || "not started"}</div>
         <div>Source: ${search?.source || "none"}</div>
         <div>Current URL: ${clean(state?.currentUrl || location.href).slice(0, 72)}</div>
-        <div>Runtime: ${state?.startedAt ? Math.round((Date.now() - state.startedAt) / 1000) : 0}s</div>
+        <div>Runtime: ${runtimeSeconds}s</div>
         <div>Current item: ${Number(state?.currentSearchIndex || 0) + (state ? 1 : 0)} / ${Math.min((state?.searches || []).length || 0, Number(state?.caps?.maxSearches || 10))}</div>
         <div>Completed: ${Number(state?.importedCount || 0) + Number(state?.skippedCount || 0) + Number(state?.ignoredLowConfidenceCount || 0) + Number(state?.duplicateCount || 0) + Number(state?.failedCount || 0)}</div>
         <div>Buyer items: ${state?.importedCount || 0}</div>
@@ -1605,7 +1790,7 @@
     if (!panel) {
       panel = document.createElement("div");
       panel.id = "marketvibe-recent-imports";
-      panel.style.cssText = "position:fixed;left:16px;bottom:20px;z-index:2147483647;width:min(360px,calc(100vw - 32px));border-radius:16px;background:#07111f;color:white;border:1px solid rgba(103,232,249,.35);box-shadow:0 16px 42px rgba(0,0,0,.38);padding:12px;font:12px Arial,sans-serif;";
+      panel.style.cssText = "position:fixed;left:16px;bottom:150px;z-index:2147483647;width:min(360px,calc(100vw - 32px));border-radius:16px;background:#07111f;color:white;border:1px solid rgba(103,232,249,.35);box-shadow:0 16px 42px rgba(0,0,0,.38);padding:12px;font:12px Arial,sans-serif;";
       document.body.appendChild(panel);
     }
 
@@ -1788,7 +1973,7 @@
     if (!box) {
       box = document.createElement("div");
       box.id = "marketvibe-import-status";
-      box.style.cssText = "position:fixed;right:16px;bottom:82px;z-index:2147483647;max-width:360px;border-radius:14px;background:#07111f;color:white;border:1px solid rgba(103,232,249,.45);box-shadow:0 14px 40px rgba(0,0,0,.35);padding:12px 14px;font:13px Arial,sans-serif;";
+      box.style.cssText = "position:fixed;right:16px;top:76px;z-index:2147483647;max-width:min(360px,calc(100vw - 32px));border-radius:14px;background:#07111f;color:white;border:1px solid rgba(103,232,249,.45);box-shadow:0 14px 40px rgba(0,0,0,.35);padding:12px 14px;font:13px Arial,sans-serif;";
       document.body.appendChild(box);
     }
     box.textContent = message;
@@ -1796,6 +1981,7 @@
   }
 
   async function sendPosts(posts, searchPhrase = new URLSearchParams(location.search).get("q") || "") {
+    if (extensionReloadRequired) throw new Error("Extension reloaded. Please refresh the Facebook page.");
     const state = getLeadHuntState();
     if (state?.active && state.paused) throw new Error("Buyer Radar is paused");
     if (state && !state.active) throw new Error("Buyer Radar is stopped");
@@ -1825,6 +2011,7 @@
       sendButton.textContent = "Sent to MarketVibe";
       return true;
     } catch (error) {
+      if (handleExtensionContextInvalidated(error, "send single post")) return false;
       if (!(await handleImportAuthError(error))) showStatus(`MarketVibe import failed: ${error && error.message ? error.message : "unknown error"}`);
       sendButton.disabled = false;
       sendButton.textContent = originalText || "Send this post to MarketVibe";
@@ -1845,6 +2032,7 @@
       posts.forEach(saveRecentImport);
       showStatus(`Imported ${posts.length} buyer-intent posts. Good: ${data.counts?.good || 0}.`);
     } catch (error) {
+      if (handleExtensionContextInvalidated(error, "send visible posts")) return;
       if (!(await handleImportAuthError(error))) showStatus(`MarketVibe import failed: ${error && error.message ? error.message : "unknown error"}`);
     } finally {
       button.disabled = false;
@@ -1856,7 +2044,7 @@
   button.id = "marketvibe-import-button";
   button.type = "button";
   button.textContent = "Send visible posts to MarketVibe";
-  button.style.cssText = "position:fixed;right:18px;bottom:24px;z-index:2147483647;border:0;border-radius:999px;background:linear-gradient(90deg,#10b981,#67e8f9);color:#03131f;font:800 14px Arial,sans-serif;padding:13px 17px;box-shadow:0 12px 34px rgba(0,0,0,.32);cursor:pointer;";
+  button.style.cssText = "position:fixed;left:18px;bottom:24px;z-index:2147483647;border:0;border-radius:999px;background:linear-gradient(90deg,#10b981,#67e8f9);color:#03131f;font:800 14px Arial,sans-serif;padding:13px 17px;box-shadow:0 12px 34px rgba(0,0,0,.32);cursor:pointer;";
   button.addEventListener("click", sendVisible);
   document.body.appendChild(button);
   installStoredKeyResumeListener();
