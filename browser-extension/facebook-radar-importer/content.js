@@ -245,9 +245,11 @@
     /how do i get booking system clients/i,
   ];
 
-  const SERVICE_CONTEXT_PATTERN = /\b(web designers?|website designers?|web design(?:ers?| agencies| services?)?|website services?|seo freelancers?|seo agencies?|seo consultants?|seo services?|local marketers?|local marketing agencies?|marketing agencies?|agencies|agency owners?|freelancers?|freelance services?|booking system sellers?|booking systems?|automation consultants?|social media managers?|social media marketing agencies?|smma|service providers?|lead gen agencies?|lead generation agencies?|web design agency|website agency|appointment setting|appointment-setting)\b/i;
-  const SPECIFIC_INTENT_PATTERN = /\b(web design clients?|website clients?|seo clients?|marketing clients?|agency leads?|agency clients?|local marketing clients?|local business prospecting|local business leads?|finding clients?|find clients?|client acquisition|smma clients?|lead generation|appointment setting leads?|appointment-setting leads?|selling websites?|sell websites?|selling seo|sell seo|selling services to local businesses|prospecting|prospects?|outreach)\b/i;
-  const EXACT_BUYER_INTENT_PATTERN = /\b(web design clients?|seo clients?|agency leads?|local business leads?|local business prospecting|selling websites?|sell websites?|selling seo|sell seo|marketing clients?|smma clients?|client acquisition|appointment setting leads?|appointment-setting leads?|lead generation)\b/i;
+  const WEBSITE_SERVICE_PATTERN = /\b(helping people with (?:their )?websites?|help people with (?:their )?websites?|websites?|web design|website designers?|web designers?|website services?|web design services?|i build websites?|i make websites?|build websites?|make websites?)\b/i;
+  const CLIENT_ACQUISITION_PAIN_PATTERN = /\b(how to get clients?|how do i get clients?|get clients?|need clients?|find clients?|finding clients?|terrible at marketing|bad at marketing|struggling (?:with|to do)? marketing|marketing is hard|need leads?|find leads?|client acquisition|prospecting|prospects?)\b/i;
+  const SERVICE_CONTEXT_PATTERN = /\b(web designers?|website designers?|web design(?:ers?| agencies| services?)?|website services?|seo freelancers?|seo agencies?|seo consultants?|seo services?|local marketers?|local marketing agencies?|marketing agencies?|agenc(?:y|ies)|agency owners?|freelancers?|freelance services?|booking system sellers?|booking systems?|automation consultants?|social media managers?|social media marketing agencies?|smma|service providers?|lead gen agencies?|lead generation agencies?|web design agency|website agency|appointment setting|appointment-setting|shopify stores?|shopify services?|shopify setup services?|coaches?|consultants?|local services?)\b/i;
+  const SPECIFIC_INTENT_PATTERN = /\b(web design clients?|website clients?|seo clients?|marketing clients?|agency leads?|agency clients?|local marketing clients?|local business prospecting|local business leads?|finding clients?|find clients?|how to get clients?|how do i get clients?|client acquisition|smma clients?|lead generation|appointment setting leads?|appointment-setting leads?|selling websites?|sell websites?|selling seo|sell seo|selling services to local businesses|prospecting|prospects?|outreach)\b/i;
+  const EXACT_BUYER_INTENT_PATTERN = /\b(web design clients?|website clients?|seo clients?|agency leads?|local business leads?|local business prospecting|selling websites?|sell websites?|selling seo|sell seo|marketing clients?|smma clients?|client acquisition|appointment setting leads?|appointment-setting leads?|lead generation)\b/i;
   const WEAK_GENERIC_CLIENT_PATTERN = /\b(need clients|get clients|more clients|new clients|general clients|closing clients|close clients|sales calls?|business growth)\b/i;
   const OFF_TOPIC_PATTERN = /\b(real estate|realtor|realtors|realty|mortgage|escrow|closing costs?|property closing|insurance|life insurance|policy|policies|mlm|multi level|network marketing|dating|tinder|relationship advice|single moms?|sports?|football|nba|nfl|soccer|fan page|motivation|motivational|mindset|inspirational|side hustles?|passive income|dropshipping|affiliate|marketplace|for sale|selling my|garage sale|job seeker|resume|cv|looking for work|open to work)\b/i;
   const QUESTION_OR_DISCUSSION_PATTERN = /\b(how do i|how can i|where do i|where can i|any advice|what should i|struggling|not working|no one replies|comments?|thoughts|recommendations?)\b|\?/i;
@@ -323,7 +325,8 @@
 
   function detectMatchReason(text, score, meta = {}) {
     const reasons = [];
-    if (SERVICE_CONTEXT_PATTERN.test(text)) reasons.push("service-seller context");
+    if (WEBSITE_SERVICE_PATTERN.test(text) && CLIENT_ACQUISITION_PAIN_PATTERN.test(text)) return "Website service seller asking how to get clients.";
+    if (SERVICE_CONTEXT_PATTERN.test(text) || (WEBSITE_SERVICE_PATTERN.test(text) && CLIENT_ACQUISITION_PAIN_PATTERN.test(text))) reasons.push("service-seller context");
     if (EXACT_BUYER_INTENT_PATTERN.test(text)) reasons.push("specific client-acquisition phrase");
     else if (SPECIFIC_INTENT_PATTERN.test(text)) reasons.push("prospecting/client-acquisition context");
     if (QUESTION_OR_DISCUSSION_PATTERN.test(text)) reasons.push("discussion/question signal");
@@ -343,9 +346,12 @@
   function scorePost(text, meta = {}) {
     let score = 0;
     let strongMatches = 0;
-    const serviceSeller = SERVICE_CONTEXT_PATTERN.test(text);
-    const specificIntent = SPECIFIC_INTENT_PATTERN.test(text);
-    const exactBuyerIntent = EXACT_BUYER_INTENT_PATTERN.test(text);
+    const websiteServiceSeller = WEBSITE_SERVICE_PATTERN.test(text);
+    const clientAcquisitionPain = CLIENT_ACQUISITION_PAIN_PATTERN.test(text);
+    const serviceIntentCombination = websiteServiceSeller && clientAcquisitionPain;
+    const serviceSeller = SERVICE_CONTEXT_PATTERN.test(text) || serviceIntentCombination;
+    const specificIntent = SPECIFIC_INTENT_PATTERN.test(text) || serviceIntentCombination;
+    const exactBuyerIntent = EXACT_BUYER_INTENT_PATTERN.test(text) || serviceIntentCombination;
     const genericLocalBusiness = /\b(my business|our business|business owner|small business owner|restaurant|cafe|clinic|salon|contractor|roofer|plumber|law firm|gym|dentist|shopify store|ecommerce store|online store|my website gets no traffic|my business has no leads|store not converting)\b/i.test(text);
     const offTopicMatches = countPatternMatches(text, [OFF_TOPIC_PATTERN]);
 
@@ -370,6 +376,9 @@
 
     if (/\?/.test(text)) score += 8;
     if (/\b(i|my|we|our)\b/i.test(text) && /\b(struggling|stuck|need|looking|can't|cannot|no|help|advice)\b/i.test(text)) score += 15;
+    if (websiteServiceSeller) score += 28;
+    if (clientAcquisitionPain) score += 22;
+    if (serviceIntentCombination) score += 48;
     if (specificIntent) score += 30;
     if (exactBuyerIntent) score += 24;
     if (serviceSeller && /\b(leads|clients|prospects|outreach|prospecting|cold calling|client acquisition)\b/i.test(text)) score += 24;
@@ -471,6 +480,7 @@
   }
 
   function detectPainPoint(text) {
+    if (WEBSITE_SERVICE_PATTERN.test(text) && CLIENT_ACQUISITION_PAIN_PATTERN.test(text)) return "Website service seller asking how to get clients.";
     if (/\b(outreach|no one replies)\b/i.test(text)) return "outreach not working";
     if (/\b(website clients?|web design clients?|sell websites?)\b/i.test(text)) return "web design client acquisition";
     if (/\b(seo clients?|sell seo|local seo clients?)\b/i.test(text)) return "SEO client acquisition";

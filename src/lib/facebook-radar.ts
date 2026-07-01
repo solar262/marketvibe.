@@ -131,16 +131,18 @@ export const DEFAULT_FACEBOOK_EXCLUDE_KEYWORDS = [
   "spam",
 ];
 
-const SERVICE_SELLER_PATTERN = /\b(web designers?|website designers?|web design(?:ers?| agencies| services?)?|website services?|seo freelancers?|seo agencies?|seo consultants?|seo services?|local marketers?|local marketing agencies?|marketing agencies?|agencies|agency owners?|freelancers?|freelance services?|booking system sellers?|booking systems?|automation consultants?|social media managers?|social media marketing agencies?|smma|service providers?|lead gen agencies?|lead generation agencies?|web design agency|website agency|appointment setting|appointment-setting)\b/i;
-const SPECIFIC_INTENT_PATTERN = /\b(web design clients?|website clients?|seo clients?|marketing clients?|agency leads?|agency clients?|local marketing clients?|local business prospecting|local business leads?|finding clients?|find clients?|client acquisition|smma clients?|lead generation|appointment setting leads?|appointment-setting leads?|selling websites?|sell websites?|selling seo|sell seo|selling services to local businesses|prospecting|prospects?|outreach)\b/i;
-const EXACT_BUYER_INTENT_PATTERN = /\b(web design clients?|seo clients?|agency leads?|local business leads?|local business prospecting|selling websites?|sell websites?|selling seo|sell seo|marketing clients?|smma clients?|client acquisition|appointment setting leads?|appointment-setting leads?|lead generation)\b/i;
+const WEBSITE_SERVICE_PATTERN = /\b(helping people with (?:their )?websites?|help people with (?:their )?websites?|websites?|web design|website designers?|web designers?|website services?|web design services?|i build websites?|i make websites?|build websites?|make websites?)\b/i;
+const CLIENT_ACQUISITION_PAIN_PATTERN = /\b(how to get clients?|how do i get clients?|get clients?|need clients?|find clients?|finding clients?|terrible at marketing|bad at marketing|struggling (?:with|to do)? marketing|marketing is hard|need leads?|find leads?|client acquisition|prospecting|prospects?)\b/i;
+const SERVICE_SELLER_PATTERN = /\b(web designers?|website designers?|web design(?:ers?| agencies| services?)?|website services?|seo freelancers?|seo agencies?|seo consultants?|seo services?|local marketers?|local marketing agencies?|marketing agencies?|agenc(?:y|ies)|agency owners?|freelancers?|freelance services?|booking system sellers?|booking systems?|automation consultants?|social media managers?|social media marketing agencies?|smma|service providers?|lead gen agencies?|lead generation agencies?|web design agency|website agency|appointment setting|appointment-setting|shopify stores?|shopify services?|shopify setup services?|coaches?|consultants?|local services?)\b/i;
+const SPECIFIC_INTENT_PATTERN = /\b(web design clients?|website clients?|seo clients?|marketing clients?|agency leads?|agency clients?|local marketing clients?|local business prospecting|local business leads?|finding clients?|find clients?|how to get clients?|how do i get clients?|client acquisition|smma clients?|lead generation|appointment setting leads?|appointment-setting leads?|selling websites?|sell websites?|selling seo|sell seo|selling services to local businesses|prospecting|prospects?|outreach)\b/i;
+const EXACT_BUYER_INTENT_PATTERN = /\b(web design clients?|website clients?|seo clients?|agency leads?|local business leads?|local business prospecting|selling websites?|sell websites?|selling seo|sell seo|marketing clients?|smma clients?|client acquisition|appointment setting leads?|appointment-setting leads?|lead generation)\b/i;
 const WEAK_GENERIC_CLIENT_PATTERN = /\b(need clients|get clients|more clients|new clients|general clients|closing clients|close clients|sales calls?|business growth)\b/i;
 const PAIN_PATTERN = /\b(need clients|how do i get clients|get clients|client acquisition|looking for clients|find clients|finding clients|need leads|looking for leads|local business leads|local leads|prospecting|prospect list|find prospects|business prospects|generating more leads|generate more leads|struggling generating more leads|struggling to generate leads|lead generation|cold outreach not working|outreach not working|cold calling is too time consuming|alternatives to cold calling|no one replies|no replies|where do i find prospects|where can i find prospects|where do i find local business leads|sell websites|selling websites|sell seo|selling seo|sell booking systems|social media management clients)\b/i;
 const LOCAL_BUSINESS_OWNER_PATTERN = /\b(my business|our business|business owner|small business owner|restaurant|cafe|clinic|salon|contractor|roofer|plumber|law firm|gym|dentist|shopify store|ecommerce store|online store|need a website for my business|my website is not getting customers|business is slow)\b/i;
 const OFF_TOPIC_PATTERN = /\b(real estate|realtor|realtors|realty|mortgage|escrow|closing costs?|property closing|insurance|life insurance|policy|policies|mlm|multi level|network marketing|dating|tinder|relationship advice|single moms?|sports?|football|nba|nfl|soccer|fan page|motivation|motivational|mindset|inspirational|side hustles?|passive income|dropshipping|affiliate|marketplace|for sale|selling my|garage sale|job seeker|resume|cv|looking for work|open to work)\b/i;
 const DISCUSSION_PATTERN = /\b(how do i|how can i|where do i|where can i|any advice|what should i|struggling|not working|no one replies|comments?|thoughts|recommendations?)\b|\?/i;
 const IMAGE_OR_MEME_PATTERN = /\b(meme|funny|photo dump|caption this|image only|reel|watch this|viral)\b/i;
-const BAD_PATTERN = /\b(hiring|hire me|looking for work|looking for web developer|need a web developer|web developer needed|pay per website|\$50 per website|remote developer|salary|full-time|part-time|job opening|job post|vacancy|apply now|course launch|buy my|dm me for|limited offer|promo code|giveaway|i built this|i build websites|i can build|i offer|we provide leads|guaranteed clients|guaranteed leads|buy leads|sell leads|cheap website|crypto|forex|mlm|multi level|affiliate|dropshipping|drop shipping|reseller|wholesale|telegram)\b/i;
+const BAD_PATTERN = /\b(hiring|hire me|looking for work|looking for web developer|need a web developer|web developer needed|pay per website|\$50 per website|remote developer|salary|full-time|part-time|job opening|job post|vacancy|apply now|course launch|buy my|dm me for|limited offer|promo code|giveaway|i built this|i offer|we provide leads|guaranteed clients|guaranteed leads|buy leads|sell leads|cheap website|crypto|forex|mlm|multi level|affiliate|dropshipping|drop shipping|reseller|wholesale|telegram)\b/i;
 const PRIVATE_GROUP_PATTERN = /\b(private group|members only|screenshot from a private group|do not share|confidential)\b/i;
 const SEARCH_SKIP_SIGNALS = ["hiring", "jobs", "cheap web developer", "pay per website", "people selling leads", "spam offers", "DM me", "guaranteed clients"];
 const SEARCH_GOOD_SIGNALS = ["client-acquisition questions", "prospecting advice requests", "agency/freelancer pain", "local business lead sourcing", "outreach failure", "service-selling strategy"];
@@ -330,6 +332,7 @@ export function generateFacebookSearchLinks(input: FacebookRadarSearchInput): Fa
 }
 
 function detectPainPoint(text: string) {
+  if (WEBSITE_SERVICE_PATTERN.test(text) && CLIENT_ACQUISITION_PAIN_PATTERN.test(text)) return "Website service seller asking how to get clients.";
   if (/\b(cold outreach|no one replies|outreach not working)\b/i.test(text)) return "outreach not working";
   if (/\b(web design|web designer|sell websites|website clients)\b/i.test(text)) return "web design client acquisition";
   if (/\b(seo clients|seo freelancer|seo agency|sell seo)\b/i.test(text)) return "SEO client acquisition";
@@ -373,6 +376,9 @@ export function normalizeFacebookLeadSignature(value: { text?: string; url?: str
 export function scoreFacebookLeadPreview(candidate: FacebookLeadCandidate, filters: FacebookRadarFilters = createDefaultFacebookFilters(), seen = new Set<string>()): FacebookLeadPreview {
   const text = cleanText(candidate.text || "");
   const combined = cleanText([text, candidate.groupName, candidate.location].filter(Boolean).join(" "));
+  const serviceIntentCombination = WEBSITE_SERVICE_PATTERN.test(combined) && CLIENT_ACQUISITION_PAIN_PATTERN.test(combined);
+  const hasServiceSeller = SERVICE_SELLER_PATTERN.test(combined) || serviceIntentCombination;
+  const hasSpecificIntent = SPECIFIC_INTENT_PATTERN.test(combined) || serviceIntentCombination;
   let rank = scorePost(combined, "service sellers", filters.includeCategories.join(", "));
   if ((candidate.comments || 0) >= 2 || DISCUSSION_PATTERN.test(combined)) rank = Math.min(100, rank + Math.min(12, (candidate.comments || 0) * 2 + 6));
   const skipReasons: string[] = [];
@@ -383,10 +389,10 @@ export function scoreFacebookLeadPreview(candidate: FacebookLeadCandidate, filte
   if (BAD_PATTERN.test(combined)) skipReasons.push("job, spam, crypto, MLM, reseller, seller marketplace, or low-quality intent");
   if (OFF_TOPIC_PATTERN.test(combined)) skipReasons.push("off-topic: real estate, insurance, dating, sports, motivation, marketplace, side hustle, or job-seeker content");
   if (IMAGE_OR_MEME_PATTERN.test(combined) && !DISCUSSION_PATTERN.test(combined)) skipReasons.push("image, meme, or low-discussion content");
-  if (LOCAL_BUSINESS_OWNER_PATTERN.test(combined) && !SERVICE_SELLER_PATTERN.test(combined)) skipReasons.push("generic local business owner post, not a service-seller buyer");
-  if (!SERVICE_SELLER_PATTERN.test(combined)) skipReasons.push("not clearly from a freelancer, agency, marketer, or service seller");
-  if (!SPECIFIC_INTENT_PATTERN.test(combined)) skipReasons.push("missing specific client-acquisition or prospecting context");
-  if (WEAK_GENERIC_CLIENT_PATTERN.test(combined) && !EXACT_BUYER_INTENT_PATTERN.test(combined)) skipReasons.push("generic client/sales language without a specific service-selling angle");
+  if (LOCAL_BUSINESS_OWNER_PATTERN.test(combined) && !hasServiceSeller) skipReasons.push("generic local business owner post, not a service-seller buyer");
+  if (!hasServiceSeller) skipReasons.push("not clearly from a freelancer, agency, marketer, or service seller");
+  if (!hasSpecificIntent) skipReasons.push("missing specific client-acquisition or prospecting context");
+  if (WEAK_GENERIC_CLIENT_PATTERN.test(combined) && !EXACT_BUYER_INTENT_PATTERN.test(combined) && !serviceIntentCombination) skipReasons.push("generic client/sales language without a specific service-selling angle");
   if (filters.publicGroupsOnly && candidate.isPublicGroup === false) skipReasons.push("not confirmed public");
   if ((candidate.groupMembers || 0) < filters.minimumMembers) skipReasons.push("group below minimum members");
   if ((candidate.groupPostsPerDay || 0) < filters.minimumPostsPerDay) skipReasons.push("group below minimum daily activity");
@@ -415,7 +421,7 @@ export function scoreFacebookLeadPreview(candidate: FacebookLeadCandidate, filte
     groupName: candidate.groupName || "Facebook source",
     groupSizeActivity: `${candidate.groupMembers || 0} members · ${candidate.groupPostsPerDay || 0} posts/day`,
     snippet: text.slice(0, 260),
-    authorType: SERVICE_SELLER_PATTERN.test(text) ? "Likely service seller" : "Unknown",
+    authorType: SERVICE_SELLER_PATTERN.test(text) || (WEBSITE_SERVICE_PATTERN.test(text) && CLIENT_ACQUISITION_PAIN_PATTERN.test(text)) ? "Likely service seller" : "Unknown",
     intentScore: scoreLabel(rank),
     intentRank: rank,
     painPoint,
@@ -449,6 +455,7 @@ export function shouldSendFacebookLead(preview: FacebookLeadPreview, sent = new 
 
 function detectIntent(text: string) {
   if (/\b(cold outreach|no replies|outreach)\b/i.test(text)) return "outreach";
+  if (WEBSITE_SERVICE_PATTERN.test(text) && CLIENT_ACQUISITION_PAIN_PATTERN.test(text)) return "web-design-clients";
   if (/\b(seo clients|seo freelancer|seo services|rankings|local seo)\b/i.test(text)) return "seo-clients";
   if (/\b(web design|sell websites|website clients|website redesign|businesses without websites)\b/i.test(text)) return "web-design-clients";
   if (/\b(lead generation|local leads|agency clients|prospecting|local business prospects)\b/i.test(text)) return "lead-generation";
@@ -458,9 +465,15 @@ function detectIntent(text: string) {
 
 function scorePost(text: string, targetBuyer: string, painKeywords: string) {
   let score = 0;
-  const hasServiceSeller = hasAny(text, SERVICE_SELLER_PATTERN);
+  const hasWebsiteServiceSeller = hasAny(text, WEBSITE_SERVICE_PATTERN);
+  const hasClientAcquisitionPain = hasAny(text, CLIENT_ACQUISITION_PAIN_PATTERN);
+  const serviceIntentCombination = hasWebsiteServiceSeller && hasClientAcquisitionPain;
+  const hasServiceSeller = hasAny(text, SERVICE_SELLER_PATTERN) || serviceIntentCombination;
   const localBusinessOwner = hasAny(text, LOCAL_BUSINESS_OWNER_PATTERN);
   if (hasServiceSeller) score += 34;
+  if (hasWebsiteServiceSeller) score += 28;
+  if (hasClientAcquisitionPain) score += 22;
+  if (serviceIntentCombination) score += 48;
   if (hasAny(text, PAIN_PATTERN)) score += 42;
   if (/\?/.test(text)) score += 8;
   if (/\b(help|advice|struggling|stuck|not working|where do i find|how do i)\b/i.test(text)) score += 10;
@@ -477,14 +490,14 @@ function scorePost(text: string, targetBuyer: string, painKeywords: string) {
   if (localBusinessOwner && !hasServiceSeller) score -= 60;
   if (!hasServiceSeller && !/\b(sell websites|sell seo|local business leads|find prospects|prospecting|client acquisition|agency clients)\b/i.test(text)) score -= 35;
   if (DISCUSSION_PATTERN.test(text)) score += 10;
-  if (EXACT_BUYER_INTENT_PATTERN.test(text)) score += 24;
-  if (SPECIFIC_INTENT_PATTERN.test(text)) score += 30;
-  if (WEAK_GENERIC_CLIENT_PATTERN.test(text) && !EXACT_BUYER_INTENT_PATTERN.test(text) && !hasServiceSeller) score -= 45;
-  if (WEAK_GENERIC_CLIENT_PATTERN.test(text) && !EXACT_BUYER_INTENT_PATTERN.test(text)) score -= 20;
+  if (EXACT_BUYER_INTENT_PATTERN.test(text) || serviceIntentCombination) score += 24;
+  if (SPECIFIC_INTENT_PATTERN.test(text) || serviceIntentCombination) score += 30;
+  if (WEAK_GENERIC_CLIENT_PATTERN.test(text) && !EXACT_BUYER_INTENT_PATTERN.test(text) && !serviceIntentCombination && !hasServiceSeller) score -= 45;
+  if (WEAK_GENERIC_CLIENT_PATTERN.test(text) && !EXACT_BUYER_INTENT_PATTERN.test(text) && !serviceIntentCombination) score -= 20;
   if (IMAGE_OR_MEME_PATTERN.test(text) || (!DISCUSSION_PATTERN.test(text) && text.length < 160)) score -= 20;
   if (!hasServiceSeller) score -= 35;
-  if (!SPECIFIC_INTENT_PATTERN.test(text)) score -= 45;
-  if (!hasServiceSeller && !SPECIFIC_INTENT_PATTERN.test(text)) score -= 60;
+  if (!SPECIFIC_INTENT_PATTERN.test(text) && !serviceIntentCombination) score -= 45;
+  if (!hasServiceSeller && !SPECIFIC_INTENT_PATTERN.test(text) && !serviceIntentCombination) score -= 60;
   if (OFF_TOPIC_PATTERN.test(text)) score -= 70;
   if (BAD_PATTERN.test(text)) score -= 55;
   if (PRIVATE_GROUP_PATTERN.test(text)) score -= 35;
@@ -529,7 +542,7 @@ function replyForIntent(intent: string) {
 export function analyzeFacebookLead(input: FacebookRadarInput): FacebookRadarResult {
   const postText = cleanText(input.postText);
   const combined = cleanText([postText, input.targetBuyer, input.painKeywords].filter(Boolean).join(" "));
-  const rawScore = postText ? scorePost(combined, input.targetBuyer, input.painKeywords) : 0;
+  const rawScore = postText ? scorePost(postText, input.targetBuyer, input.painKeywords) : 0;
   const blocked = !postText || BAD_PATTERN.test(postText) || OFF_TOPIC_PATTERN.test(postText);
   const privateRisk = PRIVATE_GROUP_PATTERN.test(postText);
   const action: FacebookRadarAction = blocked || rawScore < 50 ? "Skip" : "ManualOnly";
@@ -537,6 +550,9 @@ export function analyzeFacebookLead(input: FacebookRadarInput): FacebookRadarRes
   const risk: FacebookRadarRisk = blocked || privateRisk ? "High" : rawScore >= 70 ? "Low" : "Medium";
   const intent = detectIntent(combined);
   const replies = replyForIntent(intent);
+  const websiteClientReason = WEBSITE_SERVICE_PATTERN.test(postText) && CLIENT_ACQUISITION_PAIN_PATTERN.test(postText)
+    ? "Website service seller asking how to get clients."
+    : "";
 
   if (action === "Skip") {
     return {
@@ -557,7 +573,7 @@ export function analyzeFacebookLead(input: FacebookRadarInput): FacebookRadarRes
     score,
     risk,
     intent,
-    reason: `Detected ${intent.replace(/-/g, " ")} pain with a ${rawScore}/100 fit score. Manual engagement only.`,
+    reason: websiteClientReason || `Detected ${intent.replace(/-/g, " ")} pain with a ${rawScore}/100 fit score. Manual engagement only.`,
     quickReply: replies.quickReply,
     deeperReply: replies.deeperReply,
     manualNote: privateRisk

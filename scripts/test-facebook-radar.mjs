@@ -96,6 +96,17 @@ assert.notEqual(analysis.action, "Skip", "Analyze pasted post should return a bu
 assert.match(analysis.quickReply, /outreach|visible problem|service pitch|platforms/i, "Analyze pasted post should return helpful replies");
 assert.match(analysis.manualNote, /manual|links|profile|posting/i, "Manual note should reinforce manual engagement");
 
+const websiteServiceSellerPost = "Hey everyone, I'm in the business of helping people with their websites. Any tips on how to get clients? I do good work, but I'm terrible at marketing.";
+const websiteServiceSellerAnalysis = analyzeFacebookLead({
+  postText: websiteServiceSellerPost,
+  targetBuyer: "web designers, freelancers, agencies",
+  painKeywords: "how to get clients, terrible at marketing",
+  sourceUrl: "",
+});
+assert.notEqual(websiteServiceSellerAnalysis.action, "Skip", "Website service seller asking how to get clients should not be skipped");
+assert.equal(websiteServiceSellerAnalysis.score, "High", "Website service seller client-acquisition pain should be High fit");
+assert.equal(websiteServiceSellerAnalysis.reason, "Website service seller asking how to get clients.", "Exact website-service buyer match should explain why it matched");
+
 const cheapDeveloper = analyzeFacebookLead({
   postText: "I need a web developer for my clients' projects. I will pay $50 per website.",
   targetBuyer: "web designers",
@@ -113,12 +124,12 @@ const launchedBusiness = analyzeFacebookLead({
 assert.equal(launchedBusiness.action, "Skip", "Generic local business owner posts should be skipped as buyer-radar inventory");
 
 const outreachPain = analyzeFacebookLead({
-  postText: "Cold outreach not working. No one replies to my outreach. How do I get clients?",
+  postText: "I run a small agency and cold outreach is not working. No one replies to my outreach. How do I get clients?",
   targetBuyer: "agencies",
   painKeywords: "cold outreach not working",
   sourceUrl: "",
 });
-assert.equal(outreachPain.score, "High", "Cold outreach not working should be High fit");
+assert.equal(outreachPain.score, "High", "Service-seller cold outreach pain should be High fit");
 
 const genericNeedClients = analyzeFacebookLead({
   postText: "Need clients and sales this month. Any tips for closing more clients?",
@@ -166,6 +177,23 @@ assert.ok(BUYER_INTENT_QUERY_LIBRARY.includes("where can I find local business l
 assert.equal(BUYER_INTENT_QUERY_LIBRARY.includes("I need a website for my business"), false, "Buyer intent query library should not target local business owners as buyers");
 
 const defaultFilters = createDefaultFacebookFilters();
+const genericGroupWebsiteSellerPreviews = filterAndRankFacebookLeads([
+  {
+    text: websiteServiceSellerPost,
+    url: "https://www.facebook.com/groups/entrepreneurship/posts/321",
+    groupName: "Small Business and Entrepreneurship",
+    groupMembers: 18000,
+    groupPostsPerDay: 22,
+    comments: 9,
+    reactions: 14,
+    language: "English",
+    isPublicGroup: true,
+  },
+], defaultFilters);
+assert.equal(genericGroupWebsiteSellerPreviews[0].passedFilters, true, "Generic entrepreneurship group should not block genuine website-service client-acquisition posts");
+assert.equal(genericGroupWebsiteSellerPreviews[0].intentScore, "High", "Website service seller preview should score High");
+assert.match(genericGroupWebsiteSellerPreviews[0].reason, /Website service seller asking how to get clients/i, "Preview should summarize the website-service client-acquisition pain");
+
 const buyerIntentPreviews = filterAndRankFacebookLeads([
   {
     text: "I run a small web design service and cold outreach is not working. Where can I find local business leads and get clients without spamming?",
@@ -277,6 +305,18 @@ const agencyLeadPainImport = scoreImportedFacebookPosts({
 });
 assert.equal(agencyLeadPainImport[0]?.label, "Good", "Exact agency lead-generation pain should import as Good");
 assert.ok(agencyLeadPainImport[0]?.fitRank >= 70, "Exact skipped example should rank as high-intent import");
+
+const websiteServiceSellerImport = scoreImportedFacebookPosts({
+  posts: [{
+    text: websiteServiceSellerPost,
+    sourceName: "Small Business and Entrepreneurship",
+    author: "Website helper",
+    url: "https://www.facebook.com/groups/entrepreneurship/posts/321",
+  }],
+  searchPhrase: "how to get clients website services",
+});
+assert.equal(websiteServiceSellerImport[0]?.label, "Good", "Exact website-service client-acquisition post should import as Good");
+assert.equal(websiteServiceSellerImport[0]?.matchReason, "Website service seller asking how to get clients.", "Imported item should store the exact match reason");
 
 assert.match(pageSource, /activeSearchLink = availableSearchLinks/, "One-card workflow state should use one active search card");
 assert.match(pageSource, /MAIN_TABS/, "Facebook Radar should expose main workflow tabs");
@@ -399,6 +439,7 @@ assert.doesNotMatch(extensionSource, /need more customers/, "Facebook importer s
 assert.match(extensionSource, /OFF_TOPIC_PATTERN/, "Facebook importer should penalize off-topic categories");
 assert.match(extensionSource, /WEAK_GENERIC_CLIENT_PATTERN/, "Facebook importer should penalize generic client language");
 assert.match(extensionSource, /SPECIFIC_INTENT_PATTERN/, "Facebook importer should require specific client-acquisition context");
+assert.match(extensionSource, /Website service seller asking how to get clients\./, "Facebook importer should store the website-service match reason");
 assert.match(extensionSource, /cheap website/, "Facebook importer should reject cheap-work posts");
 assert.match(extensionSource, /guaranteed clients/, "Facebook importer should reject guaranteed-client spam");
 assert.match(extensionSource, /group directory/, "Facebook importer should reject directory noise");
