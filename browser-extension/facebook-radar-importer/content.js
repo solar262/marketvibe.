@@ -45,15 +45,61 @@
     return `hunt-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   }
 
-  function internalApiKey() {
-    return clean(localStorage.getItem("marketvibe_internal_key") || "");
+  function isMarketVibeHost() {
+    return /(^|\.)marketvibe1\.com$/i.test(location.hostname);
   }
 
-  function internalHeaders(extra = {}) {
+  function extensionStorageAvailable() {
+    return Boolean(globalThis.chrome?.storage?.local);
+  }
+
+  async function internalApiKey() {
+    if (!extensionStorageAvailable()) return "";
+    const stored = await chrome.storage.local.get("marketvibe_internal_key");
+    return clean(stored.marketvibe_internal_key || "");
+  }
+
+  async function setInternalApiKey(key) {
+    if (!extensionStorageAvailable()) return false;
+    await chrome.storage.local.set({ marketvibe_internal_key: clean(key) });
+    return true;
+  }
+
+  async function internalHeaders(extra = {}) {
     const headers = { "Content-Type": "application/json", ...extra };
-    const key = internalApiKey();
+    const key = await internalApiKey();
     if (key) headers["X-MarketVibe-Internal-Key"] = key;
     return headers;
+  }
+
+  function installMarketVibeDashboardBridge() {
+    window.addEventListener("message", async (event) => {
+      if (event.source !== window || event.origin !== location.origin) return;
+      const data = event.data || {};
+      if (data.type !== "MARKETVIBE_BUYER_RADAR_SAVE_KEY") return;
+      const key = clean(data.key || "");
+      const saved = key ? await setInternalApiKey(key) : false;
+      window.postMessage({
+        type: "MARKETVIBE_BUYER_RADAR_KEY_SAVE_RESULT",
+        status: saved ? "Connected" : "Missing key",
+      }, location.origin);
+    });
+  }
+
+  function installStoredKeyResumeListener() {
+    if (!extensionStorageAvailable()) return;
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName !== "local" || !changes.marketvibe_internal_key?.newValue) return;
+      const state = getLeadHuntState();
+      if (state?.active && state.paused && /key|auth/i.test(`${state.importAuthStatus || ""} ${state.status || ""}`)) {
+        resumeLeadHunt("Internal API key connected. Resuming Buyer Radar.");
+      }
+    });
+  }
+
+  if (isMarketVibeHost()) {
+    installMarketVibeDashboardBridge();
+    return;
   }
 
   async function fetchWithTimeout(url, options = {}, timeoutMs = ACTION_TIMEOUT_MS) {
@@ -94,11 +140,11 @@
     return Boolean(state?.active && !state.paused);
   }
 
-  function postLeadHuntEvent(eventType, payload = {}) {
+  async function postLeadHuntEvent(eventType, payload = {}) {
     const state = getLeadHuntState();
     fetchWithTimeout(EVENT_API_URL, {
       method: "POST",
-      headers: internalHeaders(),
+      headers: await internalHeaders(),
       body: JSON.stringify({
         runId: state?.runId || "",
         eventType,
@@ -107,12 +153,12 @@
     }).catch((error) => logLeadHunt("event sync failed", { eventType, message: error?.message || "unknown" }));
   }
 
-  function recordProcessedUrl(sourceUrl, status, payload = {}) {
+  async function recordProcessedUrl(sourceUrl, status, payload = {}) {
     const state = getLeadHuntState();
     if (!sourceUrl) return;
     fetchWithTimeout(PROCESSED_URL_API_URL, {
       method: "POST",
-      headers: internalHeaders(),
+      headers: await internalHeaders(),
       body: JSON.stringify({
         runId: state?.runId || "",
         sourceUrl,
@@ -126,6 +172,33 @@
     const configured = Number(state?.caps?.confidenceThreshold || HIGH_INTENT_IMPORT_THRESHOLD);
     if (!Number.isFinite(configured)) return HIGH_INTENT_IMPORT_THRESHOLD;
     return Math.max(50, Math.min(95, configured));
+  }
+
+  function isImportAuthError(error) {
+    return /\bHTTP (401|403)\b|auth required|unauthorized|forbidden/i.test(String(error?.message || error || ""));
+  }
+
+  async function handleImportAuthError(error, fallbackState = getLeadHuntState()) {
+    if (!isImportAuthError(error)) return false;
+    const state = getLeadHuntState() || fallbackState;
+    const authStatus = await internalApiKey() ? "Invalid key" : "Missing key";
+    const message = `${authStatus}. Add/update the internal API key in the Buyer Radar dashboard, then resume.`;
+    if (state) {
+      saveLeadHuntState({
+        ...state,
+        active: true,
+        paused: true,
+        currentLock: "",
+        importAuthStatus: authStatus,
+        status: message,
+        errors: [],
+        nextActionAt: Date.now() + 3600000,
+      });
+      ensureLeadHuntControlPoller();
+    }
+    showStatus(message);
+    logLeadHunt("import auth needed", { authStatus, message: error?.message || "HTTP 401" });
+    return true;
   }
 
   function clean(value) {
@@ -854,11 +927,11 @@
     syncLeadHuntStatus(nextState);
   }
 
-  function syncLeadHuntStatus(nextState) {
+  async function syncLeadHuntStatus(nextState) {
     const search = currentLeadHuntSearch(nextState);
     fetchWithTimeout(STATUS_API_URL, {
       method: "POST",
-      headers: internalHeaders(),
+        headers: await internalHeaders(),
       body: JSON.stringify({
         runId: nextState.runId || "",
         active: Boolean(nextState.active),
@@ -887,7 +960,7 @@
     const state = getLeadHuntState();
     if (!state?.runId) return false;
     try {
-      const response = await fetchWithTimeout(STATUS_API_URL, { headers: internalHeaders({ "Content-Type": "application/json" }) }, 8000);
+      const response = await fetchWithTimeout(STATUS_API_URL, { headers: await internalHeaders({ "Content-Type": "application/json" }) }, 8000);
       if (!response.ok) return false;
       const remote = await response.json();
       if (!remote || remote.runId !== state.runId) return false;
@@ -985,7 +1058,6 @@
   }
 
   function startLeadHunt(config = defaultLeadHuntConfig()) {
-    if (config.internalKey) localStorage.setItem("marketvibe_internal_key", clean(config.internalKey));
     const searches = buildLeadHuntSearches(config);
     const state = {
       runId: config.runId || newRunId(),
@@ -1013,6 +1085,7 @@
       lastActiveSignature: "",
       loadingSince: 0,
       loadingReloaded: false,
+      importAuthStatus: "",
       status: "Buyer Radar starting.",
     };
     saveLeadHuntState(state);
@@ -1069,7 +1142,7 @@
   function resumeLeadHunt(message = "Resuming Buyer Radar.", options = {}) {
     const state = getLeadHuntState();
     if (state) {
-      const resumedState = { ...state, active: true, paused: false, currentLock: "", status: message, nextActionAt: Date.now() + 250 };
+      const resumedState = { ...state, active: true, paused: false, currentLock: "", importAuthStatus: /key connected|internal api key/i.test(message) ? "Connected" : state.importAuthStatus || "", status: message, nextActionAt: Date.now() + 250 };
       if (options.sync === false) {
         localStorage.setItem(LEAD_HUNT_KEY, JSON.stringify(resumedState));
         renderLeadHuntPanel();
@@ -1254,6 +1327,7 @@
       }
       return true;
     } catch (error) {
+      if (await handleImportAuthError(error, state)) return false;
       const failedCount = Number(state.failedCount || 0) + 1;
       saveLeadHuntState({
         ...state,
@@ -1430,6 +1504,7 @@
         advanceAfterFacebookPage(stateWithDuplicates, "No high-intent match after scanning visible page.");
       }
     } catch (error) {
+      if (await handleImportAuthError(error, state)) return;
       const failedCount = Number(state.failedCount || 0) + 1;
       const failedState = {
         ...state,
@@ -1475,6 +1550,7 @@
         <div>Skipped: ${state?.skippedCount || 0}</div>
         <div>Ignored low-confidence: ${state?.ignoredLowConfidenceCount || 0}</div>
         <div>Min confidence: ${confidenceThreshold(state)}</div>
+        <div>Import auth: ${state?.importAuthStatus || "Not checked"}</div>
         <div>Duplicates: ${state?.duplicateCount || 0}</div>
         <div>Failed: ${state?.failedCount || 0}</div>
       </div>
@@ -1725,10 +1801,13 @@
     if (state && !state.active) throw new Error("Buyer Radar is stopped");
     const response = await fetchWithTimeout(API_URL, {
       method: "POST",
-      headers: internalHeaders(),
+      headers: await internalHeaders(),
       body: JSON.stringify({ posts, searchPhrase, runId: state?.runId || "" }),
     });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok) {
+      const message = response.status === 401 || response.status === 403 ? `MarketVibe import auth required (HTTP ${response.status})` : `HTTP ${response.status}`;
+      throw new Error(message);
+    }
     return response.json();
   }
 
@@ -1746,7 +1825,7 @@
       sendButton.textContent = "Sent to MarketVibe";
       return true;
     } catch (error) {
-      showStatus(`MarketVibe import failed: ${error && error.message ? error.message : "unknown error"}`);
+      if (!(await handleImportAuthError(error))) showStatus(`MarketVibe import failed: ${error && error.message ? error.message : "unknown error"}`);
       sendButton.disabled = false;
       sendButton.textContent = originalText || "Send this post to MarketVibe";
       return false;
@@ -1766,7 +1845,7 @@
       posts.forEach(saveRecentImport);
       showStatus(`Imported ${posts.length} buyer-intent posts. Good: ${data.counts?.good || 0}.`);
     } catch (error) {
-      showStatus(`MarketVibe import failed: ${error && error.message ? error.message : "unknown error"}`);
+      if (!(await handleImportAuthError(error))) showStatus(`MarketVibe import failed: ${error && error.message ? error.message : "unknown error"}`);
     } finally {
       button.disabled = false;
       button.textContent = "Send visible posts to MarketVibe";
@@ -1780,6 +1859,7 @@
   button.style.cssText = "position:fixed;right:18px;bottom:24px;z-index:2147483647;border:0;border-radius:999px;background:linear-gradient(90deg,#10b981,#67e8f9);color:#03131f;font:800 14px Arial,sans-serif;padding:13px 17px;box-shadow:0 12px 34px rgba(0,0,0,.32);cursor:pointer;";
   button.addEventListener("click", sendVisible);
   document.body.appendChild(button);
+  installStoredKeyResumeListener();
   parseLeadHuntLaunch();
   ensureLeadHuntControlPoller();
   if (getLeadHuntState()?.active) {

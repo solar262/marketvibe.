@@ -10,6 +10,7 @@ const leadHuntPageSource = fs.readFileSync("src/app/lead-hunt-autopilot/page.tsx
 const importedPageSource = fs.readFileSync("src/app/facebook-radar/imported/page.tsx", "utf8");
 const internalMarketingLeadsPageSource = fs.readFileSync("src/app/internal-marketing-leads/page.tsx", "utf8");
 const internalMarketingLeadsApiSource = fs.readFileSync("src/app/api/internal-marketing-leads/route.ts", "utf8");
+const internalMarketingLeadAuthStatusSource = fs.readFileSync("src/app/api/internal-marketing-leads/auth-status/route.ts", "utf8");
 const internalMarketingLeadEventsApiSource = fs.readFileSync("src/app/api/internal-marketing-leads/events/route.ts", "utf8");
 const huntStatusSource = fs.readFileSync("src/app/api/internal-marketing-leads/hunt-status/route.ts", "utf8");
 const internalMarketingLeadsSource = fs.readFileSync("src/lib/internal-marketing-leads.ts", "utf8");
@@ -405,7 +406,12 @@ assert.match(leadHuntPageSource, /Outreach engine mode/, "Lead Hunt Autopilot sh
 assert.match(leadHuntPageSource, /Autopilot for allowed adapters only/, "Lead Hunt Autopilot should include allowed-adapter outreach mode");
 assert.match(leadHuntPageSource, /Create test internal lead/, "Lead Hunt page should include test lead verification control");
 assert.match(leadHuntPageSource, /Extension version warning/, "Lead Hunt page should warn about old extension versions");
-assert.match(leadHuntPageSource, /internalKey/, "Lead Hunt launch should pass an optional internal key to the extension");
+assert.match(leadHuntPageSource, /MARKETVIBE_BUYER_RADAR_SAVE_KEY/, "Lead Hunt page should send verified keys to the extension storage bridge");
+assert.match(leadHuntPageSource, /Connected/, "Lead Hunt page should show connected key status");
+assert.match(leadHuntPageSource, /Invalid key/, "Lead Hunt page should show invalid key status");
+assert.match(leadHuntPageSource, /Missing key/, "Lead Hunt page should show missing key status");
+assert.match(leadHuntPageSource, /\/api\/internal-marketing-leads\/auth-status/, "Lead Hunt page should validate internal keys server-side");
+assert.doesNotMatch(leadHuntPageSource, /internalKey: internalKey\.trim/, "Lead Hunt launch must not expose the internal key in the URL hash");
 
 assert.match(extensionSource, /function extractPostUrl/, "Facebook importer should extract exact post URLs");
 assert.match(extensionSource, /function cleanLeadText/, "Extension should clean imported lead text");
@@ -506,6 +512,18 @@ assert.match(extensionSource, /\[role="dialog"\]/, "Autopilot should scan Facebo
 assert.match(extensionSource, /STATUS_API_URL/, "Autopilot should sync live counters back to MarketVibe");
 assert.match(extensionSource, /api\/internal-marketing-leads/, "Lead Hunt extension should send imports to the internal marketing lead API");
 assert.doesNotMatch(extensionSource, /api\/facebook-radar\/import/, "Lead Hunt extension must not send imports to old Facebook Radar import API");
+assert.match(extensionManifest, /"storage"/, "Extension should have storage permission for the internal key");
+assert.match(extensionManifest, /marketvibe1\.com/, "Extension should run on MarketVibe pages for key storage bridge");
+assert.match(extensionSource, /chrome\.storage\.local\.set/, "Extension should store the internal key in extension storage");
+assert.match(extensionSource, /chrome\.storage\.local\.get/, "Extension should read the internal key from extension storage");
+assert.match(extensionSource, /MARKETVIBE_BUYER_RADAR_SAVE_KEY/, "Extension should receive key-save messages from the dashboard");
+assert.match(extensionSource, /X-MarketVibe-Internal-Key/, "Extension should pass the internal key in import headers");
+assert.match(extensionSource, /Invalid key|Missing key|Connected/, "Extension should expose clear key states");
+assert.doesNotMatch(extensionSource, /localStorage\.setItem\("marketvibe_internal_key"/, "Extension must not store the internal key in page localStorage");
+assert.match(internalMarketingLeadAuthStatusSource, /internalAccessKey/, "Internal key status API should validate against the server-side configured key");
+assert.match(internalMarketingLeadAuthStatusSource, /Connected/, "Internal key status API should return Connected");
+assert.match(internalMarketingLeadAuthStatusSource, /Invalid key/, "Internal key status API should return Invalid key");
+assert.match(internalMarketingLeadAuthStatusSource, /Missing key/, "Internal key status API should return Missing key");
 assert.match(extensionSource, /syncLeadHuntStatus/, "Autopilot should update MarketVibe hunt status counters");
 assert.match(extensionSource, /function withLeadHuntStateHash/, "Autopilot should preserve queue state while moving across Facebook, Google, and Bing");
 assert.match(extensionSource, /marketvibeLeadHuntState/, "Autopilot should restore cross-domain queue state from URL hash");

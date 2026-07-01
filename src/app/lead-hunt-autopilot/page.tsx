@@ -5,6 +5,7 @@ import { Download, ExternalLink, Pause, Play, RefreshCw, Square } from "lucide-r
 
 type SourceKey = "facebook" | "google" | "bing";
 type OutreachMode = "off" | "draft-only" | "manual-approval" | "allowed-adapters";
+type InternalKeyStatus = "Missing key" | "Connected" | "Invalid key" | "Not saved";
 
 type ImportedLead = {
   id: string;
@@ -86,6 +87,7 @@ export default function LeadHuntAutopilotPage() {
   const [outreachMode, setOutreachMode] = useState<OutreachMode>("draft-only");
   const [status, setStatus] = useState("Ready. Click Run Buyer Radar to launch the browser extension workflow.");
   const [internalKey, setInternalKey] = useState("");
+  const [internalKeyStatus, setInternalKeyStatus] = useState<InternalKeyStatus>("Missing key");
   const [importData, setImportData] = useState<ImportResponse | null>(null);
   const [runLogs, setRunLogs] = useState<LeadHuntEvent[]>([]);
   const [runtimeSeconds, setRuntimeSeconds] = useState(0);
@@ -159,6 +161,35 @@ export default function LeadHuntAutopilotPage() {
     if (next.status) setStatus(next.status);
   }
 
+  async function saveInternalKeyToExtension() {
+    const key = internalKey.trim();
+    if (!key) {
+      setInternalKeyStatus("Missing key");
+      setStatus("Missing key. Enter the internal API key before saving Buyer Radar auth.");
+      return;
+    }
+
+    const response = await fetch("/api/internal-marketing-leads/auth-status", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-MarketVibe-Internal-Key": key,
+      },
+    });
+    const payload = await response.json().catch(() => ({ status: response.ok ? "Connected" : "Invalid key" })) as { status?: InternalKeyStatus };
+    if (!response.ok || payload.status !== "Connected") {
+      const nextStatus = payload.status === "Missing key" ? "Missing key" : "Invalid key";
+      setInternalKeyStatus(nextStatus);
+      setStatus(`${nextStatus}. Buyer Radar imports remain paused until the key is fixed.`);
+      return;
+    }
+
+    window.postMessage({ type: "MARKETVIBE_BUYER_RADAR_SAVE_KEY", key }, window.location.origin);
+    setInternalKey("");
+    setInternalKeyStatus("Connected");
+    setStatus("Connected. Buyer Radar key verified and sent to the extension.");
+  }
+
   async function updateHuntControl(patch: Partial<LeadHuntStatus>) {
     const response = await fetch("/api/internal-marketing-leads/hunt-status", {
       method: "POST",
@@ -208,6 +239,18 @@ export default function LeadHuntAutopilotPage() {
     };
   }, []);
 
+  useEffect(() => {
+    function onExtensionKeyResult(event: MessageEvent) {
+      if (event.source !== window || event.origin !== window.location.origin) return;
+      const data = event.data as { type?: string; status?: InternalKeyStatus };
+      if (data.type !== "MARKETVIBE_BUYER_RADAR_KEY_SAVE_RESULT") return;
+      setInternalKeyStatus(data.status === "Connected" ? "Connected" : "Missing key");
+      if (data.status === "Connected") setStatus("Connected. Buyer Radar key saved in extension storage.");
+    }
+    window.addEventListener("message", onExtensionKeyResult);
+    return () => window.removeEventListener("message", onExtensionKeyResult);
+  }, []);
+
   function runLeadHunt() {
     const runId = globalThis.crypto?.randomUUID?.() || `hunt-${Date.now()}`;
     setRuntimeSeconds(0);
@@ -239,7 +282,6 @@ export default function LeadHuntAutopilotPage() {
       sources,
       caps: { maxSearches, maxImportedLeads, delayMs, confidenceThreshold },
       outreach: { mode: outreachMode, adapters: [] as string[] },
-      internalKey: internalKey.trim(),
     };
     window.open(`https://www.facebook.com/search/posts/?q=${encodeURIComponent(LEAD_HUNT_QUERIES[0])}#marketvibeLeadHunt=${encodeURIComponent(JSON.stringify(config))}`, "_blank", "noopener,noreferrer");
   }
@@ -344,16 +386,31 @@ export default function LeadHuntAutopilotPage() {
             Internal browser workflow for finding service sellers with client-acquisition pain. No auto-DM, no auto-comment, no private data, and no spam actions.
           </p>
 
-          <label className="mt-5 grid max-w-xl gap-2 text-sm font-bold text-slate-200">
-            Internal API key for extension imports
-            <input
-              type="password"
-              value={internalKey}
-              onChange={(event) => setInternalKey(event.target.value)}
-              placeholder="Only needed when INTERNAL_MARKETING_API_KEY is enabled"
-              className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white"
-            />
-          </label>
+          <div className="mt-5 grid max-w-xl gap-3 rounded-2xl border border-white/10 bg-slate-950/40 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label htmlFor="buyer-radar-internal-key" className="text-sm font-bold text-slate-200">Internal API key for extension imports</label>
+              <span className={`rounded-full px-3 py-1 text-xs font-black ${
+                internalKeyStatus === "Connected" ? "bg-emerald-300/15 text-emerald-100" :
+                internalKeyStatus === "Invalid key" ? "bg-rose-300/15 text-rose-100" :
+                "bg-amber-300/15 text-amber-100"
+              }`}>{internalKeyStatus}</span>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                id="buyer-radar-internal-key"
+                type="password"
+                value={internalKey}
+                onChange={(event) => {
+                  setInternalKey(event.target.value);
+                  if (!event.target.value.trim()) setInternalKeyStatus("Missing key");
+                  else if (internalKeyStatus !== "Connected") setInternalKeyStatus("Not saved");
+                }}
+                placeholder="Stored in the browser extension only"
+                className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white"
+              />
+              <button onClick={() => void saveInternalKeyToExtension()} className="rounded-full border border-emerald-300/25 bg-emerald-300/10 px-5 py-3 text-sm font-black text-emerald-100">Save key</button>
+            </div>
+          </div>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <button onClick={runLeadHunt} className="inline-flex min-w-0 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-emerald-300 to-cyan-200 px-5 py-4 text-sm font-black text-slate-950 shadow-xl shadow-emerald-950/30 sm:text-base">
