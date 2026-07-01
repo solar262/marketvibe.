@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight, Building2, Globe2, Loader2, MapPin, Search, ShieldCheck } from "lucide-react";
 import { track } from "@vercel/analytics";
 import { businessTypes, countries, serviceCategories } from "@/lib/lead-engine";
@@ -14,12 +14,47 @@ const defaultInput: LeadSearchInput = {
   serviceCategory: "Web design",
 };
 
+const SEARCH_STATE_KEY = "marketvibe_lead_search_state_v1";
+
+type LeadSearchSavedState = {
+  input?: LeadSearchInput;
+  leads?: BusinessLead[];
+  sourceNote?: string;
+  sourceStatus?: "live" | "demo" | "idle";
+};
+
+function readSavedSearchState(): LeadSearchSavedState | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const stored = window.sessionStorage.getItem(SEARCH_STATE_KEY);
+    if (!stored) return null;
+    const parsed = JSON.parse(stored) as LeadSearchSavedState;
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeSavedSearchState(state: LeadSearchSavedState) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(SEARCH_STATE_KEY, JSON.stringify(state));
+  } catch {
+    // Ignore storage failures so search still works normally.
+  }
+}
+
 export function LeadSearchApp({ initialLeads = [] }: { initialLeads?: BusinessLead[] }) {
-  const [input, setInput] = useState(defaultInput);
-  const [leads, setLeads] = useState<BusinessLead[]>(initialLeads);
+  const [input, setInput] = useState<LeadSearchInput>(() => readSavedSearchState()?.input || defaultInput);
+  const [leads, setLeads] = useState<BusinessLead[]>(() => readSavedSearchState()?.leads || initialLeads);
   const [loading, setLoading] = useState(false);
-  const [sourceNote, setSourceNote] = useState(initialLeads.length ? "Sample previews are shown until you run a live public data search." : "");
-  const [sourceStatus, setSourceStatus] = useState<"live" | "demo" | "idle">(initialLeads.length ? "demo" : "idle");
+  const [sourceNote, setSourceNote] = useState(() => readSavedSearchState()?.sourceNote || (initialLeads.length ? "Sample previews are shown until you run a live public data search." : ""));
+  const [sourceStatus, setSourceStatus] = useState<"live" | "demo" | "idle">(() => readSavedSearchState()?.sourceStatus || (initialLeads.length ? "demo" : "idle"));
+
+  useEffect(() => {
+    writeSavedSearchState({ input, leads, sourceNote, sourceStatus });
+  }, [input, leads, sourceNote, sourceStatus]);
 
   async function runSearch() {
     setLoading(true);
@@ -30,9 +65,13 @@ export function LeadSearchApp({ initialLeads = [] }: { initialLeads?: BusinessLe
       body: JSON.stringify(input),
     });
     const data = await response.json();
-    setLeads(data.leads || []);
-    setSourceNote(data.sourceNote || "");
-    setSourceStatus(data.sourceStatus || "idle");
+    const nextLeads = data.leads || [];
+    const nextSourceNote = data.sourceNote || "";
+    const nextSourceStatus = data.sourceStatus || "idle";
+    setLeads(nextLeads);
+    setSourceNote(nextSourceNote);
+    setSourceStatus(nextSourceStatus);
+    writeSavedSearchState({ input, leads: nextLeads, sourceNote: nextSourceNote, sourceStatus: nextSourceStatus });
     setLoading(false);
   }
 
