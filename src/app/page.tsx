@@ -19,26 +19,26 @@ import {
 import { sampleLeads } from "@/lib/lead-engine";
 
 export const metadata: Metadata = {
-  title: "MarketVibe Lead Engine | Find High-Intent Customer Conversations",
-  description: "Find people already talking about the problems your business solves, then join conversations with helpful, human replies.",
+  title: "MarketVibe | Opportunity Intelligence for Modern Prospecting",
+  description: "Discover qualified opportunities, review prospect signals, and turn outreach into a sharper prospecting workflow.",
 };
 
 export default function Home() {
   const lead = sampleLeads[0];
   const visibleFindings = lead.audit.findings.filter((finding) => finding.found).slice(0, 3);
   const heroBenefits = [
-    [SearchCheck, "Scan public conversations"],
-    [Target, "Rank high-intent problems"],
-    [MousePointerClick, "Spot lead and traffic pain"],
-    [Globe2, "Review public business signals"],
+    [SearchCheck, "Qualified opportunity discovery"],
+    [Target, "Lead opportunity scoring"],
+    [MousePointerClick, "Outreach angle suggestions"],
+    [Globe2, "Audit-ready prospect signals"],
   ] as const;
   const howItWorks = [
-    [SearchCheck, "Enter your product and audience", "Describe who you help, what problem you solve, and the terms buyers use."],
-    [Target, "Find high-intent conversations", "Rank public posts where people ask for help with customers, leads, traffic, sales, visibility, or growth."],
-    [ClipboardCheck, "Review pain and reply angle", "See the detected pain point, intent score, relevance reason, and a helpful reply draft."],
-    [UnlockKeyhole, "Move into lead search or reports", "Use public business signals and audit reports when you want local prospect research too."],
+    [SearchCheck, "Set your market", "Describe who you want to reach, the offer you sell, and the opportunity type you care about."],
+    [Target, "Review qualified opportunities", "MarketVibe organizes prospects around visible demand, business signals, and outreach potential."],
+    [ClipboardCheck, "Understand the angle", "See the likely pain point, opportunity score, audit summary, and a practical outreach direction."],
+    [UnlockKeyhole, "Move into action", "Open lead search, preview audits, and work from a cleaner prospecting workflow without touching checkout logic."],
   ] as const;
-  const audience = ["Web designers", "SEO freelancers", "Agencies", "Consultants", "Local marketers", "Service sellers"];
+  const audience = ["Freelancers", "Agencies", "Lead generation businesses", "Consultants", "Local marketers", "Service providers"];
   const auditIncludes = [
     "Business overview",
     "Opportunity score",
@@ -52,7 +52,7 @@ export default function Home() {
   const trustItems = [
     "Secure checkout",
     "Audit preview",
-    "Public conversations",
+    "Qualified opportunities",
     "Built for service sellers",
   ];
 
@@ -65,13 +65,13 @@ export default function Home() {
         <div className="relative mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-[0.94fr_1.06fr] md:items-center lg:px-8 lg:py-16">
           <div className="min-w-0">
             <p className="inline-flex flex-wrap items-center gap-2 rounded-full border border-cyan-300/20 bg-white/8 px-3 py-1 text-xs font-semibold text-cyan-100 shadow-lg shadow-cyan-950/20 backdrop-blur">
-              <Sparkles className="h-4 w-4 text-emerald-300" /> MarketVibe Lead Engine
+              <Sparkles className="h-4 w-4 text-emerald-300" /> MarketVibe Opportunity Intelligence
             </p>
             <h1 className="mt-5 max-w-2xl text-4xl font-semibold tracking-tight text-white sm:text-5xl lg:text-[3.7rem] lg:leading-[1.02]">
-              Find People Already Talking About the Problems You Solve
+              Stop Chasing Cold Leads
             </h1>
             <p className="mt-5 max-w-xl text-base leading-7 text-slate-300 sm:text-lg">
-              MarketVibe helps you discover public conversations where people are asking for help with customers, leads, traffic, sales, visibility, or growth.
+              MarketVibe helps businesses uncover qualified opportunities faster with smarter prospect discovery, audit summaries, opportunity scoring, and outreach angles.
             </p>
 
             <div className="mt-6 grid max-w-xl gap-2 sm:grid-cols-2">
@@ -85,10 +85,10 @@ export default function Home() {
 
             <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               <Link href="/free-leads" className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-emerald-400 to-cyan-300 px-5 py-3 text-sm font-semibold text-slate-950 shadow-xl shadow-emerald-950/30 transition hover:brightness-105">
-                Get Free Leads <ArrowRight className="h-4 w-4" />
+                Start Finding Opportunities <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link href="/lead-search" className="inline-flex items-center justify-center gap-2 rounded-full border border-white/15 bg-white/10 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-black/15 backdrop-blur transition hover:bg-white/15">
-                Find Leads
+              <Link href="/pricing" className="inline-flex items-center justify-center gap-2 rounded-full border border-white/15 bg-white/10 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-black/15 backdrop-blur transition hover:bg-white/15">
+                View Pricing
               </Link>
             </div>
 
@@ -108,7 +108,7 @@ export default function Home() {
                 <div className="rounded-[1.45rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,#22d3ee22,transparent_15rem),radial-gradient(circle_at_bottom_left,#10b9811f,transparent_15rem),#08111f] p-4 text-white">
                   <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
                     <div className="min-w-0">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-200">Lead intelligence dashboard</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-200">Opportunity intelligence dashboard</p>
                       <h2 className="mt-2 truncate text-lg font-semibold">{lead.businessName}</h2>
                       <p className="mt-1 text-xs text-slate-400">{lead.city}, {lead.country} · {lead.businessCategory}</p>
                     </div>
@@ -120,9 +120,9 @@ export default function Home() {
 
                   <div className="mt-4 grid gap-2 sm:grid-cols-3">
                     {[
-                      [Globe2, "Website gaps", `${lead.audit.issues.length} signals`],
+                      [Globe2, "Audit signals", `${lead.audit.issues.length} signals`],
                       [Eye, "Contact visibility", lead.audit.emailVisible || lead.audit.phoneVisible ? "Detected" : "Needs review"],
-                      [MousePointerClick, "CTA issue", lead.audit.clearCallToActionVisible ? "Clear" : "Weak"],
+                      [MousePointerClick, "Outreach angle", lead.audit.clearCallToActionVisible ? "Clear" : "Needs work"],
                     ].map(([Icon, label, value]) => (
                       <div key={label as string} className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.055] p-3 shadow-inner shadow-white/5">
                         <Icon className="h-4 w-4 text-cyan-200" />
@@ -137,7 +137,7 @@ export default function Home() {
                       <div key={finding.label} className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.97] p-3 text-slate-950 shadow-xl shadow-black/15">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="text-sm font-semibold">{finding.label}</p>
-                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">Website gap</span>
+                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">Audit signal</span>
                         </div>
                         <p className="mt-1 text-xs leading-5 text-slate-600">{finding.detail}</p>
                       </div>
@@ -146,7 +146,7 @@ export default function Home() {
 
                   <div className="mt-4 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-cyan-100">Suggested service angle</p>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-cyan-100">Suggested outreach angle</p>
                       <span className="rounded-full bg-emerald-300/15 px-2 py-1 text-[11px] font-semibold text-emerald-200">{lead.audit.priority} priority</span>
                     </div>
                     <p className="mt-2 text-xs leading-5 text-slate-100">{lead.audit.serviceAngle}</p>
@@ -172,7 +172,7 @@ export default function Home() {
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div className="max-w-3xl">
               <p className="text-sm font-semibold text-emerald-300">How MarketVibe Works</p>
-              <h2 className="mt-2 text-3xl font-semibold tracking-tight text-white">A focused workflow for finding better opportunities.</h2>
+              <h2 className="mt-2 text-3xl font-semibold tracking-tight text-white">Opportunity intelligence for modern prospecting.</h2>
             </div>
             <Link href="/free-leads" className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-white/10">
               Get Free Leads <ArrowRight className="h-4 w-4" />
@@ -197,9 +197,9 @@ export default function Home() {
         <div className="mx-auto grid max-w-7xl gap-6 px-4 py-14 sm:px-6 lg:grid-cols-[1fr_1.15fr] lg:items-start lg:px-8">
           <div className="min-w-0 rounded-3xl border border-white/10 bg-white/[0.06] p-6 shadow-2xl shadow-black/15">
             <p className="text-sm font-semibold text-emerald-300">Sample Audit Preview</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white">See why a business may be worth reviewing.</h2>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white">See why an opportunity may be worth pursuing.</h2>
             <p className="mt-4 leading-7 text-slate-300">
-              The sample audit shows the kind of public website signals MarketVibe turns into a practical report and service angle.
+              The sample audit shows the kind of visible business signals MarketVibe turns into practical opportunity notes and outreach angles.
             </p>
             <div className="mt-6 rounded-2xl border border-white/10 bg-slate-950/55 p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -248,9 +248,9 @@ export default function Home() {
       <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
         <div className="grid gap-4 md:grid-cols-3">
           {[
-            [BarChart3, "Lead scoring", "Rank opportunities by visible gaps instead of sorting through raw lists."],
-            [ShieldCheck, "Public signal checks", "Review website, contact, booking, review, and trust signals in one place."],
-            [Layers3, "Report-ready workflow", "Move from search to audit preview to checkout without manual handoff."],
+            [BarChart3, "Opportunity scoring", "Rank better prospects by visible signals instead of sorting through raw lists."],
+            [ShieldCheck, "Audit summaries", "Review website, contact, booking, review, and trust signals in one place."],
+            [Layers3, "Outreach workflow", "Move from opportunity review to audit preview to checkout without manual handoff."],
           ].map(([Icon, title, body]) => (
             <div key={title as string} className="min-w-0 rounded-3xl border border-white/10 bg-white/[0.055] p-6 shadow-xl shadow-black/10">
               <Icon className="h-7 w-7 text-emerald-300" />
