@@ -93,7 +93,7 @@ const previewCards = [
 const trustSignals = [
   "Premium opportunity workflow",
   "Context before outreach",
-  "Sample-data previews",
+  "Sample opportunity previews",
   "Practical prospect research",
 ];
 
