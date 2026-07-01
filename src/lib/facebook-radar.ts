@@ -93,25 +93,20 @@ export type FacebookRadarSchedule = {
 };
 
 export const BUYER_INTENT_QUERY_LIBRARY = [
-  "how do I get web design clients",
-  "how do I get SEO clients",
-  "where can I find local business leads",
-  "how to sell websites to local businesses",
-  "how to sell SEO to local businesses",
-  "how to find clients for local marketing agency",
-  "web designer struggling to get clients",
-  "SEO freelancer struggling to get clients",
-  "agency owner client acquisition",
-  "cold outreach not working for agency",
+  "need clients",
+  "need leads",
+  "looking for clients",
+  "looking for leads",
+  "how do I get clients",
+  "how do I find customers",
+  "need more customers",
+  "need sales",
+  "ads not working",
+  "lead generation help",
+  "cold outreach not working",
   "no one replies to my outreach",
-  "where do marketers find prospects",
-  "how to find booking system clients",
-  "how to sell booking systems to small businesses",
-  "how to get social media management clients",
-  "automation consultant how to find clients",
-  "best niches for local lead generation",
-  "how to prospect local businesses",
-  "where to find businesses that need websites",
+  "struggling to generate leads",
+  "where do I find prospects",
 ];
 
 export const DEFAULT_FACEBOOK_EXCLUDE_KEYWORDS = [
@@ -230,8 +225,8 @@ function addQuotedNiche(phrase: string, niche: string) {
 function marketVibeSearchScore(phrase: string) {
   const text = phrase.toLowerCase();
   let score = 45;
-  if (/\b(cold outreach not working|outreach not working|no one replies|prospecting is not working)\b/.test(text)) score += 45;
-  if (/\b(how do i get clients|where do i find prospects|where can i find prospects|how do i get leads|where can i find local business leads)\b/.test(text)) score += 38;
+  if (/\b(need clients|need leads|looking for clients|looking for leads|need more customers|need sales|ads not working|lead generation help|cold outreach not working|outreach not working|no one replies|struggling to generate leads|prospecting is not working)\b/.test(text)) score += 45;
+  if (/\b(how do i get clients|how do i find customers|where do i find prospects|where can i find prospects|how do i get leads|where can i find local business leads)\b/.test(text)) score += 38;
   if (/\b(sell websites|sell seo|sell booking systems|social media management clients|automation consultant)\b/.test(text)) score += 30;
   if (/\b(agency|freelancer|web design|seo|local marketing|booking system|automation consultant|social media manager)\b/.test(text)) score += 12;
   if (WEAK_SEARCH_PATTERN.test(text)) score -= 80;
@@ -259,21 +254,20 @@ export function generateFacebookSearchLinks(input: FacebookRadarSearchInput): Fa
   const painTerms = splitTerms(input.painKeywords);
   const niches = nicheVariants([input.targetBuyer, input.niche, input.painKeywords].join(" "));
   const precisePains = [
-    "no one replies to my outreach",
-    "cold outreach not working",
+    "need clients",
+    "need leads",
+    "looking for clients",
+    "looking for leads",
     "how do I get clients",
-    "where can I find local business leads",
-    "how do I get leads",
-    "how do I get web design clients",
-    "how do I get SEO clients",
-    "where do marketers find prospects",
-    "prospecting is not working",
-    "how do I sell websites to local businesses",
-    "how do I sell SEO to small businesses",
-    "how do I get booking system clients",
-    "how do I get social media management clients",
-    "outreach not working",
-    "agency owner client acquisition",
+    "how do I find customers",
+    "need more customers",
+    "need sales",
+    "ads not working",
+    "lead generation help",
+    "cold outreach not working",
+    "no one replies to my outreach",
+    "struggling to generate leads",
+    "where do I find prospects",
     ...BUYER_INTENT_QUERY_LIBRARY,
   ];
   const phrases = new Set<string>();
@@ -325,7 +319,7 @@ export function generateFacebookSearchLinks(input: FacebookRadarSearchInput): Fa
       fitScore,
       goodSignals: SEARCH_GOOD_SIGNALS,
       skipSignals: SEARCH_SKIP_SIGNALS,
-      reason: `MarketVibe fit ${fitScore}/100: best when results show agency, freelancer, prospecting, local-lead, client-acquisition, or outreach pain.`,
+      reason: `MarketVibe fit ${fitScore}/100: best when results show a person asking for clients, leads, customers, sales, prospecting help, or outreach pain.`,
       postsUrl: facebookPostsUrl(phrase),
       groupsUrl: facebookGroupsUrl(phrase),
     }));
@@ -414,7 +408,7 @@ export function scoreFacebookLeadPreview(candidate: FacebookLeadCandidate, filte
 
   if (skipReasons.length) rank = Math.min(rank, 45);
   const painPoint = detectPainPoint(combined);
-  const passedFilters = skipReasons.length === 0 && rank >= 75;
+  const passedFilters = skipReasons.length === 0 && rank >= 50;
 
   return {
     id: signature || `${Date.now()}`,
@@ -450,7 +444,7 @@ export function filterAndRankFacebookLeads(candidates: FacebookLeadCandidate[], 
 }
 
 export function shouldSendFacebookLead(preview: FacebookLeadPreview, sent = new Set<string>()) {
-  return preview.passedFilters && preview.intentScore === "High" && !sent.has(preview.id);
+  return preview.passedFilters && (preview.intentScore === "High" || preview.intentScore === "Medium") && !sent.has(preview.id);
 }
 
 function detectIntent(text: string) {
