@@ -113,6 +113,16 @@ function classify(analysis: FacebookRadarResult, rank: number): ScoredFacebookPo
   return "ManualOnly";
 }
 
+function isExtensionQualified(post: ImportedFacebookPost, text: string, confidenceScore: number) {
+  if (confidenceScore < 78) return false;
+  const evidence = [text, post.matchReason, post.painPoint, post.queryUsed, post.sourceUsed].map((item) => clean(item, 300)).join(" ");
+  return /\b(web\s*design|website|seo|agency|freelancer|marketer|service seller|client|clients|lead|leads|prospect|prospects|outreach|marketing)\b/i.test(evidence);
+}
+
+function extensionLabel(confidenceScore: number): ScoredFacebookPost["label"] {
+  return confidenceScore >= 78 ? "Good" : "ManualOnly";
+}
+
 export function scoreImportedFacebookPosts(input: {
   posts: ImportedFacebookPost[];
   searchPhrase?: string;
@@ -139,7 +149,11 @@ export function scoreImportedFacebookPosts(input: {
         painKeywords: [painKeywords, searchPhrase].filter(Boolean).join(", "),
         sourceUrl,
       });
-      const fitRank = rankFromScore(analysis.score, analysis.action, analysis.risk);
+      const analyzedRank = rankFromScore(analysis.score, analysis.action, analysis.risk);
+      const suppliedConfidence = Number(post.confidenceScore || 0);
+      const extensionQualified = isExtensionQualified(post, text, suppliedConfidence);
+      const fitRank = extensionQualified ? Math.max(analyzedRank, suppliedConfidence) : analyzedRank;
+      const label = extensionQualified ? extensionLabel(fitRank) : classify(analysis, fitRank);
 
       return {
         id: `${Date.now()}-${index}`,
@@ -159,7 +173,7 @@ export function scoreImportedFacebookPosts(input: {
         matchReason: clean(post.matchReason || analysis.reason, 300),
         analysis,
         fitRank,
-        label: classify(analysis, fitRank),
+        label,
       };
     })
     .filter((post): post is ScoredFacebookPost => Boolean(post))
