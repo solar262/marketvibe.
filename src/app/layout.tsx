@@ -16,9 +16,33 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const siteUrl = "https://www.marketvibe1.com";
+const siteTitle = "MarketVibe | Opportunity Intelligence for Modern Prospecting";
+const siteDescription =
+  "Find better prospects faster with opportunity scoring, outreach angles, audit summaries, and faster prospecting for freelancers, agencies, consultants, and service providers.";
+
 export const metadata: Metadata = {
-  title: "MarketVibe Lead Engine",
-  description: "Find businesses that may need web design, SEO, booking, review, and online presence help.",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: siteTitle,
+    template: "%s | MarketVibe",
+  },
+  description: siteDescription,
+  alternates: {
+    canonical: "/",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+  openGraph: {
+    title: siteTitle,
+    description: siteDescription,
+    url: siteUrl,
+    siteName: "MarketVibe",
+    type: "website",
+    locale: "en_US",
+  },
 };
 
 export default function RootLayout({
