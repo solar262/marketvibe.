@@ -7,7 +7,12 @@ export const INTERNAL_CORS_HEADERS = {
 };
 
 export function internalAccessKey() {
-  return process.env.INTERNAL_MARKETING_API_KEY || process.env.LEAD_HUNT_INTERNAL_KEY || "";
+  return (
+    process.env.BUYER_RADAR_INTERNAL_API_KEY ||
+    process.env.INTERNAL_MARKETING_API_KEY ||
+    process.env.LEAD_HUNT_INTERNAL_KEY ||
+    ""
+  ).trim();
 }
 
 function requestKey(request: Request) {
@@ -15,7 +20,7 @@ function requestKey(request: Request) {
   const bearer = authorization.match(/^Bearer\s+(.+)$/i)?.[1] || "";
   const header = request.headers.get("x-marketvibe-internal-key") || "";
   const query = new URL(request.url).searchParams.get("internal_key") || "";
-  return header || bearer || query;
+  return (header || bearer || query).trim();
 }
 
 export async function hasInternalApiAccess(request: Request) {
