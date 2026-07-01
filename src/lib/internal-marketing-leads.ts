@@ -104,6 +104,11 @@ function allowMemoryStore() {
   return process.env.NODE_ENV !== "production" || process.env.ALLOW_INTERNAL_MEMORY_STORE === "true";
 }
 
+function isMissingInternalTableError(error: unknown) {
+  const message = String((error as { message?: unknown })?.message || error || "").toLowerCase();
+  return message.includes("could not find the table") || message.includes("schema cache") || message.includes("relation") && message.includes("does not exist");
+}
+
 function requireInternalStore() {
   const supabase = getSupabaseAdmin();
   if (supabase) return supabase;
@@ -195,8 +200,20 @@ async function listFromSupabase(limit = 100) {
     .select("*")
     .order("imported_at", { ascending: false })
     .limit(limit);
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (isMissingInternalTableError(error)) return null;
+    throw new Error(error.message);
+  }
   return (data || []).map((row) => fromRow(row as Record<string, unknown>));
+}
+
+function saveToMemory(leads: ScoredFacebookPost[]) {
+  const existing = new Set(memoryLeads.map((lead) => sourceUrlKey(lead.url) || (lead.text || "").toLowerCase().slice(0, 180)));
+  for (const lead of leads) {
+    const key = sourceUrlKey(lead.url) || (lead.text || "").toLowerCase().slice(0, 180);
+    if (!existing.has(key)) memoryLeads.unshift(lead);
+  }
+  memoryLeads.splice(100);
 }
 
 async function saveToSupabase(leads: ScoredFacebookPost[], runId?: string) {
@@ -204,7 +221,10 @@ async function saveToSupabase(leads: ScoredFacebookPost[], runId?: string) {
   if (!supabase || !leads.length) return false;
   const rows = leads.map((lead) => toRow(lead, runId));
   const { error } = await supabase.from("internal_marketing_leads").upsert(rows, { onConflict: "source_url" });
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (isMissingInternalTableError(error)) return false;
+    throw new Error(error.message);
+  }
   return true;
 }
 
@@ -230,14 +250,7 @@ export async function importInternalMarketingLeads(payload: InternalMarketingLea
   const skipped = scored.filter((post) => post.label === "Skip" || post.label === "Bad fit");
   const savedToSupabase = await saveToSupabase(visible, payload.runId);
 
-  if (!savedToSupabase) {
-    const existing = new Set(memoryLeads.map((lead) => sourceUrlKey(lead.url) || (lead.text || "").toLowerCase().slice(0, 180)));
-    for (const lead of visible) {
-      const key = sourceUrlKey(lead.url) || (lead.text || "").toLowerCase().slice(0, 180);
-      if (!existing.has(key)) memoryLeads.unshift(lead);
-    }
-    memoryLeads.splice(100);
-  }
+  if (!savedToSupabase) saveToMemory(visible);
 
   await logLeadHuntEvent({
     runId: payload.runId,
@@ -308,7 +321,7 @@ export async function updateInternalMarketingLeadStatus(payload: Partial<Interna
       updated_at: new Date().toISOString(),
       stopped_at: latestInternalMarketingLeadStatus.active ? null : new Date().toISOString(),
     });
-    if (error) throw new Error(error.message);
+    if (error && !isMissingInternalTableError(error)) throw new Error(error.message);
   }
 
   return latestInternalMarketingLeadStatus;
@@ -323,7 +336,10 @@ export async function getInternalMarketingLeadStatus() {
     .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (isMissingInternalTableError(error)) return latestInternalMarketingLeadStatus;
+    throw new Error(error.message);
+  }
   if (!data) return latestInternalMarketingLeadStatus;
   const updatedAt = String(data.updated_at || "");
   const updatedAtMs = updatedAt ? Date.parse(updatedAt) : 0;
@@ -386,7 +402,11 @@ export async function logLeadHuntEvent(payload: LeadHuntEventPayload) {
     score: event.score,
     metadata: event.metadata || {},
   });
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (!isMissingInternalTableError(error)) throw new Error(error.message);
+    memoryEvents.unshift(event);
+    memoryEvents.splice(100);
+  }
   return event;
 }
 
@@ -399,7 +419,10 @@ export async function getLeadHuntEvents(limit = 25): Promise<LeadHuntEventRecord
     .select("run_id,event_type,message,reason,source_url,query,score,metadata,created_at")
     .order("created_at", { ascending: false })
     .limit(safeLimit);
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (isMissingInternalTableError(error)) return memoryEvents.slice(0, safeLimit);
+    throw new Error(error.message);
+  }
   return (data || []).map((row) => ({
     runId: row.run_id ? String(row.run_id) : "",
     eventType: String(row.event_type || ""),
@@ -430,7 +453,10 @@ export async function recordProcessedUrl(payload: ProcessedUrlPayload) {
     score: asNumber(payload.score),
     updated_at: new Date().toISOString(),
   }, { onConflict: "run_id,source_url" });
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (!isMissingInternalTableError(error)) throw new Error(error.message);
+    memoryProcessedUrls.set(`${payload.runId || "local"}:${sourceUrl}`, payload);
+  }
   return payload;
 }
 
@@ -443,7 +469,10 @@ export async function updateInternalMarketingLead(id: string, patch: { status?: 
   if (status) update.status = status;
   if (outreachStatus) update.outreach_status = outreachStatus;
   const { error } = await supabase.from("internal_marketing_leads").update(update).eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (isMissingInternalTableError(error)) return { id, status, outreachStatus, storage: "memory" };
+    throw new Error(error.message);
+  }
   return { id, status, outreachStatus, storage: "supabase" };
 }
 
