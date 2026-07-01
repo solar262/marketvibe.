@@ -50,52 +50,11 @@ const FB_JUNK_WORDS = new Set([
   "join",
 ]);
 
-const HARD_REJECT_PATTERNS = [
-  /\b(dm me|message me|inbox me|comment info|book a call|schedule a call)\b/i,
-  /\b(i can help|i can assist|we can help|we help|i offer|we offer|i provide|we provide|my services|our services)\b/i,
-  /\b(need clients\?|want clients\?|need leads\?|want leads\?|do you need clients|do you need leads|get more clients today)\b/i,
-  /\b(guaranteed clients|guaranteed leads|verified leads|targeted leads|buy leads|sell leads|pay per lead|lead generation service)\b/i,
-  /\b(join my group|join our group|facebook group of|promote your business|networking group|want an invite)\b/i,
-  /\b(course|webinar|masterclass|academy|training|coaching program|free training|workshop|download my guide)\b/i,
-  /\b(hiring|job|vacancy|roles? open|looking for work|open to work|for hire|commission only|commission based|upwork|fiverr)\b/i,
-  /\b(real estate|realtor|mortgage|insurance|crypto|forex|mlm|affiliate|dropshipping|reseller|giveaway|promo code)\b/i,
-  /\b(affordable website services|websites? for small budgets|we build websites|i build websites for|i make websites for)\b/i,
-];
-
-const BUYER_PAIN_PATTERNS = [
-  /\bneed (?:more )?(?:clients|leads|customers|sales)\b/i,
-  /\blooking for (?:more )?(?:clients|leads|customers|prospects)\b/i,
-  /\bhow (?:do|can) i (?:get|find) (?:more )?(?:clients|leads|customers|prospects)\b/i,
-  /\bwhere (?:do|can) i find (?:clients|leads|customers|prospects)\b/i,
-  /\bstruggling (?:to|with) (?:get|getting|find|finding|generate|generating) (?:more )?(?:clients|leads|customers|sales)\b/i,
-  /\b(?:ads|facebook ads|google ads) (?:are )?(?:not working|don'?t work|aren'?t working)\b/i,
-  /\b(?:cold outreach|cold email|cold emails|cold calling|prospecting) (?:is )?(?:not working|doesn'?t work|isn'?t working)\b/i,
-  /\bno one replies(?: to my outreach| to my emails| to my messages)?\b/i,
-  /\blead generation help\b/i,
-  /\bclient acquisition\b/i,
-];
-
-const HELP_REQUEST_PATTERNS = [
-  /\b(how do i|how can i|where do i|where can i|any advice|what should i do|can someone help|need help|recommendations|ideas|tips)\b/i,
-  /\?/,
-];
-
-const SERVICE_OR_BUSINESS_CONTEXT_PATTERNS = [
-  /\b(agency|freelancer|consultant|coach|marketer|service provider|business owner|small business|startup|founder)\b/i,
-  /\b(web design|website|seo|marketing|social media|smma|appointment setting|booking system|automation|shopify|ecommerce)\b/i,
-  /\b(my business|our business|my agency|our agency|my service|our service|my offer|our offer)\b/i,
-];
+const IMPORT_BUYER_PAIN_PATTERN = /\b(need (?:more )?(?:clients|leads|customers|sales)|looking for (?:clients|leads|customers|prospects)|how (?:do|can) i (?:get|find) (?:clients|leads|customers|prospects)|where (?:do|can) i find (?:clients|leads|customers|prospects)|struggling (?:to|with) (?:get|getting|find|finding|generate|generating) (?:clients|leads|customers|sales)|ads (?:are )?not working|cold outreach (?:is )?not working|no one replies|lead generation help|client acquisition)\b/i;
+const IMPORT_SELLER_OR_SPAM_PATTERN = /\b(dm me|message me|inbox me|i can help|we can help|i offer|we offer|i provide|we provide|my services|our services|need clients\?|need leads\?|guaranteed clients|guaranteed leads|buy leads|sell leads|join my group|promote your business|course|webinar|masterclass|hiring|job|looking for work|open to work|real estate|insurance|crypto|forex|mlm|affiliate|dropshipping|reseller|giveaway|promo code|affordable website services|we build websites)\b/i;
 
 function clean(value: unknown, limit = 900) {
   return String(value || "").replace(/\s+/g, " ").trim().slice(0, limit);
-}
-
-function hasMatch(text: string, patterns: RegExp[]) {
-  return patterns.some((pattern) => pattern.test(text));
-}
-
-function countMatches(text: string, patterns: RegExp[]) {
-  return patterns.reduce((total, pattern) => total + (pattern.test(text) ? 1 : 0), 0);
 }
 
 function dedupeRepeatedWords(text: string) {
@@ -136,36 +95,11 @@ function stripFacebookSpam(value: unknown, limit = 900) {
 function cleanImportedText(value: unknown, limit = 900) {
   let text = stripFacebookSpam(value, 3000);
 
-  const usefulStart = text.search(/\b(hi|hello|hey|question|quick question|how do|how can|where do|where can|i need|i want|i have|i built|i launched|i'm|im|my|we|one of|most early|recently|looking|cold|no leads|no sales|no traffic|ads not working|need clients|need leads|need customers|need sales)\b/i);
+  const usefulStart = text.search(/\b(hi|hello|hey|question|quick question|how do|i need|i want|i have|i built|i launched|i'm|im|my|we|one of|most early|recently|looking|cold|no leads|no sales|no traffic)\b/i);
   if (usefulStart > 0 && usefulStart < 450) text = text.slice(usefulStart);
 
   const cleaned = clean(text, limit);
   return cleaned && !/^facebook$/i.test(cleaned) ? cleaned : "Facebook post imported";
-}
-
-function scoreBuyerIntent(post: ImportedFacebookPost, text: string, suppliedConfidence: number) {
-  const evidence = [text, post.matchReason, post.painPoint, post.queryUsed, post.sourceUsed].map((item) => clean(item, 300)).join(" ");
-
-  if (hasMatch(evidence, HARD_REJECT_PATTERNS)) return 0;
-
-  const painMatches = countMatches(evidence, BUYER_PAIN_PATTERNS);
-  const helpMatches = countMatches(evidence, HELP_REQUEST_PATTERNS);
-  const contextMatches = countMatches(evidence, SERVICE_OR_BUSINESS_CONTEXT_PATTERNS);
-  const firstPerson = /\b(i|i'm|im|my|we|our)\b/i.test(evidence);
-  const sellerQuestionTrap = /\b(?:need|want) (?:clients|leads|customers)\?/i.test(evidence);
-
-  if (!painMatches || sellerQuestionTrap) return 0;
-
-  let score = 38;
-  score += Math.min(34, painMatches * 17);
-  score += Math.min(18, helpMatches * 9);
-  score += Math.min(14, contextMatches * 7);
-  if (firstPerson) score += 10;
-  if (/\b(no one replies|cold outreach|ads not working|struggling|need help|any advice|what should i do)\b/i.test(evidence)) score += 12;
-  if (suppliedConfidence >= 78) score += 8;
-  if (text.length < 60) score -= 18;
-
-  return Math.max(0, Math.min(100, score));
 }
 
 function rankFromScore(score: FacebookRadarResult["score"], action: FacebookRadarResult["action"], risk: FacebookRadarResult["risk"]) {
@@ -176,11 +110,22 @@ function rankFromScore(score: FacebookRadarResult["score"], action: FacebookRada
   return Math.max(0, Math.min(100, rank));
 }
 
-function classifyByBuyerIntent(buyerRank: number): ScoredFacebookPost["label"] {
-  if (buyerRank >= 78) return "Good";
-  if (buyerRank >= 60) return "ManualOnly";
-  if (buyerRank <= 0) return "Bad fit";
-  return "Skip";
+function classify(analysis: FacebookRadarResult, rank: number): ScoredFacebookPost["label"] {
+  if (analysis.action === "Skip") return rank <= 25 ? "Bad fit" : "Skip";
+  if (rank >= 70) return "Good";
+  return "ManualOnly";
+}
+
+function isExtensionQualified(post: ImportedFacebookPost, text: string, confidenceScore: number) {
+  if (confidenceScore < 78) return false;
+  const postEvidence = [text, post.matchReason, post.painPoint].map((item) => clean(item, 300)).join(" ");
+  if (IMPORT_SELLER_OR_SPAM_PATTERN.test(postEvidence)) return false;
+  if (!IMPORT_BUYER_PAIN_PATTERN.test(postEvidence)) return false;
+  return /\b(clients|client|leads|lead|customers|sales|prospect|prospects|outreach|ads|marketing|business|agency|freelancer|website|seo)\b/i.test(postEvidence);
+}
+
+function extensionLabel(confidenceScore: number): ScoredFacebookPost["label"] {
+  return confidenceScore >= 78 ? "Good" : "ManualOnly";
 }
 
 export function scoreImportedFacebookPosts(input: {
@@ -190,8 +135,8 @@ export function scoreImportedFacebookPosts(input: {
   painKeywords?: string;
 }) {
   const searchPhrase = clean(input.searchPhrase, 180);
-  const targetBuyer = clean(input.targetBuyer || "people asking for clients, leads, customers, sales, prospecting help, or outreach help", 240);
-  const painKeywords = clean(input.painKeywords || "need clients, need leads, looking for clients, looking for leads, how do I get clients, how do I find customers, ads not working, cold outreach not working, no one replies, struggling to generate leads, where do I find prospects", 240);
+  const targetBuyer = clean(input.targetBuyer || "web designers, SEO freelancers, local marketers, small agencies", 240);
+  const painKeywords = clean(input.painKeywords || "web design clients, SEO clients, local business leads, prospecting, cold outreach not working", 240);
   const seen = new Set<string>();
 
   return (input.posts || [])
@@ -211,11 +156,9 @@ export function scoreImportedFacebookPosts(input: {
       });
       const analyzedRank = rankFromScore(analysis.score, analysis.action, analysis.risk);
       const suppliedConfidence = Number(post.confidenceScore || 0);
-      const buyerRank = scoreBuyerIntent(post, text, suppliedConfidence);
-      const label = classifyByBuyerIntent(buyerRank);
-      const fitRank = label === "Good" || label === "ManualOnly"
-        ? Math.max(buyerRank, Math.min(analyzedRank, 78))
-        : Math.min(buyerRank, analyzedRank);
+      const extensionQualified = isExtensionQualified(post, text, suppliedConfidence);
+      const fitRank = extensionQualified ? Math.max(analyzedRank, suppliedConfidence) : analyzedRank;
+      const label = extensionQualified ? extensionLabel(fitRank) : classify(analysis, fitRank);
 
       return {
         id: `${Date.now()}-${index}`,
@@ -231,24 +174,9 @@ export function scoreImportedFacebookPosts(input: {
         painPoint: clean(post.painPoint || analysis.intent.replace(/-/g, " "), 120),
         replyDraft: clean(post.replyDraft, 600),
         outreachMode: clean(post.outreachMode, 80),
-        confidenceScore: buyerRank || Number(post.confidenceScore || fitRank || 0),
+        confidenceScore: Number(post.confidenceScore || fitRank || 0),
         matchReason: clean(post.matchReason || analysis.reason, 300),
-        analysis: label === "Bad fit" || label === "Skip"
-          ? {
-              ...analysis,
-              action: "Skip",
-              score: "Low",
-              risk: "High",
-              reason: buyerRank <= 0
-                ? "Rejected: seller, job, promo, group/course, off-topic, or no clear buyer pain request."
-                : "Skipped: buyer intent is not strong enough for import.",
-              quickReply: "SKIP THIS ONE.",
-              deeperReply: "Not recommended",
-            }
-          : {
-              ...analysis,
-              reason: `${analysis.reason} Buyer-intent filter ${buyerRank}/100: person appears to be asking for leads, clients, customers, sales, prospecting, ads, or outreach help.`,
-            },
+        analysis,
         fitRank,
         label,
       };
