@@ -3,7 +3,7 @@
   const STATUS_API_URL = "https://www.marketvibe1.com/api/internal-marketing-leads/hunt-status";
   const EVENT_API_URL = "https://www.marketvibe1.com/api/internal-marketing-leads/events";
   const PROCESSED_URL_API_URL = "https://www.marketvibe1.com/api/internal-marketing-leads/processed-url";
-  const EXTENSION_VERSION = "0.1.4";
+  const EXTENSION_VERSION = "0.1.5";
   const CACHE_KEY = "marketvibe_recent_facebook_imports";
   const MAX_RECENT_IMPORTS = 20;
   const SCAN_INTERVAL_MS = 1500;
@@ -11,7 +11,7 @@
   const HANDLED_KEY = "marketvibe_facebook_handled_posts";
   const MAX_HANDLED_POSTS = 500;
   const LEAD_HUNT_KEY = "marketvibe_lead_hunt_autopilot";
-  const MAX_SCROLL_ATTEMPTS = 12;
+  const MAX_SCROLL_ATTEMPTS = 25;
   const HIGH_INTENT_IMPORT_THRESHOLD = 78;
   const STUCK_RECOVERY_MS = 60000;
   const LOADING_RECOVERY_MS = 30000;
@@ -1009,9 +1009,9 @@
         bing: true,
       },
       caps: {
-        maxSearches: 90,
-        maxImportedLeads: 80,
-        delayMs: 8000,
+        maxSearches: 300,
+        maxImportedLeads: 250,
+        delayMs: 3000,
         confidenceThreshold: HIGH_INTENT_IMPORT_THRESHOLD,
       },
       outreach: {
@@ -2059,6 +2059,7 @@
   markFeed();
   setInterval(markFeed, SCAN_INTERVAL_MS);
 })();
+
 
 
 
