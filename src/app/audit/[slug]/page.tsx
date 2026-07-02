@@ -36,7 +36,7 @@ function reportSummary(name: string, score: number, issue: string, serviceCatego
 }
 
 function polishedOutreachMessage(input: { name: string; businessCategory: string; city: string; issue: string }) {
-  return `Hi ${input.name} team,\n\nI was reviewing ${input.businessCategory} in ${input.city} and noticed a couple of simple website items that may be worth improving.\n\nThe main thing I spotted was ${input.issue}. Small improvements here can make it easier for potential customers to understand the offer, trust the business, and make contact.\n\nI put together a short plain-English website audit with the main fixes. Would you like me to send it over?\n\nBest,\nMarketVibe\n\nYou are receiving this because your business contact details appear publicly listed. Reply "unsubscribe" and I will not contact you again.`;
+  return `Hi ${input.name} team,\n\nI was reviewing ${input.businessCategory} in ${input.city} and noticed a couple of simple website items that may be worth improving.\n\nThe main thing I spotted was ${input.issue}. Small improvements here can make it easier for potential customers to understand the offer, trust the business, and make contact.\n\nI put together a short plain-English website audit with the main fixes. Would you like me to send it over?\n\nBest,\n[Your name / agency name]\n\nYou are receiving this because your business contact details appear publicly listed. Reply "unsubscribe" and I will not contact you again.`;
 }
 
 function suggestedOffer(serviceCategory: string) {
