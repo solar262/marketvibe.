@@ -66,16 +66,25 @@ type LeadHuntEvent = {
 };
 
 const LEAD_HUNT_QUERIES = [
-  "how do I get web design clients",
-  "how do I get SEO clients",
+  "web designer struggling to get clients",
+  "freelance web designer need clients",
+  "web design agency struggling to get leads",
+  "where do web designers find clients",
+  "how do I get clients for my web design agency",
+  "seo freelancer struggling to get clients",
+  "seo agency struggling to get leads",
+  "agency owner struggling to get clients",
+  "agency owner client acquisition",
+  "cold outreach not working agency",
+  "cold email not working agency",
   "where can I find local business leads",
   "how to sell websites to local businesses",
   "how to sell SEO to local businesses",
-  "web designer struggling to get clients",
-  "SEO freelancer struggling to get clients",
-  "agency owner client acquisition",
-  "cold outreach not working for agency",
-  "where do marketers find prospects",
+  "smma struggling to get clients",
+  "social media manager struggling to get clients",
+  "booking system clients",
+  "appointment setting leads for agency",
+  "automation consultant struggling to get clients",
 ];
 
 export default function LeadHuntAutopilotPage() {
