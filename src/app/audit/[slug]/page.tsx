@@ -4,6 +4,45 @@ import { CheckoutButton } from "@/components/CheckoutButton";
 import { findLeadBySlug } from "@/lib/lead-engine";
 import { getAuditBySlugFromSupabase } from "@/lib/lead-persistence";
 
+function titleCase(value: string) {
+  return value.replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function mainIssue(issue?: string) {
+  return (issue || "website visibility gaps").split(":")[0].toLowerCase();
+}
+
+function isUsefulContactPageUrl(value?: string) {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    const pathname = url.pathname.toLowerCase();
+    if (/\.(css|js|json|xml|png|jpg|jpeg|gif|webp|svg|ico|woff2?|ttf|map|pdf)$/i.test(pathname)) return false;
+    if (/\/wp-content\/(plugins|themes|uploads)\//i.test(pathname)) return false;
+    if (/\/(assets|static|dist|build|chunks)\//i.test(pathname)) return false;
+    return /contact|kontakt|book|booking|appointment|get-in-touch|quote|enquiry|inquiry/i.test(value);
+  } catch {
+    return false;
+  }
+}
+
+function contactPageDisplay(value?: string) {
+  return isUsefulContactPageUrl(value) ? value : "Not detected";
+}
+
+function reportSummary(name: string, score: number, issue: string, serviceCategory: string) {
+  const opportunityLevel = score >= 70 ? "strong" : score >= 40 ? "clear" : "basic";
+  return `${name} is a verified public business lead with a ${opportunityLevel} website-improvement angle. The scan found ${issue}, giving a service provider a practical reason to start a ${serviceCategory.toLowerCase()}, local visibility, contact-flow, or trust-signal conversation.`;
+}
+
+function polishedOutreachMessage(input: { name: string; businessCategory: string; city: string; issue: string }) {
+  return `Hi ${input.name} team,\n\nI was reviewing ${input.businessCategory} in ${input.city} and noticed a couple of simple website items that may be worth improving.\n\nThe main thing I spotted was ${input.issue}. Small improvements here can make it easier for potential customers to understand the offer, trust the business, and make contact.\n\nI put together a short plain-English website audit with the main fixes. Would you like me to send it over?\n\nBest,\nMarketVibe\n\nYou are receiving this because your business contact details appear publicly listed. Reply "unsubscribe" and I will not contact you again.`;
+}
+
+function suggestedOffer(serviceCategory: string) {
+  return `Offer a fixed-price ${serviceCategory.toLowerCase()} or local visibility tune-up covering contact/quote clarity, mobile usability, local SEO basics, and trust proof.`;
+}
+
 export default async function AuditPage({
   params,
   searchParams,
@@ -16,6 +55,15 @@ export default async function AuditPage({
   const lead = (await getAuditBySlugFromSupabase(slug)) || findLeadBySlug(slug);
   const isUnlocked = unlocked === "1";
   const visibleIssues = lead.audit.issues.slice(0, 3);
+  const firstIssue = mainIssue(lead.audit.issues[0]);
+  const city = titleCase(lead.city);
+  const cleanSummary = reportSummary(lead.businessName, lead.audit.score, firstIssue, lead.audit.serviceAngle || lead.businessCategory);
+  const outreachMessage = polishedOutreachMessage({
+    name: lead.businessName,
+    businessCategory: lead.businessCategory,
+    city,
+    issue: firstIssue,
+  });
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
@@ -26,7 +74,7 @@ export default async function AuditPage({
               {lead.sourceStatus === "live" ? "LIVE public audit preview" : "Sample audit preview"}
             </p>
             <h1 className="mt-2 text-3xl font-semibold text-slate-950">{lead.businessName}</h1>
-            <p className="mt-2 text-slate-600">{lead.city}, {lead.country} · {lead.businessCategory}</p>
+            <p className="mt-2 text-slate-600">{city}, {lead.country} · {lead.businessCategory}</p>
           </div>
           <div className="grid h-24 w-24 place-items-center rounded-md bg-slate-950 text-3xl font-semibold text-white">
             {lead.audit.score}
@@ -49,7 +97,7 @@ export default async function AuditPage({
 
         <section className="mt-8 rounded-lg border border-emerald-200 bg-emerald-50 p-5">
           <h2 className="font-semibold text-emerald-950">Short problem summary</h2>
-          <p className="mt-2 text-sm leading-6 text-emerald-900">{lead.audit.summary}</p>
+          <p className="mt-2 text-sm leading-6 text-emerald-900">{cleanSummary}</p>
         </section>
 
         {!isUnlocked ? (
@@ -81,7 +129,7 @@ export default async function AuditPage({
               <h2 className="font-semibold text-slate-950">Full Lead Details</h2>
               <div className="mt-4 grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
                 <span>Website: {lead.website}</span>
-                <span>Contact page: {lead.contactPageUrl || "Not detected"}</span>
+                <span>Contact page: {contactPageDisplay(lead.contactPageUrl)}</span>
                 <span>Email: {lead.publicEmail || "Not visible"}</span>
                 <span>Phone: {lead.phone || "Not visible"}</span>
                 <span>Google profile: {lead.googleProfileUrl}</span>
@@ -104,9 +152,9 @@ export default async function AuditPage({
             </div>
             <div className="rounded-lg border border-slate-200 bg-white p-5">
               <h2 className="font-semibold text-slate-950">Outreach Message</h2>
-              <p className="mt-3 whitespace-pre-line rounded-md bg-slate-50 p-4 text-sm leading-6 text-slate-700">{lead.audit.outreachMessage}</p>
-              <p className="mt-4 text-sm text-slate-700"><strong>Subject:</strong> {lead.audit.subjectLine}</p>
-              <p className="mt-2 text-sm text-slate-700"><strong>Suggested offer:</strong> {lead.audit.suggestedOffer}</p>
+              <p className="mt-3 whitespace-pre-line rounded-md bg-slate-50 p-4 text-sm leading-6 text-slate-700">{outreachMessage}</p>
+              <p className="mt-4 text-sm text-slate-700"><strong>Subject:</strong> Quick website visibility note for {lead.businessName}</p>
+              <p className="mt-2 text-sm text-slate-700"><strong>Suggested offer:</strong> {suggestedOffer(lead.businessCategory)}</p>
             </div>
             <button className="inline-flex w-fit items-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-950">
               <Download className="h-4 w-4" /> PDF-ready export
