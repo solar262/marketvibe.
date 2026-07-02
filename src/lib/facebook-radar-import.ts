@@ -51,6 +51,8 @@ const FB_JUNK_WORDS = new Set([
 ]);
 
 const IMPORT_BUYER_PAIN_PATTERN = /\b(need (?:more )?(?:clients|leads|customers|sales)|looking for (?:clients|leads|customers|prospects)|how (?:do|can) i (?:get|find) (?:clients|leads|customers|prospects)|where (?:do|can) i find (?:clients|leads|customers|prospects)|struggling (?:to|with) (?:get|getting|find|finding|generate|generating) (?:clients|leads|customers|sales)|ads (?:are )?not working|cold outreach (?:is )?not working|no one replies|lead generation help|client acquisition)\b/i;
+const IMPORT_SERVICE_SELLER_PATTERN = /\b(web designers?|website designers?|web design(?: agency| services?)?|website services?|i build websites?|i make websites?|help(?:ing)? people with (?:their )?websites?|seo freelancers?|seo agencies?|seo consultants?|seo services?|marketing agencies?|local marketers?|local marketing agencies?|agency owners?|smma|social media managers?|booking systems?|booking-system sellers?|automation consultants?|lead gen(?:eration)? agencies?|appointment setters?|service providers?|freelancers?|consultants?)\b/i;
+const IMPORT_GENERIC_LOCAL_BUSINESS_PATTERN = /\b(i own|my|our)\s+(?:salon|restaurant|cafe|gym|clinic|dentist|law firm|shop|store|boutique|plumbing|roofing|contractor|local business|small business)\b|\b(?:salon|restaurant|cafe|gym|clinic|dentist|law firm|shop|store|boutique|plumber|roofer|contractor)\s+(?:owner|business)\b/i;
 const IMPORT_SELLER_OR_SPAM_PATTERN = /\b(dm me|message me|inbox me|i can help|we can help|i offer|we offer|i provide|we provide|my services|our services|need clients\?|need leads\?|guaranteed clients|guaranteed leads|buy leads|sell leads|join my group|promote your business|course|webinar|masterclass|hiring|job|looking for work|open to work|real estate|insurance|crypto|forex|mlm|affiliate|dropshipping|reseller|giveaway|promo code|affordable website services|we build websites)\b/i;
 
 function clean(value: unknown, limit = 900) {
@@ -121,7 +123,12 @@ function isExtensionQualified(post: ImportedFacebookPost, text: string, confiden
   const postEvidence = [text, post.matchReason, post.painPoint].map((item) => clean(item, 300)).join(" ");
   if (IMPORT_SELLER_OR_SPAM_PATTERN.test(postEvidence)) return false;
   if (!IMPORT_BUYER_PAIN_PATTERN.test(postEvidence)) return false;
-  return /\b(clients|client|leads|lead|customers|sales|prospect|prospects|outreach|ads|marketing|business|agency|freelancer|website|seo)\b/i.test(postEvidence);
+  if (!IMPORT_SERVICE_SELLER_PATTERN.test(postEvidence)) return false;
+  return /\b(clients|client|leads|lead|customers|sales|prospect|prospects|outreach|ads|marketing|agency|freelancer|website|seo)\b/i.test(postEvidence);
+}
+
+function isGenericLocalBusinessLead(text: string) {
+  return IMPORT_GENERIC_LOCAL_BUSINESS_PATTERN.test(text) && !IMPORT_SERVICE_SELLER_PATTERN.test(text);
 }
 
 function extensionLabel(confidenceScore: number): ScoredFacebookPost["label"] {
@@ -158,7 +165,7 @@ export function scoreImportedFacebookPosts(input: {
       const suppliedConfidence = Number(post.confidenceScore || 0);
       const extensionQualified = isExtensionQualified(post, text, suppliedConfidence);
       const fitRank = extensionQualified ? Math.max(analyzedRank, suppliedConfidence) : analyzedRank;
-      const label = extensionQualified ? extensionLabel(fitRank) : classify(analysis, fitRank);
+      const label = isGenericLocalBusinessLead(text) ? "Skip" : extensionQualified ? extensionLabel(fitRank) : classify(analysis, fitRank);
 
       return {
         id: `${Date.now()}-${index}`,

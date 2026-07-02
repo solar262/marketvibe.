@@ -223,7 +223,7 @@ async function saveToSupabase(leads: ScoredFacebookPost[], runId?: string) {
   const { error } = await supabase.from("internal_marketing_leads").upsert(rows, { onConflict: "source_url" });
   if (error) {
     if (isMissingInternalTableError(error)) return false;
-    throw new Error(error.message);
+    throw new Error(`Supabase insert failed for internal_marketing_leads: ${error.message}`);
   }
   return true;
 }

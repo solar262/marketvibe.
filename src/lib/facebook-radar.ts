@@ -97,6 +97,7 @@ export const BUYER_INTENT_QUERY_LIBRARY = [
   "need leads",
   "looking for clients",
   "looking for leads",
+  "how do I get web design clients",
   "how do I get clients",
   "how do I find customers",
   "need more customers",
@@ -107,6 +108,7 @@ export const BUYER_INTENT_QUERY_LIBRARY = [
   "no one replies to my outreach",
   "struggling to generate leads",
   "where do I find prospects",
+  "where can I find local business leads",
 ];
 
 export const DEFAULT_FACEBOOK_EXCLUDE_KEYWORDS = [
