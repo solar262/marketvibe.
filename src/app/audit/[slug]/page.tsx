@@ -61,6 +61,28 @@ function suggestedOffer() {
   return "Offer a fixed-price local visibility tune-up covering contact/quote clarity, mobile usability, local SEO basics, and trust proof.";
 }
 
+function serviceAngleGuidance(input: { businessCategory: string; city: string; issue: string }) {
+  const audience = businessAudience(input.businessCategory);
+  return [
+    {
+      title: "Best first offer",
+      text: "Start with a fixed-price local visibility tune-up instead of a full redesign pitch. Keep it practical: clearer quote/contact actions, mobile usability, local SEO basics, and trust proof.",
+    },
+    {
+      title: "Why this business may care",
+      text: `People comparing ${audience} in ${input.city} often want a fast way to understand the offer and request a quote. Because the scan found ${input.issue}, there is a clear reason to discuss improving the customer contact path.`,
+    },
+    {
+      title: "How to approach",
+      text: "Lead with one simple observation from the report, then offer to send the plain-English audit. Avoid a hard pitch in the first message.",
+    },
+    {
+      title: "What not to promise",
+      text: "Do not promise more customers, guaranteed sales, or guaranteed rankings. Position the work as a practical improvement opportunity based on public website signals.",
+    },
+  ];
+}
+
 export default async function AuditPage({
   params,
   searchParams,
@@ -78,6 +100,11 @@ export default async function AuditPage({
   const cleanSummary = reportSummary(lead.businessName, lead.audit.score, firstIssue);
   const outreachMessage = polishedOutreachMessage({
     name: lead.businessName,
+    businessCategory: lead.businessCategory,
+    city,
+    issue: firstIssue,
+  });
+  const serviceAngle = serviceAngleGuidance({
     businessCategory: lead.businessCategory,
     city,
     issue: firstIssue,
@@ -166,6 +193,17 @@ export default async function AuditPage({
                 <ul className="mt-3 grid gap-2 text-sm leading-6 text-slate-700">
                   {lead.audit.fixChecklist.map((item) => <li key={item}>{item}</li>)}
                 </ul>
+              </div>
+            </div>
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-5">
+              <h2 className="font-semibold text-emerald-950">Service angle for this business</h2>
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                {serviceAngle.map((item) => (
+                  <div key={item.title} className="rounded-md border border-emerald-100 bg-white p-4 text-sm leading-6 text-slate-700">
+                    <strong className="block text-slate-950">{item.title}</strong>
+                    <span>{item.text}</span>
+                  </div>
+                ))}
               </div>
             </div>
             <div className="rounded-lg border border-slate-200 bg-white p-5">
