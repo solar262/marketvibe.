@@ -4,6 +4,9 @@ import { CheckoutButton } from "@/components/CheckoutButton";
 import { findLeadBySlug } from "@/lib/lead-engine";
 import { getAuditBySlugFromSupabase } from "@/lib/lead-persistence";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 function titleCase(value: string) {
   return value.replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
@@ -195,6 +198,13 @@ export default async function AuditPage({
                 </ul>
               </div>
             </div>
+            <div className="rounded-lg border border-slate-200 bg-white p-5">
+              <h2 className="font-semibold text-slate-950">Outreach Message</h2>
+              <p className="mt-3 whitespace-pre-line rounded-md bg-slate-50 p-4 text-sm leading-6 text-slate-700">{outreachMessage}</p>
+              <p className="mt-3 text-xs leading-5 text-slate-500">Replace [Your name / agency name] before sending this message.</p>
+              <p className="mt-4 text-sm text-slate-700"><strong>Subject:</strong> Quick website visibility note for {lead.businessName}</p>
+              <p className="mt-2 text-sm text-slate-700"><strong>Suggested offer:</strong> {suggestedOffer()}</p>
+            </div>
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-5">
               <h2 className="font-semibold text-emerald-950">Service angle for this business</h2>
               <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -205,13 +215,6 @@ export default async function AuditPage({
                   </div>
                 ))}
               </div>
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-white p-5">
-              <h2 className="font-semibold text-slate-950">Outreach Message</h2>
-              <p className="mt-3 whitespace-pre-line rounded-md bg-slate-50 p-4 text-sm leading-6 text-slate-700">{outreachMessage}</p>
-              <p className="mt-3 text-xs leading-5 text-slate-500">Replace [Your name / agency name] before sending this message.</p>
-              <p className="mt-4 text-sm text-slate-700"><strong>Subject:</strong> Quick website visibility note for {lead.businessName}</p>
-              <p className="mt-2 text-sm text-slate-700"><strong>Suggested offer:</strong> {suggestedOffer()}</p>
             </div>
             <button className="inline-flex w-fit items-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-950">
               <Download className="h-4 w-4" /> PDF-ready export
