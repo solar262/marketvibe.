@@ -12,6 +12,24 @@ function mainIssue(issue?: string) {
   return (issue || "website visibility gaps").split(":")[0].toLowerCase();
 }
 
+function businessAudience(value: string) {
+  const normalized = value.toLowerCase().trim();
+  const map: Record<string, string> = {
+    roofers: "roofing businesses",
+    plumbers: "plumbing businesses",
+    cleaners: "cleaning businesses",
+    dentists: "dental clinics",
+    gyms: "fitness businesses",
+    cafes: "cafes",
+    restaurants: "restaurants",
+    salons: "salons",
+    barbers: "barbershops",
+    "local shops": "local shops",
+    "ecommerce stores": "ecommerce stores",
+  };
+  return map[normalized] || normalized || "local businesses";
+}
+
 function isUsefulContactPageUrl(value?: string) {
   if (!value) return false;
   try {
@@ -30,17 +48,17 @@ function contactPageDisplay(value?: string) {
   return isUsefulContactPageUrl(value) ? value : "Not detected";
 }
 
-function reportSummary(name: string, score: number, issue: string, serviceCategory: string) {
+function reportSummary(name: string, score: number, issue: string) {
   const opportunityLevel = score >= 70 ? "strong" : score >= 40 ? "clear" : "basic";
-  return `${name} is a verified public business lead with a ${opportunityLevel} website-improvement angle. The scan found ${issue}, giving a service provider a practical reason to start a ${serviceCategory.toLowerCase()}, local visibility, contact-flow, or trust-signal conversation.`;
+  return `${name} is a verified public business lead with a ${opportunityLevel} website-improvement angle. The scan found ${issue}, giving a service provider a practical reason to start a local visibility, contact-flow, or trust-signal conversation.`;
 }
 
 function polishedOutreachMessage(input: { name: string; businessCategory: string; city: string; issue: string }) {
-  return `Hi ${input.name} team,\n\nI was reviewing ${input.businessCategory} in ${input.city} and noticed a couple of simple website items that may be worth improving.\n\nThe main thing I spotted was ${input.issue}. Small improvements here can make it easier for potential customers to understand the offer, trust the business, and make contact.\n\nI put together a short plain-English website audit with the main fixes. Would you like me to send it over?\n\nBest,\n[Your name / agency name]\n\nYou are receiving this because your business contact details appear publicly listed. Reply "unsubscribe" and I will not contact you again.`;
+  return `Hi ${input.name} team,\n\nI was reviewing ${businessAudience(input.businessCategory)} in ${input.city} and noticed a couple of simple website items that may be worth improving.\n\nThe main thing I spotted was ${input.issue}. Small improvements here can make it easier for potential customers to understand the offer, trust the business, and make contact.\n\nI put together a short plain-English website audit with the main fixes. Would you like me to send it over?\n\nBest,\n[Your name / agency name]\n\nYou are receiving this because your business contact details appear publicly listed. Reply "unsubscribe" and I will not contact you again.`;
 }
 
-function suggestedOffer(serviceCategory: string) {
-  return `Offer a fixed-price ${serviceCategory.toLowerCase()} or local visibility tune-up covering contact/quote clarity, mobile usability, local SEO basics, and trust proof.`;
+function suggestedOffer() {
+  return "Offer a fixed-price local visibility tune-up covering contact/quote clarity, mobile usability, local SEO basics, and trust proof.";
 }
 
 export default async function AuditPage({
@@ -57,7 +75,7 @@ export default async function AuditPage({
   const visibleIssues = lead.audit.issues.slice(0, 3);
   const firstIssue = mainIssue(lead.audit.issues[0]);
   const city = titleCase(lead.city);
-  const cleanSummary = reportSummary(lead.businessName, lead.audit.score, firstIssue, lead.audit.serviceAngle || lead.businessCategory);
+  const cleanSummary = reportSummary(lead.businessName, lead.audit.score, firstIssue);
   const outreachMessage = polishedOutreachMessage({
     name: lead.businessName,
     businessCategory: lead.businessCategory,
@@ -153,8 +171,9 @@ export default async function AuditPage({
             <div className="rounded-lg border border-slate-200 bg-white p-5">
               <h2 className="font-semibold text-slate-950">Outreach Message</h2>
               <p className="mt-3 whitespace-pre-line rounded-md bg-slate-50 p-4 text-sm leading-6 text-slate-700">{outreachMessage}</p>
+              <p className="mt-3 text-xs leading-5 text-slate-500">Replace [Your name / agency name] before sending this message.</p>
               <p className="mt-4 text-sm text-slate-700"><strong>Subject:</strong> Quick website visibility note for {lead.businessName}</p>
-              <p className="mt-2 text-sm text-slate-700"><strong>Suggested offer:</strong> {suggestedOffer(lead.businessCategory)}</p>
+              <p className="mt-2 text-sm text-slate-700"><strong>Suggested offer:</strong> {suggestedOffer()}</p>
             </div>
             <button className="inline-flex w-fit items-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-950">
               <Download className="h-4 w-4" /> PDF-ready export
