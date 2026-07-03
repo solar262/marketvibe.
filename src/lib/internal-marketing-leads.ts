@@ -129,6 +129,32 @@ function sourceUrlKey(value: unknown) {
   return clean(value, 700).toLowerCase();
 }
 
+function responseFromLeads(input: {
+  leads: ScoredFacebookPost[];
+  skipped?: ScoredFacebookPost[];
+  storage: InternalMarketingLeadResponse["storage"];
+  importedAt?: string;
+  scoredCount?: number;
+}): InternalMarketingLeadResponse {
+  const results = input.leads.filter((post) => post.label === "Good" || post.label === "ManualOnly").slice(0, 100);
+  const skipped = (input.skipped || input.leads.filter((post) => post.label === "Skip" || post.label === "Bad fit")).slice(0, 100);
+
+  return {
+    source: "internal_marketing_leads",
+    counts: {
+      imported: results.length,
+      scored: Number(input.scoredCount ?? results.length + skipped.length),
+      good: results.filter((post) => post.label === "Good").length,
+      manualOnly: results.filter((post) => post.label === "ManualOnly").length,
+      skipped: skipped.length,
+    },
+    results,
+    skipped,
+    importedAt: input.importedAt || latestImport?.importedAt || "",
+    storage: input.storage,
+  };
+}
+
 function toRow(lead: ScoredFacebookPost, runId?: string) {
   return {
     run_id: runId || null,
@@ -146,7 +172,7 @@ function toRow(lead: ScoredFacebookPost, runId?: string) {
     query_used: lead.queryUsed || null,
     source_used: lead.sourceUsed || null,
     pain_point: lead.painPoint || null,
-    intent_reason: lead.analysis?.reason || null,
+    intent_reason: lead.matchReason || lead.analysis?.reason || null,
     reply_draft: lead.replyDraft || lead.analysis?.quickReply || null,
     outreach_mode: lead.outreachMode || null,
     outreach_status: "new",
@@ -207,6 +233,21 @@ async function listFromSupabase(limit = 100) {
   return (data || []).map((row) => fromRow(row as Record<string, unknown>));
 }
 
+async function countSupabaseLeads(runId?: string) {
+  const supabase = requireInternalStore();
+  if (!supabase) return memoryLeads.length;
+  let query = supabase
+    .from("internal_marketing_leads")
+    .select("id", { count: "exact", head: true });
+  if (runId) query = query.eq("run_id", runId);
+  const { count, error } = await query;
+  if (error) {
+    if (isMissingInternalTableError(error)) return null;
+    throw new Error(error.message);
+  }
+  return Number(count || 0);
+}
+
 function saveToMemory(leads: ScoredFacebookPost[]) {
   const existing = new Set(memoryLeads.map((lead) => sourceUrlKey(lead.url) || (lead.text || "").toLowerCase().slice(0, 180)));
   for (const lead of leads) {
@@ -220,23 +261,23 @@ async function saveToSupabase(leads: ScoredFacebookPost[], runId?: string) {
   const supabase = requireInternalStore();
   if (!supabase || !leads.length) return false;
   const rows = leads.map((lead) => toRow(lead, runId));
-  const { error } = await supabase.from("internal_marketing_leads").upsert(rows, { onConflict: "source_url" });
+  const { data, error } = await supabase
+    .from("internal_marketing_leads")
+    .upsert(rows, { onConflict: "source_url" })
+    .select("id");
   if (error) {
     if (isMissingInternalTableError(error)) return false;
     throw new Error(`Supabase insert failed for internal_marketing_leads: ${error.message}`);
   }
+  if (!data || data.length === 0) throw new Error("Supabase insert failed for internal_marketing_leads: no rows were returned after upsert.");
   return true;
 }
 
 export async function getInternalMarketingLeads(): Promise<InternalMarketingLeadResponse> {
   const supabaseLeads = await listFromSupabase();
-  const leads = supabaseLeads || memoryLeads;
-  const results = leads.filter((post) => post.label === "Good" || post.label === "ManualOnly").slice(0, 100);
-  const skipped = leads.filter((post) => post.label === "Skip" || post.label === "Bad fit").slice(0, 100);
-  const storage = supabaseLeads ? "supabase" : "memory";
-  return latestImport
-    ? { ...latestImport, results, skipped, storage }
-    : { ...emptyResponse(storage), results, skipped };
+  if (supabaseLeads) return responseFromLeads({ leads: supabaseLeads, storage: "supabase" });
+  if (memoryLeads.length) return responseFromLeads({ leads: memoryLeads, storage: "memory" });
+  return latestImport || emptyResponse("memory");
 }
 
 export async function importInternalMarketingLeads(payload: InternalMarketingLeadPayload): Promise<InternalMarketingLeadResponse> {
@@ -260,27 +301,24 @@ export async function importInternalMarketingLeads(payload: InternalMarketingLea
     metadata: { scored: scored.length, skipped: skipped.length, storage: savedToSupabase ? "supabase" : "memory" },
   });
 
-  latestImport = {
-    source: "internal_marketing_leads",
-    counts: {
-      imported: visible.length,
-      scored: scored.length,
-      good: scored.filter((post) => post.label === "Good").length,
-      manualOnly: scored.filter((post) => post.label === "ManualOnly").length,
-      skipped: skipped.length,
-    },
-    results: visible,
+  latestImport = responseFromLeads({
+    leads: visible,
     skipped,
-    importedAt: new Date().toISOString(),
     storage: savedToSupabase ? "supabase" : "memory",
-  };
+    importedAt: new Date().toISOString(),
+    scoredCount: scored.length,
+  });
 
   return latestImport;
 }
 
 export async function updateInternalMarketingLeadStatus(payload: Partial<InternalMarketingLeadStatus>) {
+  const runId = clean(payload.runId, 80) || latestInternalMarketingLeadStatus.runId;
+  const savedImportedCount = runId ? await countSupabaseLeads(runId).catch(() => null) : null;
+  const imported = savedImportedCount ?? asNumber(payload.imported);
+
   latestInternalMarketingLeadStatus = {
-    runId: clean(payload.runId, 80) || latestInternalMarketingLeadStatus.runId,
+    runId,
     active: Boolean(payload.active),
     paused: Boolean(payload.paused),
     recoveryNeeded: Boolean(payload.recoveryNeeded),
@@ -290,7 +328,7 @@ export async function updateInternalMarketingLeadStatus(payload: Partial<Interna
     currentItem: asNumber(payload.currentItem),
     totalQueued: asNumber(payload.totalQueued),
     completed: asNumber(payload.completed),
-    imported: asNumber(payload.imported),
+    imported,
     skipped: asNumber(payload.skipped),
     ignoredLowConfidence: asNumber(payload.ignoredLowConfidence),
     duplicates: asNumber(payload.duplicates),
@@ -346,7 +384,8 @@ export async function getInternalMarketingLeadStatus() {
   const recoveryNeeded = Boolean(data.active) && (!updatedAtMs || Date.now() - updatedAtMs > RUN_STALE_MS);
   const cachedSameRun = latestInternalMarketingLeadStatus.runId === String(data.id || "");
   const errors = Array.isArray(data.errors) ? data.errors.map(String).slice(0, 8) : [];
-  const imported = Number(data.imported_count || 0);
+  const savedImportedCount = await countSupabaseLeads(String(data.id || "")).catch(() => null);
+  const imported = savedImportedCount ?? Number(data.imported_count || 0);
   const skipped = Number(data.skipped_count || 0);
   const duplicates = Number(data.duplicate_count || 0);
   const failed = Number(data.failed_count || 0);
@@ -505,6 +544,9 @@ export async function createTestInternalMarketingLead() {
       url: `https://www.facebook.com/groups/marketvibe-test/posts/${Date.now()}`,
       queryUsed: "test buyer radar item survives refresh",
       sourceUsed: "internal test",
+      confidenceScore: 100,
+      matchReason: "Matched: web/website service seller + client-acquisition pain.",
+      painPoint: "client-acquisition pain",
     }],
   });
 }
