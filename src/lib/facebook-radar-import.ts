@@ -50,11 +50,13 @@ const FB_JUNK_WORDS = new Set([
   "join",
 ]);
 
-const IMPORT_BUYER_PAIN_PATTERN = /\b(need (?:more )?(?:clients|leads|customers|sales)|looking for (?:clients|leads|customers|prospects)|how (?:do|can) i (?:get|find|reach|attract|land) (?:online )?(?:clients|leads|customers|prospects)|where (?:do|can) i find (?:clients|leads|customers|prospects)|what (?:are|is) (?:the )?(?:best |effective )?ways? (?:to|for).*(?:get|find|reach|attract|land).*(?:clients|leads|prospects)|advice (?:for|on|about).*(?:getting|finding|reaching|attracting|landing).*(?:clients|leads|prospects)|struggling (?:to|with) (?:get|getting|find|finding|generate|generating) (?:clients|leads|customers|sales)|struggling to find clients|ads (?:are )?not working|cold outreach (?:is )?not working|no one replies|lead generation help|client acquisition|prospecting|local business leads)\b/i;
+const IMPORT_BUYER_PAIN_PATTERN = /\b(need (?:more )?(?:clients|leads|customers|sales)|i need (?:leads|clients|customers|prospects)|looking for (?:clients|leads|customers|prospects)|how (?:do|can) i (?:get|find|reach|attract|land) (?:online )?(?:clients|leads|customers|prospects)|where (?:do|can) i find (?:clients|leads|customers|prospects)|what (?:are|is) (?:the )?(?:best |effective )?ways? (?:to|for).*(?:get|find|reach|attract|land).*(?:clients|leads|prospects)|advice (?:for|on|about).*(?:getting|finding|reaching|attracting|landing).*(?:clients|leads|prospects)|struggling (?:to|with) (?:get|getting|find|finding|generate|generating) (?:clients|leads|customers|sales)|struggling to find clients|ads (?:are )?not working|cold outreach (?:is )?not working|no one replies|lead generation help|client acquisition|prospecting|local business leads)\b/i;
 const IMPORT_SERVICE_SELLER_PATTERN = /\b(web designers?|website designers?|web developers?|website developers?|web devs?|web design(?: agency| agencies| services?)?|web development(?: agency| agencies| services?)?|website creation services?|website services?|i build websites?|i make websites?|free websites?|offer(?:ing)? free websites?|help(?:ing)? people with (?:their )?websites?|help people with (?:their )?websites?|business of helping people with (?:their )?websites?|seo freelancers?|seo agencies?|seo consultants?|seo services?|marketing agencies?|local marketers?|local marketing agencies?|agency owners?|smma|social media managers?|booking systems?|booking-system sellers?|automation consultants?|lead gen(?:eration)? agencies?|appointment setters?|service providers?|freelancers?|consultants?)\b/i;
 const IMPORT_GENERIC_LOCAL_BUSINESS_PATTERN = /\b(i own|my|our)\s+(?:salon|restaurant|cafe|gym|clinic|dentist|law firm|shop|store|boutique|plumbing|roofing|contractor|local business|small business)\b|\b(?:salon|restaurant|cafe|gym|clinic|dentist|law firm|shop|store|boutique|plumber|roofer|contractor)\s+(?:owner|business)\b/i;
 const IMPORT_HARD_REJECT_PATTERN = /\b(guaranteed clients|guaranteed leads|buy leads|sell leads|join my group|course|webinar|masterclass|hiring|job|looking for work|open to work|real estate|insurance|crypto|forex|mlm|affiliate|dropshipping|reseller|giveaway|promo code)\b/i;
 const IMPORT_SOFT_SELLER_PATTERN = /\b(dm me|message me|inbox me|i can help|we can help|i offer|we offer|i provide|we provide|my services|our services|need clients\?|need leads\?|promote your business|affordable website services|we build websites)\b/i;
+const NOISY_GROUP_AUTHOR_PATTERN = /\b(i need a website designer|website designer web developer|web designer web developer|need a website designer|hire a web developer|find a web designer)\b/i;
+const SCRAPE_NOISE_PATTERN = /\b(shared with public group|shared with public|jul|aug|sep|oct|nov|dec|jan|feb|mar|apr|may|jun)\b.*\b(shared with public group|score:|post:)\b/i;
 
 function clean(value: unknown, limit = 900) {
   return String(value || "").replace(/\s+/g, " ").trim().slice(0, limit);
@@ -95,13 +97,24 @@ function stripFacebookSpam(value: unknown, limit = 900) {
     .trim()).slice(0, limit);
 }
 
-function cleanImportedText(value: unknown, limit = 900) {
+function extractCleanPostBody(value: unknown) {
   let text = stripFacebookSpam(value, 3000);
 
-  const usefulStart = text.search(/\b(hi|hello|hey|question|quick question|how do|how can|where do|where can|what are|what is|any advice|advice for|i need|i want|i have|i built|i launched|i'm|im|my|we|one of|most early|recently|looking|cold|no leads|no sales|no traffic|struggling to find clients)\b/i);
-  if (usefulStart > 0 && usefulStart < 450) text = text.slice(usefulStart);
+  const postMarker = text.search(/\b(hello|hi|hey|i['’]?m|im|i am|i run|i offer|i help|my business|quick question|question|how do|how can|where do|where can|what are|any advice|i need|looking for|cold outreach|struggling)\b/i);
+  if (postMarker > 0 && postMarker < 900) text = text.slice(postMarker);
 
-  const cleaned = clean(text, limit);
+  text = text
+    .replace(/\b(Post:|Author:|Group:|Score:|Shared with Public group|Shared with Public)\b/gi, " ")
+    .replace(/[—–_]+/g, " ")
+    .replace(/\b\d+\s*(?:likes?|comments?|shares?)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return clean(text, 900);
+}
+
+function cleanImportedText(value: unknown, limit = 900) {
+  const cleaned = extractCleanPostBody(value).slice(0, limit);
   return cleaned && !/^facebook$/i.test(cleaned) ? cleaned : "Facebook post imported";
 }
 
@@ -143,10 +156,20 @@ function hasServiceSellerContext(text: string) {
   return IMPORT_SERVICE_SELLER_PATTERN.test(text);
 }
 
+function looksLikeNoisyImport(post: ImportedFacebookPost, text: string) {
+  const author = clean(post.author, 160);
+  const evidence = [author, post.sourceName, text].map((item) => clean(item, 500)).join(" ");
+  if (NOISY_GROUP_AUTHOR_PATTERN.test(author)) return true;
+  if (SCRAPE_NOISE_PATTERN.test(evidence) && !/^\s*(hi|hello|hey|i['’]?m|im|i am|i run|i offer|i help|my business|how do|where do|what are|i need|looking|struggling)\b/i.test(text)) return true;
+  if (/\bif you are interested\b/i.test(text) && !/\b(how|where|struggling|cold outreach|need leads|need clients|find clients|get clients)\b/i.test(text)) return true;
+  return false;
+}
+
 function isExtensionQualified(post: ImportedFacebookPost, text: string, confidenceScore: number) {
   if (confidenceScore < 78) return false;
   const postEvidence = [text, post.matchReason, post.painPoint].map((item) => clean(item, 300)).join(" ");
   const strongBuyer = hasBuyerPain(postEvidence) && hasServiceSellerContext(postEvidence);
+  if (looksLikeNoisyImport(post, text)) return false;
   if (IMPORT_HARD_REJECT_PATTERN.test(postEvidence)) return false;
   if (!strongBuyer && IMPORT_SOFT_SELLER_PATTERN.test(postEvidence)) return false;
   if (isGenericLocalBusinessLead(postEvidence)) return false;
@@ -192,13 +215,16 @@ export function scoreImportedFacebookPosts(input: {
       const suppliedConfidence = Number(post.confidenceScore || 0);
       const extensionQualified = isExtensionQualified(post, text, suppliedConfidence);
       const genericLocalBusiness = isGenericLocalBusinessLead(text);
-      const fitRank = genericLocalBusiness ? Math.min(analyzedRank, 25) : extensionQualified ? Math.max(analyzedRank, suppliedConfidence) : analyzedRank;
-      const label = genericLocalBusiness ? "Skip" : extensionQualified ? extensionLabel(fitRank) : classify(analysis, fitRank);
+      const noisyImport = looksLikeNoisyImport(post, text);
+      const fitRank = genericLocalBusiness || noisyImport ? Math.min(analyzedRank, 25) : extensionQualified ? Math.max(analyzedRank, suppliedConfidence) : analyzedRank;
+      const label = genericLocalBusiness || noisyImport ? "Skip" : extensionQualified ? extensionLabel(fitRank) : classify(analysis, fitRank);
       const improvedReason = extensionQualified
         ? `Matched: ${buyerTypeReason(text)} + ${painReason(text)}.`
         : genericLocalBusiness
           ? "Skipped: generic local business owner, not a MarketVibe buyer."
-          : analysis.reason;
+          : noisyImport
+            ? "Skipped: noisy Facebook group/page text, not a clean buyer prospect."
+            : analysis.reason;
 
       return {
         id: `${Date.now()}-${index}`,
