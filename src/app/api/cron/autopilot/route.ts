@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 type AutopilotJobResult = {
-  ok: boolean;
   job: string;
   startedAt: string;
   finishedAt: string;
@@ -17,7 +16,6 @@ async function runScheduledBackendJob(startedAt: string): Promise<AutopilotJobRe
   const durationMs = Date.parse(finishedAt) - Date.parse(startedAt);
 
   return {
-    ok: true,
     job: "autopilot-placeholder",
     startedAt,
     finishedAt,
@@ -36,7 +34,7 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       message: "Autopilot completed",
-      ...result,
+      result,
     });
   } catch (error) {
     const failedAt = new Date().toISOString();
