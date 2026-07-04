@@ -21,8 +21,9 @@
   const EXTENSION_VERSION = "0.1.9";
   const CACHE_KEY = "marketvibe_buyer_radar_recent_facebook_imports";
   const MAX_RECENT_IMPORTS = 20;
-  const SCAN_INTERVAL_MS = 1500;
-  const SCAN_CLEANUP_MS = 3000;
+  const SCAN_INTERVAL_MS = 6000;
+  const SCAN_CLEANUP_MS = 5000;
+  const MAX_VISIBLE_SCAN_NODES = 12;
   const HANDLED_KEY = "marketvibe_buyer_radar_handled_posts";
   const MAX_HANDLED_POSTS = 500;
   const LEAD_HUNT_KEY = "marketvibe_buyer_radar_state";
@@ -63,6 +64,7 @@
   let leadHuntIntervalId = 0;
   let leadHuntControlPollId = 0;
   let leadHuntTickRunning = false;
+  let markFeedRunning = false;
   let extensionReloadRequired = false;
   const leadHuntTimeoutIds = new Set();
   if (window.__MARKETVIBE_BUYER_RADAR_CONTENT_ACTIVE__) return;
@@ -236,6 +238,10 @@
       const state = getLeadHuntState();
       if (!state?.active || state.paused) {
         logLeadHunt("scheduled action blocked", { reason, active: Boolean(state?.active), paused: Boolean(state?.paused) });
+        return;
+      }
+      if (document.hidden) {
+        logLeadHunt("scheduled action paused while tab hidden", { reason });
         return;
       }
       callback(state);
@@ -1085,10 +1091,8 @@
   }
 
   function getVisibleCandidateNodes() {
-    const selectors = [
-      '[role="dialog"] [role="article"]',
+    const candidateSelector = [
       '[role="dialog"]',
-      '[aria-modal="true"] [role="article"]',
       '[aria-modal="true"]',
       '[role="article"]',
       "div[aria-posinset]",
@@ -1096,18 +1100,41 @@
       "div[data-pagelet*='SearchResults'] div[role='article']",
       "div[aria-describedby]",
       "article",
-    ];
+    ].join(",");
     const seen = new Set();
-    return selectors
-      .flatMap((selector) => Array.from(document.querySelectorAll(selector)))
-      .filter((node) => {
-        if (!(node instanceof HTMLElement)) return false;
-        if (seen.has(node)) return false;
-        seen.add(node);
-        const box = node.getBoundingClientRect();
-        const text = getPostText(node);
-        return box.bottom >= -80 && box.top <= window.innerHeight + 700 && text.length >= 35;
-      });
+    const nodes = [];
+    const addNode = (node) => {
+      if (!(node instanceof HTMLElement) || seen.has(node)) return;
+      const box = node.getBoundingClientRect();
+      if (box.bottom < -80 || box.top > window.innerHeight + 240 || box.width < 120 || box.height < 40) return;
+      seen.add(node);
+      nodes.push(node);
+    };
+
+    document.querySelectorAll('[role="dialog"], [aria-modal="true"]').forEach(addNode);
+
+    if (typeof document.elementsFromPoint === "function") {
+      const xSamples = [0.34, 0.5, 0.66].map((ratio) => Math.max(12, Math.round(window.innerWidth * ratio)));
+      for (let y = 72; y <= window.innerHeight - 48; y += 150) {
+        for (const x of xSamples) {
+          for (const element of document.elementsFromPoint(x, y)) {
+            const candidate = element instanceof Element ? element.closest(candidateSelector) : null;
+            if (candidate) addNode(candidate);
+            if (nodes.length >= MAX_VISIBLE_SCAN_NODES) break;
+          }
+          if (nodes.length >= MAX_VISIBLE_SCAN_NODES) break;
+        }
+        if (nodes.length >= MAX_VISIBLE_SCAN_NODES) break;
+      }
+    }
+
+    if (!nodes.length) {
+      for (const node of Array.from(document.querySelectorAll('[role="article"], div[aria-posinset]')).slice(0, MAX_VISIBLE_SCAN_NODES)) addNode(node);
+    }
+
+    return nodes
+      .slice(0, MAX_VISIBLE_SCAN_NODES)
+      .filter((node) => getPostText(node).length >= 35);
   }
 
   function markNodeHandled(node, score) {
@@ -1256,9 +1283,11 @@
 
   function isFacebookLoadingScreen() {
     if (!/facebook\.com/i.test(location.hostname)) return false;
-    const text = clean(document.body?.innerText || "").slice(0, 500);
-    const articleCount = document.querySelectorAll('[role="article"], div[aria-posinset]').length;
-    return articleCount === 0 && /\b(loading|please wait|temporarily unavailable|this content isn't available)\b/i.test(text);
+    const hasContent = Boolean(document.querySelector('[role="article"], div[aria-posinset], [role="dialog"] [data-ad-preview="message"]'));
+    if (hasContent) return false;
+    if (document.querySelector('[role="progressbar"], [aria-busy="true"]')) return true;
+    const text = clean(document.body?.textContent || "").slice(0, 500);
+    return /\b(loading|please wait|temporarily unavailable|this content isn't available)\b/i.test(text);
   }
 
   function recoverCurrentLeadHuntItem(reason = "Skip current") {
@@ -2092,6 +2121,7 @@
     if (leadHuntTickRunning) return;
     const state = getLeadHuntState();
     if (!state?.active || state.paused) return;
+    if (document.hidden) return;
     if (Date.now() < Number(state.nextActionAt || 0)) return;
     if (await pollLeadHuntControl(`before tick:${trigger}`)) return;
     leadHuntTickRunning = true;
@@ -2549,6 +2579,8 @@
   }
 
   function markFeed() {
+    if (document.hidden || markFeedRunning || isFacebookLoadingScreen()) return;
+    markFeedRunning = true;
     let highlighted = 0;
     const cleanupTimer = window.setTimeout(cleanupScanUi, SCAN_CLEANUP_MS);
 
@@ -2600,11 +2632,12 @@
     } finally {
       window.clearTimeout(cleanupTimer);
       cleanupScanUi();
+      markFeedRunning = false;
     }
   }
 
   function collectVisibleCards() {
-    const nodes = Array.from(document.querySelectorAll('[role="article"], div[aria-posinset]'));
+    const nodes = getVisibleCandidateNodes();
     const seen = new Set();
     const posts = [];
     for (const node of nodes) {
@@ -2622,6 +2655,11 @@
       if (posts.length >= 10) break;
     }
     return posts.sort((a, b) => b.score - a.score);
+  }
+
+  function runPassiveFeedScan() {
+    if (document.hidden || isFacebookLoadingScreen()) return;
+    markFeed();
   }
 
   function showStatus(message) {
@@ -2729,8 +2767,13 @@
   renderRecentImports();
   renderQueueControls();
   renderLeadHuntPanel();
-  markFeed();
-  setInterval(markFeed, SCAN_INTERVAL_MS);
+  runPassiveFeedScan();
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) return;
+    runPassiveFeedScan();
+    if (getLeadHuntState()?.active) ensureLeadHuntRunner("tab visible");
+  });
+  setInterval(runPassiveFeedScan, SCAN_INTERVAL_MS);
 })();
 
 

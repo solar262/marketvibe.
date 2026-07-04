@@ -616,9 +616,14 @@ assert.match(extensionSource, /Send this post to MarketVibe/, "Highlighted posts
 assert.match(extensionSource, /function sendSinglePost/, "Per-post import workflow should exist");
 assert.match(extensionSource, /sendPosts\(\[post\]\)/, "Per-post import should send only one post");
 assert.match(extensionSource, /function sendVisible/, "Bulk visible import should remain as backup");
-assert.match(extensionSource, /const SCAN_INTERVAL_MS = 1500/, "Extension should rescan Facebook cards every 1.5 seconds");
-assert.match(extensionSource, /const SCAN_CLEANUP_MS = 3000/, "Extension should clean scan UI if scanning takes more than 3 seconds");
-assert.match(extensionSource, /setInterval\(markFeed, SCAN_INTERVAL_MS\)/, "Extension should use one interval scanner without repeatedly adding overlays");
+assert.match(extensionSource, /const SCAN_INTERVAL_MS = 6000/, "Extension should throttle passive Facebook card rescans");
+assert.match(extensionSource, /const SCAN_CLEANUP_MS = 5000/, "Extension should keep scan cleanup bounded");
+assert.match(extensionSource, /const MAX_VISIBLE_SCAN_NODES = 12/, "Extension should cap visible DOM candidates per scan");
+assert.match(extensionSource, /document\.elementsFromPoint/, "Extension should sample visible viewport elements instead of scanning the entire DOM");
+assert.match(extensionSource, /document\.hidden/, "Extension should pause scanning while the tab is hidden");
+assert.match(extensionSource, /function runPassiveFeedScan/, "Extension should use a guarded passive scanner");
+assert.match(extensionSource, /setInterval\(runPassiveFeedScan, SCAN_INTERVAL_MS\)/, "Extension should use one throttled passive scanner interval");
+assert.match(extensionSource, /markFeedRunning/, "Extension should prevent overlapping feed scans");
 assert.match(extensionSource, /function cleanupScanUi/, "Extension should always clean scan UI");
 assert.match(extensionSource, /finally \{[\s\S]*cleanupScanUi\(\)/, "Failed scans should clean up scan UI in finally");
 assert.match(extensionSource, /No (?:high-intent posts|service-seller buyer intent) found on (?:visible page|this page)/, "Extension should show no-results status in the floating badge");
@@ -746,6 +751,10 @@ assert.match(extensionSource, /Auto DM: Off/, "Extension panel should expose an 
 assert.match(contactFlowSource, /AUTO_DM_PREP_KEY/, "Contact flow should read the Auto DM prep toggle");
 assert.match(contactFlowSource, /AUTO_DM_PREPARED_KEY/, "Contact flow should remember prepared contacts");
 assert.match(contactFlowSource, /function runAutoDmPrepForVisibleMatches/, "Contact flow should prepare one visible matched post when Auto DM is enabled");
+assert.match(contactFlowSource, /CONTACT_FLOW_INTERVAL_MS = 5000/, "Contact flow should reduce interval enhancement frequency");
+assert.match(contactFlowSource, /CONTACT_FLOW_MUTATION_DEBOUNCE_MS = 1200/, "Contact flow MutationObserver should be debounced");
+assert.match(contactFlowSource, /new MutationObserver\(\(\) => scheduleEnhance\(\)\)/, "Contact flow MutationObserver should schedule debounced work");
+assert.match(contactFlowSource, /\.slice\(0, 10\)/, "Contact flow should cap enhanced action rows per pass");
 assert.match(contactFlowSource, /Send manually/, "Contact flow should keep final send manual");
 assert.match(contactFlowSource, /if \(!options\.automatic\) opened = openContactTarget\(node\)/, "Automatic Auto DM prep should not open new tabs");
 assert.match(contactFlowSource, /Use Open profile\/post to send manually/, "Automatic Auto DM prep should tell the user to open the profile manually");

@@ -5,8 +5,12 @@
   const AUTO_DM_PREPARED_KEY = "marketvibe_buyer_radar_auto_dm_prepared";
   const PANEL_ID = "marketvibe-contact-flow-toast";
   const AUTO_DM_PREP_DELAY_MS = 9000;
+  const CONTACT_FLOW_INTERVAL_MS = 5000;
+  const CONTACT_FLOW_MUTATION_DEBOUNCE_MS = 1200;
   let autoDmPrepRunning = false;
   let lastAutoDmPrepAt = 0;
+  let enhanceTimer = 0;
+  let enhanceRunning = false;
 
   if (!/facebook\.com$/i.test(location.hostname)) return;
 
@@ -228,8 +232,14 @@
     return rect.bottom > 80 && rect.top < window.innerHeight - 80 && rect.width > 120 && rect.height > 80;
   }
 
+  function isFacebookBusyLoading() {
+    return Boolean(!document.querySelector(".marketvibe-card-actions") && document.querySelector('[role="progressbar"], [aria-busy="true"]'));
+  }
+
   function getPendingMatchNodes() {
     return Array.from(document.querySelectorAll(".marketvibe-card-actions"))
+      .filter((actions) => actions instanceof HTMLElement && isVisibleNode(actions))
+      .slice(0, 10)
       .map((actions) => actions.closest('[role="article"], div[aria-posinset]'))
       .filter((node) => {
         if (!(node instanceof HTMLElement)) return false;
@@ -327,17 +337,35 @@
   }
 
   function enhance() {
-    document.querySelectorAll(".marketvibe-card-actions").forEach((actions) => enhanceActionBar(actions));
-    syncAutoDmButtons();
-    runAutoDmPrepForVisibleMatches();
+    if (document.hidden || enhanceRunning || isFacebookBusyLoading()) return;
+    enhanceRunning = true;
+    try {
+      Array.from(document.querySelectorAll(".marketvibe-card-actions"))
+        .filter((actions) => actions instanceof HTMLElement && isVisibleNode(actions))
+        .slice(0, 10)
+        .forEach((actions) => enhanceActionBar(actions));
+      syncAutoDmButtons();
+      runAutoDmPrepForVisibleMatches();
+    } finally {
+      enhanceRunning = false;
+    }
   }
 
-  const observer = new MutationObserver(() => enhance());
-  observer.observe(document.documentElement, { childList: true, subtree: true });
+  function scheduleEnhance() {
+    if (document.hidden) return;
+    window.clearTimeout(enhanceTimer);
+    enhanceTimer = window.setTimeout(enhance, CONTACT_FLOW_MUTATION_DEBOUNCE_MS);
+  }
+
+  const observer = new MutationObserver(() => scheduleEnhance());
+  observer.observe(document.body || document.documentElement, { childList: true, subtree: true });
   window.addEventListener("marketvibe:auto-dm-prep-change", () => {
     syncAutoDmButtons();
     runAutoDmPrepForVisibleMatches("switch changed");
   });
-  window.setInterval(enhance, 1400);
-  enhance();
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) scheduleEnhance();
+  });
+  window.setInterval(() => scheduleEnhance(), CONTACT_FLOW_INTERVAL_MS);
+  scheduleEnhance();
 })();
