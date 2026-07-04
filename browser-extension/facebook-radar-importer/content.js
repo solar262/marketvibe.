@@ -323,24 +323,83 @@
     let text = trimRepeatedWords(value)
       .replace(/(?:Facebook){2,}/gi, " ")
       .replace(/\b(Home|Watch|Marketplace|Groups|Gaming|Notifications|Menu|Search|Filters|All|People|Reels|Pages|Events)\b/gi, " ")
-      .replace(/\b(Like|Comment|Share|Send|Follow|Join|Write a comment|Add a comment|View more comments|See more|See less)\b/gi, " ")
+      .replace(/\b(?:Like|Comment|Share|Send)\b(?=\s*(?:Like|Comment|Share|Send|\d|$))/gi, " ")
+      .replace(/\b(Follow|Join|Write a comment|Add a comment|View more comments|See more|See less)\b/gi, " ")
       .replace(/\b\d+\s*(likes?|comments?|shares?)\b/gi, " ")
+      .replace(/\b(?:Shared with|Shared to)\s+(?:Public\s+)?(?:group|page)\b/gi, " ")
+      .replace(/\bShared with Public\b/gi, " ")
       .replace(/\s+/g, " ")
       .trim();
-    const usefulStart = text.search(/\b(most|how|i need|i want|i have|i own|my|we|our|looking|need|no leads|no sales|no traffic|client|customer|website|seo|ads|marketing|ecommerce|business)\b/i);
+    const usefulStart = text.search(/\b(most|how|i am|i'm|i need|i want|i have|i own|my|we|our|looking|need|no leads|no sales|no traffic|client|customer|website|seo|ads|marketing|ecommerce|business)\b/i);
     if (usefulStart > 0 && usefulStart < 360) text = text.slice(usefulStart);
     return clean(text).slice(0, limit);
   }
 
+  function cleanLabelText(value, limit = 120) {
+    return clean(String(value || "")
+      .replace(/(?:Facebook){2,}/gi, " ")
+      .replace(/\| Facebook$/i, "")
+      .replace(/\b(Home|Watch|Marketplace|Groups|Gaming|Notifications|Menu|Search)\b/gi, " ")
+      .replace(/\s+/g, " ")).slice(0, limit);
+  }
+
+  function escapeRegExp(value) {
+    return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function normalizedName(value) {
+    return cleanLabelText(value, 160).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  }
+
+  function sameText(left, right) {
+    return Boolean(normalizedName(left) && normalizedName(left) === normalizedName(right));
+  }
+
+  function isGenericGroupOrPageName(value) {
+    const cleaned = cleanLabelText(value, 160);
+    const text = normalizedName(cleaned);
+    if (!text) return true;
+    if (/\b(i need a website designer|web design and development|small business owners entrepreneurs|small businesses owned by women|business networking|website designer web developer)\b/i.test(text)) return true;
+    if (/\b(group|community|networking|business owners|entrepreneurs|web design|website designer|web developer|small business|freelancers|agency owners|marketing|seo)\b/i.test(text) && !/\b[A-Z][a-z]+ [A-Z][a-z]+\b/.test(cleaned)) return true;
+    return false;
+  }
+
+  function stripMetadataFromPostText(value, sourceName = "", author = "") {
+    let text = cleanLeadText(value, 900);
+    for (const item of [sourceName, author]) {
+      const cleaned = cleanLabelText(item, 160);
+      if (!cleaned) continue;
+      const variants = Array.from(new Set([
+        cleaned,
+        cleanLeadText(cleaned, 160),
+        cleaned.replace(/[/|&+-]+/g, " ").replace(/\s+/g, " ").trim(),
+      ].filter(Boolean)));
+      for (const variant of variants) {
+        text = text.replace(new RegExp(escapeRegExp(variant), "gi"), " ");
+      }
+    }
+    return cleanLeadText(text
+      .replace(/\b(?:Shared with|Shared to)\s+(?:Public\s+)?(?:group|page)\b/gi, " ")
+      .replace(/\b(?:Author|Group|Page|Post|Score):\b/gi, " ")
+      .replace(/\s+/g, " "), 900);
+  }
+
   function getPostText(node) {
     const clone = node.cloneNode(true);
-    clone.querySelectorAll(".marketvibe-intent-badge, .marketvibe-card-actions, [aria-hidden='true'], [role='navigation'], [role='banner'], [role='button']").forEach((item) => item.remove());
-    const candidates = Array.from(clone.querySelectorAll("[data-ad-preview='message'], [dir='auto'], span, div"))
+    clone.querySelectorAll(".marketvibe-intent-badge, .marketvibe-card-actions, .marketvibe-contact-actions, [aria-hidden='true'], [role='navigation'], [role='banner'], [role='button'], button").forEach((item) => item.remove());
+    const primary = Array.from(clone.querySelectorAll("[data-ad-preview='message']"))
       .map((item) => cleanLeadText(item.textContent || "", 900))
-      .filter((text) => text.length >= 30 && !/^facebook$/i.test(text))
+      .filter((text) => text.length >= 20 && !/^facebook$/i.test(text))
+      .sort((a, b) => b.length - a.length);
+    if (primary[0]) return stripMetadataFromPostText(primary[0]) || "Facebook post imported";
+
+    const candidates = Array.from(clone.querySelectorAll("[dir='auto'], span, div"))
+      .map((item) => cleanLeadText(item.textContent || "", 900))
+      .filter((text) => text.length >= 20 && !/^facebook$/i.test(text))
+      .filter((text) => !/^(like|comment|share|send|follow|join|most relevant|view \d+ repl|reply)$/i.test(text))
       .sort((a, b) => b.length - a.length);
     const combined = Array.from(new Set(candidates.slice(0, 5))).join(" ");
-    return cleanLeadText(combined || candidates[0] || clone.textContent || "", 900) || "Facebook post imported";
+    return stripMetadataFromPostText(combined || candidates[0] || clone.textContent || "") || "Facebook post imported";
   }
 
   function getBestVisibleText(node, selectors, fallback = "") {
@@ -348,19 +407,43 @@
       const items = Array.from(node.querySelectorAll(selector));
       for (const item of items) {
         if (item instanceof HTMLElement && !isVisibleElement(item)) continue;
-        const text = cleanLeadText(item.textContent || item.getAttribute("aria-label") || "", 120);
+        const text = cleanLabelText(item.textContent || item.getAttribute("aria-label") || "", 120);
         if (text && text.length <= 120 && !/^facebook$/i.test(text)) return text;
       }
     }
     return fallback;
   }
 
-  function extractGroupName() {
-    return cleanLeadText(document.title.replace(/\| Facebook$/i, ""), 120) || "Facebook source";
+  function extractGroupName(node = document) {
+    const groupSelectors = [
+      "h1 a[role='link']",
+      "h1",
+      "h2 a[href*='/groups/']",
+      "h2 a[href*='/pages/']",
+      "a[href*='/groups/'][role='link']",
+      "a[href*='/pages/'][role='link']",
+    ];
+    const fromNode = getBestVisibleText(node, groupSelectors, "");
+    if (fromNode && !sameText(fromNode, "Facebook")) return fromNode;
+    return cleanLabelText(document.title.replace(/\| Facebook$/i, ""), 120) || "Facebook source";
   }
 
-  function extractAuthorName(node) {
-    return getBestVisibleText(node, ["h2 strong a", "h3 strong a", "strong a[role='link']", "h2 a[role='link']", "h3 a[role='link']", "a[role='link']"], "Unknown author");
+  function extractAuthorName(node, sourceName = "") {
+    const selectors = ["h2 strong a", "h3 strong a", "strong a[role='link']", "h2 a[role='link']", "h3 a[role='link']", "a[role='link']"];
+    const seen = new Set();
+    for (const selector of selectors) {
+      for (const item of Array.from(node.querySelectorAll(selector))) {
+        if (item instanceof HTMLElement && !isVisibleElement(item)) continue;
+        const text = cleanLabelText(item.textContent || item.getAttribute("aria-label") || "", 120);
+        const key = normalizedName(text);
+        if (!text || seen.has(key)) continue;
+        seen.add(key);
+        if (sameText(text, sourceName)) continue;
+        if (isGenericGroupOrPageName(text)) continue;
+        return text;
+      }
+    }
+    return "Unknown author";
   }
 
   function extractTimestamp(node) {
@@ -669,18 +752,20 @@
   }
 
   function buildPostFromNode(node, score, meta = {}) {
-    const text = getPostText(node);
+    const sourceName = meta.sourceName || extractGroupName(node);
+    const author = extractAuthorName(node, sourceName);
+    const text = stripMetadataFromPostText(getPostText(node), sourceName, author);
     const painPoint = meta.painPoint || detectPainPoint(text);
     const draft = createContextualReply({ text, painPoint, score });
     const commentCount = Number(meta.commentCount ?? extractCommentCount(node) ?? 0);
-    const matchReason = meta.matchReason || detectMatchReason(text, score, { commentCount });
+    const matchReason = meta.matchReason || detectMatchReason(text, score, { commentCount, sourceName });
     return {
       text,
       score,
       confidenceScore: score,
       matchReason,
-      sourceName: extractGroupName(),
-      author: extractAuthorName(node),
+      sourceName,
+      author,
       dateText: extractTimestamp(node),
       reactions: "",
       comments: commentCount || "",
@@ -858,7 +943,7 @@
     const qualified = [];
     for (const node of nodes) {
       const text = getPostText(node);
-      const sourceName = extractGroupName();
+      const sourceName = extractGroupName(node);
       const score = scorePost(text, { commentCount: extractCommentCount(node), sourceName });
       if (score < 25 || !isHighQualityBuyerText(text, { sourceName })) continue;
       const key = getNodeKey(node, score);
@@ -882,7 +967,7 @@
     if (dialog instanceof HTMLElement) {
       const text = getPostText(dialog);
       const commentCount = extractCommentCount(dialog);
-      const sourceName = extractGroupName();
+      const sourceName = extractGroupName(dialog);
       const score = scorePost(text, { commentCount, sourceName });
       if (score >= 25) {
         const search = currentLeadHuntSearch(getLeadHuntState() || {});
@@ -895,7 +980,7 @@
     if (!current) return null;
     const search = currentLeadHuntSearch(getLeadHuntState() || {});
     const commentCount = extractCommentCount(current.node);
-    const sourceName = extractGroupName();
+    const sourceName = extractGroupName(current.node);
     const matchReason = detectMatchReason(getPostText(current.node), current.score, { commentCount, sourceName });
     const post = buildPostFromNode(current.node, current.score, { queryUsed: search?.query || "", sourceUsed: search?.source || "", commentCount, matchReason });
     return { node: current.node, score: current.score, post, key: getPostKey(post), source: "visible" };
@@ -1533,7 +1618,7 @@
       if (node.getAttribute("data-marketvibe-auto-importing") === "true") continue;
       const text = getPostText(node);
       const commentCount = extractCommentCount(node);
-      const sourceName = extractGroupName();
+      const sourceName = extractGroupName(node);
       const score = scorePost(text, { commentCount, sourceName });
       const matchReason = detectMatchReason(text, score, { commentCount, sourceName });
       const post = buildPostFromNode(node, score, { queryUsed: search?.query || "", sourceUsed: search?.source || "", outreachMode: state.outreach?.mode || "draft-only", commentCount, matchReason });
@@ -1606,7 +1691,7 @@
     if (await pollLeadHuntControl("before auto import")) return false;
     const search = currentLeadHuntSearch(state);
     const commentCount = extractCommentCount(node);
-    const sourceName = extractGroupName();
+    const sourceName = extractGroupName(node);
     const text = getPostText(node);
     if (!isHighQualityBuyerText(text, { sourceName })) return false;
     const matchReason = detectMatchReason(text, score, { commentCount, sourceName });
@@ -2117,7 +2202,7 @@
       const nodes = getVisibleCandidateNodes();
       for (const node of nodes) {
         const text = getPostText(node);
-        const sourceName = extractGroupName();
+        const sourceName = extractGroupName(node);
         const score = scorePost(text, { commentCount: extractCommentCount(node), sourceName });
         node.style.opacity = "";
         node.style.filter = "";
@@ -2171,7 +2256,7 @@
       const box = node.getBoundingClientRect();
       if (box.bottom < 0 || box.top > window.innerHeight * 2) continue;
       const text = getPostText(node);
-      const sourceName = extractGroupName();
+      const sourceName = extractGroupName(node);
       const score = scorePost(text, { commentCount: extractCommentCount(node), sourceName });
       if (score < confidenceThreshold() || !isHighQualityBuyerText(text, { sourceName })) continue;
       const post = buildPostFromNode(node, score);
@@ -2256,6 +2341,19 @@
       button.disabled = false;
       button.textContent = "Send visible posts to MarketVibe";
     }
+  }
+
+  if (window.__MARKETVIBE_BUYER_RADAR_TEST__) {
+    window.__MarketVibeBuyerRadarTest = {
+      buildPostFromNode,
+      cleanLeadText,
+      extractAuthorName,
+      extractGroupName,
+      getPostText,
+      isGenericGroupOrPageName,
+      stripMetadataFromPostText,
+    };
+    return;
   }
 
   const button = document.createElement("button");

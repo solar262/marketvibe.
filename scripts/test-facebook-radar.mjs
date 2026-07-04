@@ -57,6 +57,109 @@ function linksFor(input) {
   return generateFacebookSearchLinks(input);
 }
 
+class FakeFacebookElement {
+  constructor({ tag = "div", text = "", attrs = {}, selectors = [], children = [] } = {}) {
+    this.tag = tag;
+    this._text = text;
+    this.attrs = attrs;
+    this.selectors = selectors;
+    this.children = children;
+    this.removed = false;
+  }
+
+  get textContent() {
+    return [this._text, ...this.children.filter((child) => !child.removed).map((child) => child.textContent)].filter(Boolean).join(" ");
+  }
+
+  getAttribute(name) {
+    return this.attrs[name] || null;
+  }
+
+  getBoundingClientRect() {
+    return { width: 100, height: 24, top: 0, bottom: 24 };
+  }
+
+  remove() {
+    this.removed = true;
+  }
+
+  cloneNode() {
+    return new FakeFacebookElement({
+      tag: this.tag,
+      text: this._text,
+      attrs: { ...this.attrs },
+      selectors: [...this.selectors],
+      children: this.children.map((child) => child.cloneNode(true)),
+    });
+  }
+
+  querySelector(selector) {
+    return this.querySelectorAll(selector)[0] || null;
+  }
+
+  querySelectorAll(selector) {
+    const selectors = selector.split(",").map((item) => item.trim()).filter(Boolean);
+    const nodes = [];
+    const visit = (node) => {
+      for (const child of node.children || []) {
+        if (child.removed) continue;
+        if (selectors.some((item) => child.matches(item))) nodes.push(child);
+        visit(child);
+      }
+    };
+    visit(this);
+    return nodes;
+  }
+
+  matches(selector) {
+    if (this.selectors.includes(selector)) return true;
+    if (selector === "[data-ad-preview='message']") return this.attrs["data-ad-preview"] === "message";
+    if (selector === "[dir='auto']") return this.attrs.dir === "auto";
+    if (selector === "span" || selector === "div" || selector === "abbr") return this.tag === selector;
+    if (selector === "a[href]") return this.tag === "a" && Boolean(this.attrs.href);
+    if (selector === "a[role='link']") return this.tag === "a" && this.attrs.role === "link";
+    if (/^a\[href\*='\/groups\/'\]/.test(selector)) return this.tag === "a" && this.attrs.role === "link" && String(this.attrs.href || "").includes("/groups/");
+    if (/^a\[href\*='\/pages\/'\]/.test(selector)) return this.tag === "a" && this.attrs.role === "link" && String(this.attrs.href || "").includes("/pages/");
+    return false;
+  }
+}
+
+function loadExtensionTestApi() {
+  const fakeDocument = {
+    title: "Facebook",
+    getElementById: () => null,
+    querySelectorAll: () => [],
+    createElement: (tag) => new FakeFacebookElement({ tag }),
+    body: { appendChild: () => {} },
+  };
+  const fakeWindow = {
+    __MARKETVIBE_BUYER_RADAR_TEST__: true,
+    getComputedStyle: () => ({ display: "block", visibility: "visible", opacity: "1" }),
+    clearTimeout: () => {},
+    setTimeout: () => 0,
+    clearInterval: () => {},
+    setInterval: () => 0,
+    crypto: {},
+  };
+  const extensionSandbox = {
+    window: fakeWindow,
+    document: fakeDocument,
+    location: {
+      hostname: "www.facebook.com",
+      origin: "https://www.facebook.com",
+      href: "https://www.facebook.com/search/posts/?q=web%20developer%20need%20leads",
+      search: "?q=web%20developer%20need%20leads",
+    },
+    URL,
+    console,
+    HTMLElement: FakeFacebookElement,
+    localStorage: { getItem: () => null, setItem: () => {} },
+    globalThis: {},
+  };
+  vm.runInNewContext(extensionSource, extensionSandbox, { filename: "buyer-radar-content.js" });
+  return extensionSandbox.window.__MarketVibeBuyerRadarTest;
+}
+
 const webDesignPhrases = phrasesFor({
   targetBuyer: "web designers, SEO freelancers",
   niche: "web design",
@@ -295,6 +398,54 @@ assert.match(cleanedImports[0].text, /client acquisition problem/i, "Imported po
 assert.equal(cleanedImports[0].sourceName, "Web Design and Development |", "Importer should clean group/page names");
 assert.equal(cleanedImports[0].author, "Muhammad Adnan", "Importer should clean author names");
 
+const extensionTestApi = loadExtensionTestApi();
+const buyerRadarSourceName = "I Need A Website Designer / Web Developer";
+const buyerRadarAuthor = "Max Narron";
+const buyerRadarBody = "I am a web developer, I need leads. Comment if you are interested.";
+const buyerRadarCard = new FakeFacebookElement({
+  children: [
+    new FakeFacebookElement({
+      tag: "a",
+      text: buyerRadarSourceName,
+      attrs: { href: "https://www.facebook.com/groups/webdesigners", role: "link" },
+      selectors: ["h1 a[role='link']", "h2 strong a", "a[href*='/groups/'][role='link']", "a[role='link']"],
+    }),
+    new FakeFacebookElement({
+      tag: "a",
+      text: buyerRadarAuthor,
+      attrs: { href: "https://www.facebook.com/max.narron", role: "link" },
+      selectors: ["h2 strong a", "strong a[role='link']", "a[role='link']"],
+    }),
+    new FakeFacebookElement({
+      tag: "div",
+      text: `${buyerRadarSourceName} ${buyerRadarAuthor} Shared with public group ${buyerRadarBody} Like Share`,
+      attrs: { "data-ad-preview": "message", dir: "auto" },
+    }),
+    new FakeFacebookElement({
+      tag: "a",
+      text: "25 June at 20:16",
+      attrs: { href: "https://www.facebook.com/groups/webdesigners/posts/123456789", role: "link" },
+      selectors: ["a[role='link']"],
+    }),
+  ],
+});
+const buyerRadarPayload = extensionTestApi.buildPostFromNode(buyerRadarCard, 100, {
+  queryUsed: "web developer need leads",
+  sourceUsed: "Facebook Search",
+  painPoint: "client acquisition",
+  matchReason: "100/100 confidence: specific client-acquisition phrase",
+});
+assert.equal(buyerRadarPayload.sourceName, buyerRadarSourceName, "Extension should map the group/page title to sourceName");
+assert.equal(buyerRadarPayload.author, buyerRadarAuthor, "Extension should map the real post author to author");
+assert.notEqual(buyerRadarPayload.author, buyerRadarSourceName, "Extension must reject group/page names as author");
+assert.equal(buyerRadarPayload.text, buyerRadarBody, "Extension should send only the cleaned post body");
+assert.equal(buyerRadarPayload.confidenceScore, 100, "Extension payload should preserve confidenceScore");
+assert.equal(buyerRadarPayload.matchReason, "100/100 confidence: specific client-acquisition phrase", "Extension payload should preserve matchReason");
+assert.equal(buyerRadarPayload.painPoint, "client acquisition", "Extension payload should preserve painPoint");
+assert.equal(buyerRadarPayload.queryUsed, "web developer need leads", "Extension payload should preserve queryUsed");
+assert.equal(buyerRadarPayload.sourceUsed, "Facebook Search", "Extension payload should preserve sourceUsed");
+assert.equal(buyerRadarPayload.url, "https://www.facebook.com/groups/webdesigners/posts/123456789", "Extension payload should preserve exact post URL");
+
 const agencyLeadPainImport = scoreImportedFacebookPosts({
   posts: [{
     text: "I'm running a web development agency and struggling on generating more leads. I find cold calling is too time consuming and I am looking for alternatives.",
@@ -395,12 +546,12 @@ assert.match(leadHuntPipelineMigration, /create table if not exists public\.lead
 assert.match(leadHuntPipelineMigration, /create table if not exists public\.lead_hunt_processed_urls/, "Pipeline migration should create processed URL table");
 assert.match(internalMarketingLeadsSource, /No memory-store fallback is allowed/, "Production internal lead storage should not silently fall back to memory");
 assert.match(internalAccessSource, /X-MarketVibe-Internal-Key/, "Internal APIs should support extension auth headers");
-assert.match(internalMarketingLeadsPageSource, /Internal Marketing Leads/, "Internal marketing leads UI should exist under its own route");
+assert.match(internalMarketingLeadsPageSource, /Buyer Radar Contact Queue|Manual Contact Queue/, "Internal marketing leads UI should exist under its own Buyer Radar route");
 assert.match(internalMarketingLeadsPageSource, /\/api\/internal-marketing-leads/, "Internal marketing leads UI should read the internal API");
 assert.match(internalMarketingLeadsPageSource, /Export CSV/, "Internal marketing leads UI should export CSV");
 assert.match(internalMarketingLeadsPageSource, /follow_up/, "Internal marketing leads UI should support follow-up status");
 assert.match(internalMarketingLeadsPageSource, /Automation status/, "Internal marketing leads UI should show automation status");
-assert.match(internalMarketingLeadsPageSource, /Reply link/, "Internal marketing leads UI should include a reply/contact link button");
+assert.match(internalMarketingLeadsPageSource, /Open post\/profile/, "Internal marketing leads UI should include an open post/profile button");
 assert.match(internalMarketingLeadsPageSource, /No reply link available/, "Internal marketing leads UI should handle missing reply links safely");
 assert.match(leadHuntPageSource, /Outreach engine mode/, "Lead Hunt Autopilot should include outreach mode architecture");
 assert.match(leadHuntPageSource, /Autopilot for allowed adapters only/, "Lead Hunt Autopilot should include allowed-adapter outreach mode");
@@ -458,7 +609,7 @@ assert.match(extensionSource, /const SCAN_CLEANUP_MS = 3000/, "Extension should 
 assert.match(extensionSource, /setInterval\(markFeed, SCAN_INTERVAL_MS\)/, "Extension should use one interval scanner without repeatedly adding overlays");
 assert.match(extensionSource, /function cleanupScanUi/, "Extension should always clean scan UI");
 assert.match(extensionSource, /finally \{[\s\S]*cleanupScanUi\(\)/, "Failed scans should clean up scan UI in finally");
-assert.match(extensionSource, /No high-intent posts found on visible page/, "Extension should show no-results status in the floating badge");
+assert.match(extensionSource, /No (?:high-intent posts|service-seller buyer intent) found on (?:visible page|this page)/, "Extension should show no-results status in the floating badge");
 assert.match(extensionSource, /pointer-events:none/, "Floating scan status should not block normal Facebook clicks");
 assert.doesNotMatch(extensionSource, /opacity = "0\.12"/, "Extension should not dim non-qualifying Facebook posts");
 assert.doesNotMatch(extensionSource, /grayscale\(1\)/, "Extension should not grey out the Facebook page");
