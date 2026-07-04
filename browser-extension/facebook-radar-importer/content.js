@@ -27,11 +27,14 @@
   const MAX_HANDLED_POSTS = 500;
   const LEAD_HUNT_KEY = "marketvibe_buyer_radar_state";
   const LEGACY_LEAD_HUNT_KEY = "marketvibe_lead_hunt_autopilot";
+  const LEAD_HUNT_VISITED_URLS_KEY = "marketvibe_buyer_radar_visited_urls";
+  const MAX_VISITED_URLS = 1200;
+  const MAX_STATE_VISITED_URLS = 220;
   const AUTO_DM_PREP_KEY = "marketvibe_buyer_radar_auto_dm_prep";
   const MAX_SCROLL_ATTEMPTS = 4;
   const MAX_LOW_CONFIDENCE_PER_QUERY = 12;
   const HIGH_INTENT_IMPORT_THRESHOLD = 78;
-  const STUCK_RECOVERY_MS = 60000;
+  const STUCK_RECOVERY_MS = 45000;
   const LOADING_RECOVERY_MS = 30000;
   const ACTION_TIMEOUT_MS = 15000;
   const CONTROL_POLL_MS = 2000;
@@ -708,6 +711,7 @@
   function scoreFacebookUrl(url) {
     const href = clean(url);
     if (!href) return -999;
+    if (isNonUsefulLeadHuntUrl(href)) return -999;
     let score = 0;
     if (/\/posts\/\d+/i.test(href)) score += 120;
     if (/story_fbid=\d+/i.test(href)) score += 115;
@@ -746,19 +750,135 @@
     }
   }
 
+  function stripLeadHuntTrackingParams(url) {
+    Array.from(url.searchParams.keys()).forEach((key) => {
+      if (/^(utm_|fbclid$|gclid$|gbraid$|wbraid$|mc_|mibextid$|refid$|__cft__$|__tn__$|comment_id$|reply_comment_id$|hc_ref$|paipv$|eid$|locale$)/i.test(key)) {
+        url.searchParams.delete(key);
+      }
+    });
+  }
+
+  function normalizeLeadHuntUrl(rawUrl = location.href) {
+    try {
+      const url = new URL(rawUrl, location.href);
+      stripLeadHuntTrackingParams(url);
+      url.hash = "";
+      url.hostname = url.hostname.toLowerCase().replace(/^m\.facebook\.com$/i, "www.facebook.com");
+      url.pathname = url.pathname.replace(/\/+$/g, "").toLowerCase();
+
+      if (/(^|\.)facebook\.com$/i.test(url.hostname)) {
+        const groupPost = url.pathname.match(/^\/groups\/([^/?#]+)\/(?:posts|permalink)\/(\d+)$/i);
+        if (groupPost) return `https://www.facebook.com/groups/${groupPost[1]}/posts/${groupPost[2]}`;
+
+        const post = url.pathname.match(/^\/(?:[^/?#]+\/)?posts\/(\d+)$/i);
+        if (post) return `https://www.facebook.com/posts/${post[1]}`;
+
+        const story = url.searchParams.get("story_fbid");
+        if (story) {
+          const groupId = url.searchParams.get("group_id");
+          const id = url.searchParams.get("id");
+          return `https://www.facebook.com/story.php?story_fbid=${story}${groupId ? `&group_id=${groupId}` : ""}${id ? `&id=${id}` : ""}`;
+        }
+
+        url.hostname = "www.facebook.com";
+        if (/^\/photo(?:\.php)?$|^\/photos(?:\/|$)|^\/media(?:\/|$)|^\/watch(?:\/|$)|^\/reel(?:\/|$)|^\/videos(?:\/|$)/i.test(url.pathname)) {
+          url.search = "";
+        }
+      }
+
+      return url.toString().replace(/\/$/g, "");
+    } catch {
+      return clean(rawUrl || location.href);
+    }
+  }
+
   function canonicalFacebookPostUrl(rawUrl) {
     try {
       const url = new URL(rawUrl, location.origin);
-      ["__cft__", "__tn__", "comment_id", "reply_comment_id", "mibextid", "refid", "fbclid"].forEach((key) => url.searchParams.delete(key));
-      url.hash = "";
-      url.hostname = url.hostname.toLowerCase();
-      url.pathname = url.pathname.replace(/\/+$/g, "").toLowerCase();
-      if (/\/groups\/[^/?#]+\/posts\/\d+$/i.test(url.pathname) || /\/groups\/[^/?#]+\/permalink\/\d+$/i.test(url.pathname) || /\/posts\/\d+$/i.test(url.pathname)) {
-        url.search = "";
-      }
-      return url.toString().replace(/\/$/g, "");
+      const normalized = normalizeLeadHuntUrl(url.toString());
+      if (/facebook\.com\/groups\/[^/?#]+\/posts\/\d+$/i.test(normalized) || /facebook\.com\/posts\/\d+$/i.test(normalized) || /facebook\.com\/story\.php\?story_fbid=\d+/i.test(normalized)) return normalized;
+      return "";
     } catch {
       return "";
+    }
+  }
+
+  function visitedUrlFromRecord(item) {
+    if (typeof item === "string") return normalizeLeadHuntUrl(item);
+    if (item && typeof item === "object") return normalizeLeadHuntUrl(item.url || item.sourceUrl || "");
+    return "";
+  }
+
+  function getVisitedUrlRecords() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(LEAD_HUNT_VISITED_URLS_KEY) || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function getVisitedLeadHuntUrls() {
+    return Array.from(new Set(getVisitedUrlRecords().map(visitedUrlFromRecord).filter(Boolean)));
+  }
+
+  function saveVisitedUrlRecords(records) {
+    const seen = new Set();
+    const normalized = [];
+    for (const record of records) {
+      const url = visitedUrlFromRecord(record);
+      if (!url || seen.has(url)) continue;
+      seen.add(url);
+      normalized.push({
+        url,
+        status: clean(record?.status || "visited", 40),
+        reason: clean(record?.reason || "", 160),
+        query: clean(record?.query || "", 160),
+        at: Number(record?.at || Date.now()),
+      });
+    }
+    localStorage.setItem(LEAD_HUNT_VISITED_URLS_KEY, JSON.stringify(normalized.slice(0, MAX_VISITED_URLS)));
+  }
+
+  function mergeVisitedUrls(state, urls = []) {
+    const merged = Array.from(new Set([
+      ...(state?.visitedUrls || []).map(normalizeLeadHuntUrl).filter(Boolean),
+      ...getVisitedLeadHuntUrls(),
+      ...urls.map(normalizeLeadHuntUrl).filter(Boolean),
+    ]));
+    return merged.slice(-MAX_STATE_VISITED_URLS);
+  }
+
+  function markLeadHuntUrlVisited(state, rawUrl = location.href, status = "visited", details = {}) {
+    const url = normalizeLeadHuntUrl(rawUrl);
+    if (!url) return state || {};
+    const records = getVisitedUrlRecords().filter((item) => visitedUrlFromRecord(item) !== url);
+    saveVisitedUrlRecords([{ url, status, reason: details.reason || "", query: details.query || "", at: Date.now() }, ...records]);
+    return {
+      ...(state || {}),
+      visitedUrls: mergeVisitedUrls(state || {}, [url]),
+    };
+  }
+
+  function isLeadHuntUrlVisited(rawUrl, state = getLeadHuntState()) {
+    const url = normalizeLeadHuntUrl(rawUrl);
+    if (!url) return false;
+    return mergeVisitedUrls(state || {}).includes(url);
+  }
+
+  function isNonUsefulLeadHuntUrl(rawUrl) {
+    try {
+      const url = new URL(rawUrl, location.href);
+      const host = url.hostname.toLowerCase();
+      const path = url.pathname.toLowerCase();
+      if (/bing\.com$/i.test(host) && /^\/images(?:\/search)?/i.test(path)) return true;
+      if (!/(^|\.)facebook\.com$/i.test(host)) return false;
+      if (/^\/(?:login|checkpoint|recover|two_factor|privacy\/consent)/i.test(path)) return true;
+      if (/^\/photo(?:\.php)?$|^\/photos(?:\/|$)|^\/media(?:\/|$)|^\/watch(?:\/|$)|^\/reel(?:\/|$)|^\/videos(?:\/|$)/i.test(path)) return true;
+      if (url.searchParams.get("fbid") && !url.searchParams.get("story_fbid")) return true;
+      return false;
+    } catch {
+      return true;
     }
   }
 
@@ -946,7 +1066,7 @@
     const canonical = canonicalFacebookPostUrl(url) || clean(url);
     if (!canonical) return false;
     const key = `url:${canonical}`;
-    return isHandledPostKey(key) || Boolean((state?.seen || []).some((item) => handledKeyAliases(item).includes(key)));
+    return isHandledPostKey(key) || isLeadHuntUrlVisited(url, state) || Boolean((state?.seen || []).some((item) => handledKeyAliases(item).includes(key)));
   }
 
   function getVisibleCandidateNodes() {
@@ -1113,10 +1233,10 @@
     }, 3000);
   }
 
-  function activeLeadHuntSignature() {
-    const dialog = document.querySelector('[role="dialog"], [aria-modal="true"]');
-    const node = dialog || getCurrentQualifiedNode()?.node || document.body;
-    return `${location.href}|${cleanLeadText(node.textContent || "", 220)}`;
+  function activeLeadHuntSignature(state = getLeadHuntState()) {
+    const current = getCurrentLeadHuntTarget();
+    const itemKey = current?.key || `result:${state?.currentSearchIndex || 0}:${state?.currentResultIndex || 0}:${state?.resultNumber || 0}`;
+    return `${normalizeLeadHuntUrl(location.href)}|${itemKey}`;
   }
 
   function isFacebookLoadingScreen() {
@@ -1136,8 +1256,9 @@
     recordProcessedUrl(sourceUrl, "skipped", { reason, query: currentLeadHuntSearch(state || {})?.query || "", score: current?.score || 0 });
     postLeadHuntEvent("STUCK_RECOVERY", { message: reason, reason, sourceUrl, score: current?.score || 0, metadata: { source: current?.source || "page" } });
     if (state) {
+      const visitedState = markLeadHuntUrlVisited(state, location.href, "skipped", { reason, query: currentLeadHuntSearch(state || {})?.query || "" });
       saveLeadHuntState({
-        ...state,
+        ...visitedState,
         skippedCount: Number(state.skippedCount || 0) + 1,
         seen: Array.from(new Set([...(state.seen || []), key])).slice(-MAX_HANDLED_POSTS),
         status: `${reason}. Marked current ${current?.source || "page"} item skipped and continuing.`,
@@ -1495,7 +1616,28 @@
     logLeadHunt("next query/result scheduled", { reason, url, query: currentLeadHuntSearch(state)?.query });
     scheduleLeadHuntAction(async (latest) => {
       if (await pollLeadHuntControl("before navigation")) return;
-      if (leadHuntIsRunnable(latest)) window.location.assign(withLeadHuntStateHash(url, latest));
+      if (!leadHuntIsRunnable(latest)) return;
+      const targetUrl = normalizeLeadHuntUrl(url);
+      if (/facebook\.com/i.test(targetUrl) && (isNonUsefulLeadHuntUrl(targetUrl) || isLeadHuntUrlVisited(targetUrl, latest))) {
+        const urls = latest.currentResultUrls || [];
+        const nextIndex = nextUnvisitedResultIndex(urls, Number(latest.currentResultIndex || 0) + 1, latest);
+        if (nextIndex >= 0) {
+          const guardedState = {
+            ...latest,
+            currentResultIndex: nextIndex,
+            resultNumber: nextIndex + 1,
+            scrollAttempts: 0,
+            status: "Skipped already visited or non-useful Facebook result.",
+            lastProgressAt: Date.now(),
+          };
+          saveLeadHuntState(guardedState);
+          window.location.assign(withLeadHuntStateHash(urls[nextIndex], guardedState));
+          return;
+        }
+        nextLeadHuntSearch(markLeadHuntUrlVisited(latest, targetUrl, "skipped", { reason: "already visited or non-useful navigation target", query: currentLeadHuntSearch(latest)?.query || "" }), "Skipped already visited or non-useful Facebook result.");
+        return;
+      }
+      window.location.assign(withLeadHuntStateHash(url, latest));
     }, Math.max(300, nextState.nextActionAt - Date.now()), "navigate");
   }
 
@@ -1529,7 +1671,7 @@
       startedAt: Date.now(),
       currentUrl: location.href,
       scrollAttempts: 0,
-      visitedUrls: [],
+      visitedUrls: getVisitedLeadHuntUrls().slice(-MAX_STATE_VISITED_URLS),
       lastProgressAt: Date.now(),
       lastActiveSignature: "",
       loadingSince: 0,
@@ -1619,7 +1761,7 @@
         currentResultUrls: [],
         resultNumber: 0,
         scrollAttempts: 0,
-        visitedUrls: [],
+        visitedUrls: mergeVisitedUrls(state),
         currentQueryIgnoredLowConfidence: 0,
         currentQueryImportedCount: 0,
         cycleCount: Number(state.cycleCount || 0) + 1,
@@ -1639,7 +1781,7 @@
       currentResultUrls: [],
       resultNumber: 0,
       scrollAttempts: 0,
-      visitedUrls: [],
+      visitedUrls: mergeVisitedUrls(state),
       currentQueryIgnoredLowConfidence: 0,
       currentQueryImportedCount: 0,
       status: reason,
@@ -1658,13 +1800,14 @@
           const raw = link.getAttribute("href") || "";
           const parsed = new URL(raw, location.origin);
           const redirected = parsed.searchParams.get("q") || parsed.searchParams.get("url") || raw;
-          return normalizeFacebookUrl(redirected);
+          return normalizeLeadHuntUrl(redirected);
         } catch {
           return "";
         }
       })
       .filter((url) => /https:\/\/(www\.)?facebook\.com\//i.test(url))
-      .filter((url) => !/\/login|\/share|\/plugins|\/privacy|\/help/i.test(url));
+      .filter((url) => !/\/login|\/share|\/plugins|\/privacy|\/help/i.test(url))
+      .filter((url) => !isNonUsefulLeadHuntUrl(url));
     return Array.from(new Set(urls)).slice(0, 12);
   }
 
@@ -1766,6 +1909,17 @@
     }, delay, reason);
   }
 
+  function scheduleResultAdvance(state, reason, visitStatus = "no_match", delay = 1200) {
+    closeOpenFacebookModal();
+    saveLeadHuntState({
+      ...state,
+      currentLock: "",
+      status: `${reason} Advancing to the next indexed result.`,
+      nextActionAt: Date.now() + delay,
+    });
+    scheduleLeadHuntAction((latest) => advanceAfterFacebookPage(latest, reason, visitStatus), delay, reason);
+  }
+
   function closeModalAndContinue(state, reason, processedKeys = []) {
     const current = getCurrentLeadHuntTarget();
     const key = current?.key || "";
@@ -1775,7 +1929,8 @@
     }
     if (current?.node) markNodeHandled(current.node, current.score);
     const seen = Array.from(new Set([...(state.seen || []), ...processedKeys.filter(Boolean)])).slice(-MAX_HANDLED_POSTS);
-    saveLeadHuntState({
+    const visitStatus = /duplicate|handled/i.test(reason) ? "skipped" : "no_match";
+    const nextState = markLeadHuntUrlVisited({
       ...state,
       seen,
       currentLock: "",
@@ -1784,9 +1939,8 @@
       lastProgressAt: Date.now(),
       lastActiveSignature: "",
       nextActionAt: Date.now() + leadHuntDelay(state),
-    });
-    closeOpenFacebookModal();
-    scheduleContinuousAdvance(reason, 1400);
+    }, location.href, visitStatus, { reason, query: currentLeadHuntSearch(state || {})?.query || "" });
+    scheduleResultAdvance(nextState, reason, visitStatus, 1400);
   }
 
   async function autoImportLeadHuntNode(node, score, reason = "highlighted-modal") {
@@ -1823,8 +1977,14 @@
       const importedCount = Number(latest.importedCount || 0) + 1;
       const seen = Array.from(new Set([...(latest.seen || []), key]));
       const continuationDelay = leadHuntDelay(latest);
-      saveLeadHuntState({
-        ...latest,
+      const visitedState = markLeadHuntUrlVisited(
+        markLeadHuntUrlVisited(latest, post.url || location.href, "imported", { reason, query: search?.query || "" }),
+        location.href,
+        "imported",
+        { reason, query: search?.query || "" },
+      );
+      const nextState = {
+        ...visitedState,
         importedCount,
         seen,
         currentLock: "",
@@ -1835,14 +1995,14 @@
         lastProgressAt: Date.now(),
         lastActiveSignature: "",
         nextActionAt: Date.now() + continuationDelay,
-      });
+      };
+      saveLeadHuntState(nextState);
       postLeadHuntEvent("LEAD_HUNT_IMPORT", { message: `Imported buyer item (${score}/${confidenceThreshold(latest)})`, reason: matchReason, sourceUrl: post.url || key, query: search?.query || "", score });
       logLeadHunt("LEAD_HUNT_IMPORT", { count: 1, importedCount, query: search?.query || "", reason, matchReason });
       if (importedCount >= Number(latest.caps?.maxImportedLeads || 10)) {
-        saveLeadHuntState({ ...latest, currentLock: "", status: `Imported ${importedCount} buyer-intent item(s). Continuing until Stop is pressed.` });
-        scheduleContinuousAdvance("import cap reached but continuous mode is on", continuationDelay + 150);
+        scheduleResultAdvance({ ...nextState, status: `Imported ${importedCount} buyer-intent item(s). Continuing until Stop is pressed.` }, "import cap reached but continuous mode is on", "imported", continuationDelay + 150);
       } else {
-        scheduleContinuousAdvance("post-import continuation", continuationDelay + 150);
+        scheduleResultAdvance(nextState, "post-import continuation", "imported", continuationDelay + 150);
       }
       return true;
     } catch (error) {
@@ -1867,29 +2027,47 @@
     }
   }
 
-  function advanceAfterFacebookPage(state, reason) {
-    const urls = state.currentResultUrls || [];
-    const nextResultIndex = Number(state.currentResultIndex || 0) + 1;
+  function nextUnvisitedResultIndex(urls, startIndex, state) {
+    for (let index = startIndex; index < urls.length; index += 1) {
+      const url = urls[index];
+      if (!url || isNonUsefulLeadHuntUrl(url) || isLeadHuntUrlVisited(url, state) || isKnownHandledUrl(url, state)) continue;
+      return index;
+    }
+    return -1;
+  }
+
+  function advanceAfterFacebookPage(state, reason, visitStatus = "no_match") {
+    closeOpenFacebookModal();
+    const search = currentLeadHuntSearch(state || {});
+    const nextState = markLeadHuntUrlVisited(state, location.href, visitStatus, { reason, query: search?.query || "" });
+    const skippedIncrement = visitStatus === "imported" ? 0 : 1;
+    if (visitStatus !== "imported") {
+      recordProcessedUrl(location.href, "skipped", { reason: `${visitStatus}: ${reason}`, query: search?.query || "", score: 0 });
+    }
+    const urls = nextState.currentResultUrls || [];
+    const nextResultIndex = nextUnvisitedResultIndex(urls, Number(nextState.currentResultIndex || 0) + 1, nextState);
     if (urls[nextResultIndex]) {
       navigateWithDelay(urls[nextResultIndex], {
-        ...state,
+        ...nextState,
         currentResultIndex: nextResultIndex,
         resultNumber: nextResultIndex + 1,
         scrollAttempts: 0,
-        skippedCount: (state.skippedCount || 0) + 1,
-        ignoredLowConfidenceCount: Number(state.ignoredLowConfidenceCount || 0),
-        visitedUrls: Array.from(new Set([...(state.visitedUrls || []), location.href])).slice(-50),
+        skippedCount: (nextState.skippedCount || 0) + skippedIncrement,
+        ignoredLowConfidenceCount: Number(nextState.ignoredLowConfidenceCount || 0),
+        visitedUrls: mergeVisitedUrls(nextState),
         lastProgressAt: Date.now(),
+        lastActiveSignature: "",
       }, `${reason} Opening result ${nextResultIndex + 1}.`);
       return;
     }
     nextLeadHuntSearch({
-      ...state,
+      ...nextState,
       scrollAttempts: 0,
-      skippedCount: (state.skippedCount || 0) + 1,
-      ignoredLowConfidenceCount: Number(state.ignoredLowConfidenceCount || 0),
-      visitedUrls: Array.from(new Set([...(state.visitedUrls || []), location.href])).slice(-50),
+      skippedCount: (nextState.skippedCount || 0) + skippedIncrement,
+      ignoredLowConfidenceCount: Number(nextState.ignoredLowConfidenceCount || 0),
+      visitedUrls: mergeVisitedUrls(nextState),
       lastProgressAt: Date.now(),
+      lastActiveSignature: "",
     }, reason);
   }
 
@@ -1934,39 +2112,61 @@
             location.reload();
             return;
           }
-          nextLeadHuntSearch({ ...state, failedCount: Number(state.failedCount || 0) + 1, loadingSince: 0, loadingReloaded: false }, "Facebook loading watchdog skipped a stuck page.");
+          if (/facebook\.com/i.test(location.hostname)) {
+            advanceAfterFacebookPage({ ...state, failedCount: Number(state.failedCount || 0) + 1, loadingSince: 0, loadingReloaded: false }, "Facebook loading watchdog skipped a stuck page.", "skipped");
+          } else {
+            const loadingSkippedState = markLeadHuntUrlVisited(state, location.href, "skipped", { reason: "Facebook loading watchdog skipped a stuck page.", query: search.query });
+            nextLeadHuntSearch({ ...loadingSkippedState, failedCount: Number(state.failedCount || 0) + 1, loadingSince: 0, loadingReloaded: false }, "Facebook loading watchdog skipped a stuck page.");
+          }
           return;
         }
         saveLeadHuntState(loadingState);
         return;
       }
 
-      const signature = activeLeadHuntSignature();
+      const signature = activeLeadHuntSignature(state);
       if (signature !== state.lastActiveSignature) {
         saveLeadHuntState({ ...state, lastActiveSignature: signature, lastProgressAt: Date.now(), loadingSince: 0, loadingReloaded: false });
       } else if (Date.now() - Number(state.lastProgressAt || state.startedAt || Date.now()) > STUCK_RECOVERY_MS) {
-        logLeadHunt("STUCK_RECOVERY", { reason: "same modal/url for 60 seconds", href: location.href });
-        recoverCurrentLeadHuntItem("Stuck watchdog recovered current post");
+        logLeadHunt("STUCK_RECOVERY", { reason: "same URL and current item for 45 seconds", href: location.href });
+        postLeadHuntEvent("STUCK_RECOVERY", { message: "Stuck watchdog skipped unchanged URL/current item", reason: "same-url-current-item", sourceUrl: location.href });
+        if (/facebook\.com/i.test(location.hostname)) {
+          advanceAfterFacebookPage(state, "Stuck watchdog skipped unchanged Facebook page.", "skipped");
+        } else {
+          const skippedState = markLeadHuntUrlVisited(state, location.href, "skipped", { reason: "same URL and current item for 45 seconds", query: search.query });
+          recordProcessedUrl(location.href, "skipped", { reason: "same URL and current item for 45 seconds", query: search.query, score: 0 });
+          nextLeadHuntSearch({ ...skippedState, failedCount: Number(state.failedCount || 0) + 1, lastActiveSignature: "", lastProgressAt: Date.now() }, "Stuck watchdog skipped unchanged search page.");
+        }
         return;
       }
 
       if (/google\.com|bing\.com/i.test(location.hostname)) {
-        const visited = new Set([...(state.visitedUrls || []), ...(state.currentResultUrls || []).slice(0, Number(state.currentResultIndex || 0) + 1)].map((url) => normalizeFacebookUrl(url)));
+        const searchPageState = markLeadHuntUrlVisited(state, location.href, "search", { reason: "indexed search page scanned", query: search.query });
+        const visited = new Set([
+          ...mergeVisitedUrls(searchPageState),
+          ...(state.currentResultUrls || []).slice(0, Number(state.currentResultIndex || 0) + 1).map(normalizeLeadHuntUrl),
+        ]);
         const resultUrls = collectIndexedFacebookResultUrls()
-          .filter((url) => !visited.has(normalizeFacebookUrl(url)))
-          .filter((url) => !isKnownHandledUrl(url, state));
+          .filter((url) => !isNonUsefulLeadHuntUrl(url))
+          .filter((url) => !visited.has(normalizeLeadHuntUrl(url)))
+          .filter((url) => !isKnownHandledUrl(url, searchPageState));
         logLeadHunt("score decision", { source: search.source, resultUrls: resultUrls.length });
         if (!resultUrls.length) {
-          if (scrollAndRescan(state, "No indexed Facebook results found yet.")) return;
-          nextLeadHuntSearch({ ...state, skippedCount: (state.skippedCount || 0) + 1 }, "No indexed Facebook results found.");
+          if (scrollAndRescan(searchPageState, "No indexed Facebook results found yet.")) return;
+          const noResultState = markLeadHuntUrlVisited(searchPageState, location.href, "no_match", { reason: "No indexed Facebook results found.", query: search.query });
+          nextLeadHuntSearch({ ...noResultState, skippedCount: (state.skippedCount || 0) + 1 }, "No indexed Facebook results found.");
           return;
         }
-        const nextState = { ...state, currentResultUrls: resultUrls, currentResultIndex: 0, resultNumber: 1, scrollAttempts: 0, visitedUrls: Array.from(new Set([...(state.visitedUrls || []), location.href])).slice(-75) };
+        const nextState = { ...searchPageState, currentResultUrls: resultUrls, currentResultIndex: 0, resultNumber: 1, scrollAttempts: 0, visitedUrls: mergeVisitedUrls(searchPageState, [location.href]) };
         navigateWithDelay(resultUrls[0], nextState, `Opening indexed Facebook result 1 of ${resultUrls.length}.`);
         return;
       }
 
       if (/facebook\.com/i.test(location.hostname)) {
+        if (isNonUsefulLeadHuntUrl(location.href)) {
+          advanceAfterFacebookPage(state, "Skipped non-useful Facebook media/login page.", "skipped");
+          return;
+        }
         markFeed();
         const decisions = scanVisibleLeadHuntCards(state, search);
         const duplicateCount = Number(state.duplicateCount || 0) + decisions.duplicates;
@@ -1997,8 +2197,12 @@
           const importedCount = Number(latest.importedCount || 0) + sentPosts.length;
           const seen = Array.from(new Set([...(latest.seen || []), ...sentPosts.map(getPostKey)]));
           const continuationDelay = leadHuntDelay(latest);
+          const visitedState = sentPosts.reduce(
+            (currentState, post) => markLeadHuntUrlVisited(currentState, post.url || location.href, "imported", { reason: "batch auto-import", query: search.query }),
+            markLeadHuntUrlVisited(latest, location.href, "imported", { reason: "batch auto-import page", query: search.query }),
+          );
           const nextState = {
-            ...latest,
+            ...visitedState,
             importedCount,
             duplicateCount,
             skippedCount,
@@ -2017,10 +2221,9 @@
           saveLeadHuntState(nextState);
           logLeadHunt("LEAD_HUNT_IMPORT", { count: sentPosts.length, importedCount, query: search.query });
           if (importedCount >= Number(latest.caps?.maxImportedLeads || 10)) {
-            saveLeadHuntState({ ...nextState, status: `Imported ${importedCount} buyer-intent item(s). Continuing until Stop is pressed.` });
-            scheduleContinuousAdvance("batch import cap reached but continuous mode is on", continuationDelay + 150);
+            scheduleResultAdvance({ ...nextState, status: `Imported ${importedCount} buyer-intent item(s). Continuing until Stop is pressed.` }, "batch import cap reached but continuous mode is on", "imported", continuationDelay + 150);
           } else {
-            scheduleContinuousAdvance("post-import continuation", continuationDelay + 150);
+            scheduleResultAdvance(nextState, "post-import continuation", "imported", continuationDelay + 150);
           }
           return;
         }
@@ -2044,7 +2247,7 @@
         }
         if (scrollAndRescan(stateWithDuplicates, "No service-seller buyer intent found on this page.")) return;
         logLeadHunt("next match", { reason: "no match after scroll attempts" });
-        advanceAfterFacebookPage(stateWithDuplicates, "No service-seller buyer intent found on this page.");
+        advanceAfterFacebookPage(stateWithDuplicates, "No service-seller buyer intent found on this page.", "no_match");
       }
     } catch (error) {
       if (handleExtensionContextInvalidated(error, `scan tick:${trigger}`)) return;
