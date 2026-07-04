@@ -637,6 +637,9 @@ assert.match(extensionSource, /hunt completed/, "Autopilot should log hunt compl
 assert.match(extensionSource, /function ensureLeadHuntRunner/, "Autopilot should explicitly start the unattended runner");
 assert.match(extensionSource, /leadHuntIntervalId/, "Autopilot should guard against duplicate runner intervals");
 assert.match(extensionSource, /leadHuntTickRunning/, "Autopilot should guard against overlapping ticks");
+assert.match(extensionSource, /__MARKETVIBE_BUYER_RADAR_CONTENT_ACTIVE__/, "Extension should use a runtime guard instead of stale DOM to prevent duplicate bootstraps");
+assert.match(extensionSource, /#marketvibe-import-button[\s\S]*#marketvibe-lead-hunt-panel[\s\S]*forEach\(\(item\) => item\.remove\(\)\)/, "Extension should remove stale overlay buttons before reinstalling live handlers");
+assert.doesNotMatch(extensionSource, /if \(document\.getElementById\("marketvibe-import-button"\)\) return/, "Extension must not skip startup because stale overlay DOM exists");
 assert.match(extensionSource, /ensureLeadHuntRunner\("hunt started"\)/, "Run Lead Hunt should start the runner immediately");
 assert.match(extensionSource, /ensureLeadHuntRunner\("state restored"\)/, "Restored hunts should restart the runner immediately after navigation");
 assert.match(extensionSource, /scheduleLeadHuntAction\(\(\) => void runLeadHuntTick\(reason\), 250, reason\)/, "Runner should fire a tracked immediate tick instead of waiting for manual buttons");

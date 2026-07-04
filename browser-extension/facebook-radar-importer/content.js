@@ -65,7 +65,17 @@
   let leadHuntTickRunning = false;
   let extensionReloadRequired = false;
   const leadHuntTimeoutIds = new Set();
-  if (document.getElementById("marketvibe-import-button")) return;
+  if (window.__MARKETVIBE_BUYER_RADAR_CONTENT_ACTIVE__) return;
+  window.__MARKETVIBE_BUYER_RADAR_CONTENT_ACTIVE__ = true;
+
+  document.querySelectorAll([
+    "#marketvibe-import-button",
+    "#marketvibe-lead-hunt-panel",
+    "#marketvibe-recent-imports",
+    "#marketvibe-queue-controls",
+    "#marketvibe-show-queue-controls",
+    "#marketvibe-scan-status",
+  ].join(",")).forEach((item) => item.remove());
 
   function isAutoDmPrepEnabled() {
     return localStorage.getItem(AUTO_DM_PREP_KEY) === "true";
