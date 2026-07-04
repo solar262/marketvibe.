@@ -702,8 +702,13 @@ assert.match(extensionSource, /confidenceThreshold/, "Autopilot should use the c
 assert.match(extensionSource, /score >= confidenceThreshold\(state\)/, "Autopilot should only import matches above the configured threshold");
 assert.match(extensionSource, /isHandledPostKey/, "Autopilot should skip duplicate or handled posts");
 assert.match(extensionSource, /ignoredLowConfidenceCount/, "Autopilot should count ignored low-confidence items");
-assert.match(extensionSource, /maxImportedLeads/, "Autopilot should stop at imported lead cap");
-assert.match(extensionSource, /maxSearches/, "Autopilot should stop at search cap");
+assert.match(extensionSource, /function scheduleContinuousAdvance/, "Autopilot should continue after imports by closing modals and scrolling");
+assert.match(extensionSource, /function closeModalAndContinue/, "Autopilot should close stale Facebook pop-outs and continue");
+assert.match(extensionSource, /LEAD_HUNT_NEXT_CYCLE/, "Autopilot should start a fresh query cycle instead of stopping at the last search");
+assert.match(extensionSource, /Continuing until Stop is pressed/, "Autopilot should keep running until the user presses Stop");
+assert.match(extensionSource, /function isKnownHandledUrl/, "Autopilot should avoid reopening indexed URLs it already handled");
+assert.match(extensionSource, /maxImportedLeads/, "Autopilot should keep imported lead cap configuration visible");
+assert.match(extensionSource, /maxSearches/, "Autopilot should keep search cap configuration visible");
 assert.match(extensionSource, /No auto-DM or auto-comment/, "Extension panel should show no messaging/commenting safety");
 assert.match(extensionSource, /Start Buyer Radar/, "Extension panel should label the internal buyer-radar workflow");
 assert.match(extensionSource, /Recovered from a blocked, blank, or unavailable page/, "Autopilot should recover from blocked or blank pages");

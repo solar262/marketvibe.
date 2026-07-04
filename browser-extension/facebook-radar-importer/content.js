@@ -729,10 +729,26 @@
   function normalizeFacebookUrl(rawUrl) {
     try {
       const url = new URL(rawUrl, location.origin);
-      ["__cft__", "__tn__", "comment_id", "reply_comment_id", "mibextid", "refid"].forEach((key) => url.searchParams.delete(key));
+      ["__cft__", "__tn__", "comment_id", "reply_comment_id", "mibextid", "refid", "fbclid"].forEach((key) => url.searchParams.delete(key));
       return url.toString();
     } catch {
       return location.href;
+    }
+  }
+
+  function canonicalFacebookPostUrl(rawUrl) {
+    try {
+      const url = new URL(rawUrl, location.origin);
+      ["__cft__", "__tn__", "comment_id", "reply_comment_id", "mibextid", "refid", "fbclid"].forEach((key) => url.searchParams.delete(key));
+      url.hash = "";
+      url.hostname = url.hostname.toLowerCase();
+      url.pathname = url.pathname.replace(/\/+$/g, "").toLowerCase();
+      if (/\/groups\/[^/?#]+\/posts\/\d+$/i.test(url.pathname) || /\/groups\/[^/?#]+\/permalink\/\d+$/i.test(url.pathname) || /\/posts\/\d+$/i.test(url.pathname)) {
+        url.search = "";
+      }
+      return url.toString().replace(/\/$/g, "");
+    } catch {
+      return "";
     }
   }
 
@@ -882,14 +898,26 @@
     }
   }
 
+  function handledKeyAliases(key) {
+    const cleaned = clean(key);
+    if (!cleaned) return [];
+    if (!cleaned.startsWith("url:")) return [cleaned];
+    const rawUrl = cleaned.slice(4);
+    const canonical = canonicalFacebookPostUrl(rawUrl);
+    return Array.from(new Set([cleaned, canonical ? `url:${canonical}` : ""].filter(Boolean)));
+  }
+
   function saveHandledPostKey(key) {
     if (!key) return;
-    const handled = getHandledPosts().filter((item) => item !== key);
-    localStorage.setItem(HANDLED_KEY, JSON.stringify([key, ...handled].slice(0, MAX_HANDLED_POSTS)));
+    const aliases = handledKeyAliases(key);
+    const handled = getHandledPosts().filter((item) => !aliases.includes(item));
+    localStorage.setItem(HANDLED_KEY, JSON.stringify([...aliases, ...handled].slice(0, MAX_HANDLED_POSTS)));
   }
 
   function getPostKey(post) {
     const url = clean(post && post.url ? post.url : "");
+    const canonical = canonicalFacebookPostUrl(url);
+    if (canonical && !isGenericFacebookUrl(canonical)) return `url:${canonical}`;
     if (url && !isGenericFacebookUrl(url)) return `url:${url}`;
     return `text:${simpleHash(post && post.text ? post.text.slice(0, 500) : "")}`;
   }
@@ -899,7 +927,16 @@
   }
 
   function isHandledPostKey(key) {
-    return Boolean(key && getHandledPosts().includes(key));
+    if (!key) return false;
+    const handled = getHandledPosts();
+    return handledKeyAliases(key).some((alias) => handled.includes(alias));
+  }
+
+  function isKnownHandledUrl(url, state = getLeadHuntState()) {
+    const canonical = canonicalFacebookPostUrl(url) || clean(url);
+    if (!canonical) return false;
+    const key = `url:${canonical}`;
+    return isHandledPostKey(key) || Boolean((state?.seen || []).some((item) => handledKeyAliases(item).includes(key)));
   }
 
   function getVisibleCandidateNodes() {
@@ -1565,7 +1602,24 @@
   function nextLeadHuntSearch(state, reason) {
     const nextIndex = (state.currentSearchIndex || 0) + 1;
     if (nextIndex >= (state.searches || []).length || nextIndex >= Number(state.caps?.maxSearches || 10)) {
-      stopLeadHunt(`Buyer Radar complete. Imported ${state.importedCount || 0} buyer-intent item(s).`);
+      const recycledState = {
+        ...state,
+        currentSearchIndex: 0,
+        currentResultIndex: 0,
+        currentResultUrls: [],
+        resultNumber: 0,
+        scrollAttempts: 0,
+        visitedUrls: [],
+        currentQueryIgnoredLowConfidence: 0,
+        currentQueryImportedCount: 0,
+        cycleCount: Number(state.cycleCount || 0) + 1,
+        status: `${reason} Completed a Buyer Radar pass; starting a fresh pass and continuing until Stop is pressed.`,
+      };
+      const search = currentLeadHuntSearch(recycledState);
+      if (search) {
+        logLeadHunt("LEAD_HUNT_NEXT_CYCLE", { query: search.query, cycle: recycledState.cycleCount });
+        navigateWithDelay(search.url, recycledState, recycledState.status);
+      }
       return;
     }
     const nextState = {
@@ -1610,6 +1664,7 @@
       skipped: 0,
       ignoredLowConfidence: 0,
       duplicates: 0,
+      processedKeys: [],
       scanned: 0,
     };
     const seenThisTick = new Set();
@@ -1629,6 +1684,9 @@
 
       if (isHandledPostKey(key) || (state.seen || []).includes(key)) {
         decisions.duplicates += 1;
+        decisions.processedKeys.push(key);
+        saveHandledPostKey(key);
+        markNodeHandled(node, score);
         recordProcessedUrl(post.url || key, "duplicate", { reason: "duplicate", query: search?.query || "", score });
         logLeadHunt("LEAD_HUNT_SKIP", { reason: "duplicate", score, key });
         continue;
@@ -1642,6 +1700,7 @@
 
       decisions.skipped += 1;
       decisions.ignoredLowConfidence += 1;
+      decisions.processedKeys.push(key);
       saveHandledPostKey(key);
       recordProcessedUrl(post.url || key, "skipped", { reason: `ignored low-confidence or weak service-seller fit below ${confidenceThreshold(state)}: ${matchReason}`, query: search?.query || "", score });
       postLeadHuntEvent("LEAD_HUNT_SKIP", { message: `Ignored low-confidence (${score}/${confidenceThreshold(state)})`, reason: matchReason, sourceUrl: post.url || key, query: search?.query || "", score });
@@ -1683,6 +1742,41 @@
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
     logLeadHunt("next match", { action: "escape-modal-after-import" });
     return true;
+  }
+
+  function scheduleContinuousAdvance(reason, delay = 1200) {
+    closeOpenFacebookModal();
+    scheduleLeadHuntAction(() => {
+      if (hasOpenFacebookModal()) {
+        forceCloseModalOrBack(reason);
+      } else {
+        window.scrollBy({ top: Math.round(window.innerHeight * 0.9), behavior: "smooth" });
+      }
+      ensureLeadHuntRunner(reason);
+    }, delay, reason);
+  }
+
+  function closeModalAndContinue(state, reason, processedKeys = []) {
+    const current = getCurrentLeadHuntTarget();
+    const key = current?.key || "";
+    if (key) {
+      saveHandledPostKey(key);
+      processedKeys.push(key);
+    }
+    if (current?.node) markNodeHandled(current.node, current.score);
+    const seen = Array.from(new Set([...(state.seen || []), ...processedKeys.filter(Boolean)])).slice(-MAX_HANDLED_POSTS);
+    saveLeadHuntState({
+      ...state,
+      seen,
+      currentLock: "",
+      scrollAttempts: 0,
+      status: `${reason} Closing Facebook pop-out and continuing.`,
+      lastProgressAt: Date.now(),
+      lastActiveSignature: "",
+      nextActionAt: Date.now() + leadHuntDelay(state),
+    });
+    closeOpenFacebookModal();
+    scheduleContinuousAdvance(reason, 1400);
   }
 
   async function autoImportLeadHuntNode(node, score, reason = "highlighted-modal") {
@@ -1735,10 +1829,10 @@
       postLeadHuntEvent("LEAD_HUNT_IMPORT", { message: `Imported buyer item (${score}/${confidenceThreshold(latest)})`, reason: matchReason, sourceUrl: post.url || key, query: search?.query || "", score });
       logLeadHunt("LEAD_HUNT_IMPORT", { count: 1, importedCount, query: search?.query || "", reason, matchReason });
       if (importedCount >= Number(latest.caps?.maxImportedLeads || 10)) {
-        stopLeadHunt(`Daily import cap reached. Imported ${importedCount} buyer-intent item(s).`);
+        saveLeadHuntState({ ...latest, currentLock: "", status: `Imported ${importedCount} buyer-intent item(s). Continuing until Stop is pressed.` });
+        scheduleContinuousAdvance("import cap reached but continuous mode is on", continuationDelay + 150);
       } else {
-        closeOpenFacebookModal();
-        scheduleLeadHuntAction(() => ensureLeadHuntRunner("post-import continuation"), continuationDelay + 150, "post-import continuation");
+        scheduleContinuousAdvance("post-import continuation", continuationDelay + 150);
       }
       return true;
     } catch (error) {
@@ -1810,11 +1904,11 @@
       postLeadHuntEvent("LEAD_HUNT_SCAN_TICK", { message: "Scan tick", sourceUrl: location.href, query: search?.query || "", metadata: { trigger } });
 
       if (!search) {
-        stopLeadHunt("Buyer Radar complete. No searches left.");
-        return;
-      }
-      if (Number(state.importedCount || 0) >= Number(state.caps?.maxImportedLeads || 10)) {
-        stopLeadHunt(`Daily import cap reached. Imported ${state.importedCount} buyer-intent item(s).`);
+        if ((state.searches || []).length) {
+          nextLeadHuntSearch({ ...state, currentSearchIndex: -1 }, "No active search selected.");
+        } else {
+          stopLeadHunt("Buyer Radar complete. No searches left.");
+        }
         return;
       }
 
@@ -1848,7 +1942,9 @@
 
       if (/google\.com|bing\.com/i.test(location.hostname)) {
         const visited = new Set([...(state.visitedUrls || []), ...(state.currentResultUrls || []).slice(0, Number(state.currentResultIndex || 0) + 1)].map((url) => normalizeFacebookUrl(url)));
-        const resultUrls = collectIndexedFacebookResultUrls().filter((url) => !visited.has(normalizeFacebookUrl(url)));
+        const resultUrls = collectIndexedFacebookResultUrls()
+          .filter((url) => !visited.has(normalizeFacebookUrl(url)))
+          .filter((url) => !isKnownHandledUrl(url, state));
         logLeadHunt("score decision", { source: search.source, resultUrls: resultUrls.length });
         if (!resultUrls.length) {
           if (scrollAndRescan(state, "No indexed Facebook results found yet.")) return;
@@ -1911,15 +2007,26 @@
           saveLeadHuntState(nextState);
           logLeadHunt("LEAD_HUNT_IMPORT", { count: sentPosts.length, importedCount, query: search.query });
           if (importedCount >= Number(latest.caps?.maxImportedLeads || 10)) {
-            stopLeadHunt(`Daily import cap reached. Imported ${importedCount} buyer-intent item(s).`);
+            saveLeadHuntState({ ...nextState, status: `Imported ${importedCount} buyer-intent item(s). Continuing until Stop is pressed.` });
+            scheduleContinuousAdvance("batch import cap reached but continuous mode is on", continuationDelay + 150);
           } else {
-            closeOpenFacebookModal();
-            scheduleLeadHuntAction(() => ensureLeadHuntRunner("post-import continuation"), continuationDelay + 150, "post-import continuation");
+            scheduleContinuousAdvance("post-import continuation", continuationDelay + 150);
           }
           return;
         }
 
-        const stateWithDuplicates = { ...state, duplicateCount, skippedCount, ignoredLowConfidenceCount, currentQueryIgnoredLowConfidence };
+        const stateWithDuplicates = {
+          ...state,
+          duplicateCount,
+          skippedCount,
+          ignoredLowConfidenceCount,
+          currentQueryIgnoredLowConfidence,
+          seen: Array.from(new Set([...(state.seen || []), ...decisions.processedKeys])).slice(-MAX_HANDLED_POSTS),
+        };
+        if (hasOpenFacebookModal() && decisions.scanned > 0) {
+          closeModalAndContinue(stateWithDuplicates, decisions.duplicates ? "Handled duplicate Facebook pop-out." : "No fresh buyer item in Facebook pop-out.", decisions.processedKeys);
+          return;
+        }
         if (currentQueryIgnoredLowConfidence >= MAX_LOW_CONFIDENCE_PER_QUERY && Number(state.currentQueryImportedCount || 0) === 0) {
           logLeadHunt("next query", { reason: "weak query results", query: search.query, ignored: currentQueryIgnoredLowConfidence });
           nextLeadHuntSearch(stateWithDuplicates, "Weak query results. Moving to next buyer-intent query.");
