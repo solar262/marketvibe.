@@ -481,6 +481,7 @@
   const STRONG_BUYER_SIGNALS = [
     /how do i get clients?/i,
     /where (?:do|can) i find (?:prospects|local business leads|business leads)/i,
+    /how to get clients?/i,
     /how do i get leads?/i,
     /struggling (?:on |with |to )?(?:generat(?:e|ing)|get(?:ting)?) (?:more )?leads?/i,
     /struggling to find clients?/i,
@@ -620,7 +621,7 @@
     if (GENERIC_BUSINESS_SOURCE_PATTERN.test(meta.sourceName || "") && !hasServiceSellerContext(evidence)) return false;
 
     // Require first-person request language
-    const firstPersonRequest = /(\bi need\b|\bi'm struggling\b|\bhow do i\b|\bwhere can i find\b|\bany tips\b|\bany suggestions\b|\bcold outreach.*not working\b)/i;
+    const firstPersonRequest = /(\bi need\b|\bi'm struggling\b|\bhow do i\b|\bhow to\b|\bwhere can i find\b|\bany tips\b|\bany suggestions\b|\bcold outreach.*not working\b)/i;
     if (!firstPersonRequest.test(evidence)) return false;
 
     // Require acquisition terms
@@ -2276,6 +2277,12 @@
         status: "Recovered from a blocked, blank, or unavailable page.",
         nextActionAt: Date.now() + leadHuntDelay(state),
       };
+      const errorMessage = String(error && error.message ? error.message : error || "");
+      const isFacebookPostPage = /facebook\.com/i.test(location.hostname) && (/\/groups\/[^/?#]+\/posts\/\d+/i.test(location.href) || /\/posts\/\d+/i.test(location.href) || /story_fbid=\d+/i.test(location.href));
+      if (hasOpenFacebookModal() || isFacebookPostPage || /did not store|filtered|rejected/i.test(errorMessage)) {
+        advanceAfterFacebookPage(failedState, "Buyer Radar skipped rejected or stuck Facebook post.", "skipped");
+        return;
+      }
       if (failedCount >= 3) {
         advanceAfterFacebookPage(failedState, "Repeated failures on this page.");
         return;
@@ -2699,6 +2706,8 @@
       extractGroupName,
       getPostText,
       isGenericGroupOrPageName,
+      isHighQualityBuyerText,
+      scorePost,
       stripMetadataFromPostText,
     };
     return;

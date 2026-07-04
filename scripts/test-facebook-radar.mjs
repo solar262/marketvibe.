@@ -447,6 +447,17 @@ assert.equal(buyerRadarPayload.queryUsed, "web developer need leads", "Extension
 assert.equal(buyerRadarPayload.sourceUsed, "Facebook Search", "Extension payload should preserve sourceUsed");
 assert.equal(buyerRadarPayload.url, "https://www.facebook.com/groups/webdesigners/posts/123456789", "Extension payload should preserve exact post URL");
 
+const freelanceWebDesignerModalText = "how to get clients as a freelance web designer?";
+assert.equal(
+  extensionTestApi.isHighQualityBuyerText(freelanceWebDesignerModalText, { sourceName: "i need a website" }),
+  true,
+  "Facebook modal post asking how to get clients as a freelance web designer should be high-quality buyer intent",
+);
+assert.ok(
+  extensionTestApi.scorePost(freelanceWebDesignerModalText, { sourceName: "i need a website" }) >= 78,
+  "Facebook modal post asking how to get clients as a freelance web designer should meet the import threshold",
+);
+
 const agencyLeadPainImport = scoreImportedFacebookPosts({
   posts: [{
     text: "I'm running a web development agency and struggling on generating more leads. I find cold calling is too time consuming and I am looking for alternatives.",
@@ -743,6 +754,7 @@ assert.doesNotMatch(contactFlowSource, /\.click\(\)/, "Contact flow must not cli
 assert.match(extensionSource, /Start Buyer Radar/, "Extension panel should label the internal buyer-radar workflow");
 assert.match(extensionSource, /Recovered from a blocked, blank, or unavailable page/, "Autopilot should recover from blocked or blank pages");
 assert.match(extensionSource, /Repeated failures on this page/, "Autopilot should advance after repeated failures");
+assert.match(extensionSource, /Buyer Radar skipped rejected or stuck Facebook post/, "Rejected or stuck Facebook post modals should be skipped and advanced immediately");
 assert.match(extensionSource, /OUTREACH_MODES/, "Extension should include outreach mode architecture");
 assert.match(extensionSource, /function createContextualReply/, "Extension should generate contextual reply drafts");
 assert.match(extensionSource, /replyDraft/, "Autopilot should save reply draft with imported leads");
