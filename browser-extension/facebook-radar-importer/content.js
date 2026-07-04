@@ -1,16 +1,32 @@
 (() => {
-  const API_URL = "https://www.marketvibe1.com/api/internal-marketing-leads";
-  const STATUS_API_URL = "https://www.marketvibe1.com/api/internal-marketing-leads/hunt-status";
-  const EVENT_API_URL = "https://www.marketvibe1.com/api/internal-marketing-leads/events";
-  const PROCESSED_URL_API_URL = "https://www.marketvibe1.com/api/internal-marketing-leads/processed-url";
-  const EXTENSION_VERSION = "0.1.5";
-  const CACHE_KEY = "marketvibe_recent_facebook_imports";
+  const BUYER_RADAR_ENGINE = "buyer-radar";
+  const BUYER_RADAR_API_BASE = "/api/internal-marketing-leads";
+  const BUYER_RADAR_API_ROUTES = {
+    import: `${BUYER_RADAR_API_BASE}`,
+    status: `${BUYER_RADAR_API_BASE}/hunt-status`,
+    events: `${BUYER_RADAR_API_BASE}/events`,
+    processedUrl: `${BUYER_RADAR_API_BASE}/processed-url`,
+  };
+  function buildBuyerRadarApiUrl(routePath) {
+    const normalizedPath = String(routePath || "").trim();
+    if (!normalizedPath.startsWith(BUYER_RADAR_API_BASE)) {
+      throw new Error(`Buyer Radar engine only allows ${BUYER_RADAR_API_BASE} routes.`);
+    }
+    return `https://www.marketvibe1.com${normalizedPath}`;
+  }
+  const API_URL = buildBuyerRadarApiUrl(BUYER_RADAR_API_ROUTES.import);
+  const STATUS_API_URL = buildBuyerRadarApiUrl(BUYER_RADAR_API_ROUTES.status);
+  const EVENT_API_URL = buildBuyerRadarApiUrl(BUYER_RADAR_API_ROUTES.events);
+  const PROCESSED_URL_API_URL = buildBuyerRadarApiUrl(BUYER_RADAR_API_ROUTES.processedUrl);
+  const EXTENSION_VERSION = "0.1.8";
+  const CACHE_KEY = "marketvibe_buyer_radar_recent_facebook_imports";
   const MAX_RECENT_IMPORTS = 20;
   const SCAN_INTERVAL_MS = 1500;
   const SCAN_CLEANUP_MS = 3000;
-  const HANDLED_KEY = "marketvibe_facebook_handled_posts";
+  const HANDLED_KEY = "marketvibe_buyer_radar_handled_posts";
   const MAX_HANDLED_POSTS = 500;
-  const LEAD_HUNT_KEY = "marketvibe_lead_hunt_autopilot";
+  const LEAD_HUNT_KEY = "marketvibe_buyer_radar_state";
+  const LEGACY_LEAD_HUNT_KEY = "marketvibe_lead_hunt_autopilot";
   const MAX_SCROLL_ATTEMPTS = 4;
   const MAX_LOW_CONFIDENCE_PER_QUERY = 12;
   const HIGH_INTENT_IMPORT_THRESHOLD = 78;
@@ -1177,8 +1193,18 @@
 
   function getLeadHuntState() {
     try {
-      const parsed = JSON.parse(localStorage.getItem(LEAD_HUNT_KEY) || "null");
-      return parsed && typeof parsed === "object" ? parsed : null;
+      const current = localStorage.getItem(LEAD_HUNT_KEY);
+      const legacy = localStorage.getItem(LEGACY_LEAD_HUNT_KEY);
+      const source = current ?? legacy ?? "null";
+      const parsed = JSON.parse(source);
+      if (parsed && typeof parsed === "object") {
+        if (current === null && legacy !== null) {
+          localStorage.setItem(LEAD_HUNT_KEY, JSON.stringify(parsed));
+          localStorage.removeItem(LEGACY_LEAD_HUNT_KEY);
+        }
+        return parsed;
+      }
+      return null;
     } catch {
       return null;
     }
@@ -1186,6 +1212,7 @@
 
   function saveLeadHuntState(nextState) {
     localStorage.setItem(LEAD_HUNT_KEY, JSON.stringify(nextState));
+    localStorage.removeItem(LEGACY_LEAD_HUNT_KEY);
     renderLeadHuntPanel();
     syncLeadHuntStatus(nextState);
   }

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "MarketVibe Facebook Radar Importer",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Internal helper that imports Facebook buyer-intent posts and supports manual contact workflow.",
   "permissions": ["activeTab", "storage"],
   "host_permissions": [

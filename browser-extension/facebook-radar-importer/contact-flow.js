@@ -1,6 +1,6 @@
 (() => {
   const SITE_URL = "https://www.marketvibe1.com";
-  const CONTACTED_KEY = "marketvibe_contacted_manual_queue";
+  const CONTACTED_KEY = "marketvibe_buyer_radar_contacted_manual_queue";
   const PANEL_ID = "marketvibe-contact-flow-toast";
 
   if (!/facebook\.com$/i.test(location.hostname)) return;
