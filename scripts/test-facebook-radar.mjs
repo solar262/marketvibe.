@@ -18,6 +18,7 @@ const internalMarketingLeadsMigration = fs.readFileSync("supabase/migrations/000
 const leadHuntPipelineMigration = fs.readFileSync("supabase/migrations/0005_lead_hunt_pipeline.sql", "utf8");
 const internalAccessSource = fs.readFileSync("src/lib/internal-access.ts", "utf8");
 const extensionSource = fs.readFileSync("browser-extension/facebook-radar-importer/content.js", "utf8");
+const contactFlowSource = fs.readFileSync("browser-extension/facebook-radar-importer/contact-flow.js", "utf8");
 const extensionManifest = fs.readFileSync("browser-extension/facebook-radar-importer/manifest.json", "utf8");
 const transpiled = ts.transpileModule(source, {
   compilerOptions: {
@@ -665,6 +666,7 @@ assert.match(extensionSource, /api\/internal-marketing-leads/, "Lead Hunt extens
 assert.doesNotMatch(extensionSource, /api\/facebook-radar\/import/, "Lead Hunt extension must not send imports to old Facebook Radar import API");
 assert.match(extensionManifest, /"storage"/, "Extension should have storage permission for the internal key");
 assert.match(extensionManifest, /marketvibe1\.com/, "Extension should run on MarketVibe pages for key storage bridge");
+assert.match(extensionManifest, /"version": "0\.1\.9"/, "Extension manifest should be bumped for Auto DM prep toggle release");
 assert.match(extensionSource, /chrome\.storage\.local\.set/, "Extension should store the internal key in extension storage");
 assert.match(extensionSource, /chrome\.storage\.local\.get/, "Extension should read the internal key from extension storage");
 assert.match(extensionSource, /MARKETVIBE_BUYER_RADAR_SAVE_KEY/, "Extension should receive key-save messages from the dashboard");
@@ -709,7 +711,14 @@ assert.match(extensionSource, /Continuing until Stop is pressed/, "Autopilot sho
 assert.match(extensionSource, /function isKnownHandledUrl/, "Autopilot should avoid reopening indexed URLs it already handled");
 assert.match(extensionSource, /maxImportedLeads/, "Autopilot should keep imported lead cap configuration visible");
 assert.match(extensionSource, /maxSearches/, "Autopilot should keep search cap configuration visible");
-assert.match(extensionSource, /No auto-DM or auto-comment/, "Extension panel should show no messaging/commenting safety");
+assert.match(extensionSource, /No auto-send or auto-comment/, "Extension panel should show no silent sending/commenting safety");
+assert.match(extensionSource, /AUTO_DM_PREP_KEY/, "Extension panel should share the Auto DM prep toggle state");
+assert.match(extensionSource, /Auto DM: Off/, "Extension panel should expose an off-by-default Auto DM switch");
+assert.match(contactFlowSource, /AUTO_DM_PREP_KEY/, "Contact flow should read the Auto DM prep toggle");
+assert.match(contactFlowSource, /AUTO_DM_PREPARED_KEY/, "Contact flow should remember prepared contacts");
+assert.match(contactFlowSource, /function runAutoDmPrepForVisibleMatches/, "Contact flow should prepare one visible matched post when Auto DM is enabled");
+assert.match(contactFlowSource, /Send manually/, "Contact flow should keep final send manual");
+assert.doesNotMatch(contactFlowSource, /\.click\(\)/, "Contact flow must not click Facebook buttons programmatically");
 assert.match(extensionSource, /Start Buyer Radar/, "Extension panel should label the internal buyer-radar workflow");
 assert.match(extensionSource, /Recovered from a blocked, blank, or unavailable page/, "Autopilot should recover from blocked or blank pages");
 assert.match(extensionSource, /Repeated failures on this page/, "Autopilot should advance after repeated failures");

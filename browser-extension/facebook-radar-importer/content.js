@@ -18,7 +18,7 @@
   const STATUS_API_URL = buildBuyerRadarApiUrl(BUYER_RADAR_API_ROUTES.status);
   const EVENT_API_URL = buildBuyerRadarApiUrl(BUYER_RADAR_API_ROUTES.events);
   const PROCESSED_URL_API_URL = buildBuyerRadarApiUrl(BUYER_RADAR_API_ROUTES.processedUrl);
-  const EXTENSION_VERSION = "0.1.8";
+  const EXTENSION_VERSION = "0.1.9";
   const CACHE_KEY = "marketvibe_buyer_radar_recent_facebook_imports";
   const MAX_RECENT_IMPORTS = 20;
   const SCAN_INTERVAL_MS = 1500;
@@ -27,6 +27,7 @@
   const MAX_HANDLED_POSTS = 500;
   const LEAD_HUNT_KEY = "marketvibe_buyer_radar_state";
   const LEGACY_LEAD_HUNT_KEY = "marketvibe_lead_hunt_autopilot";
+  const AUTO_DM_PREP_KEY = "marketvibe_buyer_radar_auto_dm_prep";
   const MAX_SCROLL_ATTEMPTS = 4;
   const MAX_LOW_CONFIDENCE_PER_QUERY = 12;
   const HIGH_INTENT_IMPORT_THRESHOLD = 78;
@@ -62,6 +63,15 @@
   let extensionReloadRequired = false;
   const leadHuntTimeoutIds = new Set();
   if (document.getElementById("marketvibe-import-button")) return;
+
+  function isAutoDmPrepEnabled() {
+    return localStorage.getItem(AUTO_DM_PREP_KEY) === "true";
+  }
+
+  function setAutoDmPrepEnabled(enabled) {
+    localStorage.setItem(AUTO_DM_PREP_KEY, enabled ? "true" : "false");
+    window.dispatchEvent(new CustomEvent("marketvibe:auto-dm-prep-change", { detail: { enabled } }));
+  }
 
   function logLeadHunt(event, details = {}) {
     console.log(`[MarketVibe Buyer Radar] ${event}`, details);
@@ -2085,6 +2095,7 @@
                 : "Ready";
     const runtimeEnd = state?.active && !state?.extensionReloadRequired && !extensionReloadRequired ? Date.now() : Number(state?.stoppedAt || Date.now());
     const runtimeSeconds = state?.startedAt ? Math.max(0, Math.round((runtimeEnd - state.startedAt) / 1000)) : 0;
+    const autoDmPrepEnabled = isAutoDmPrepEnabled();
     const badgeColor = runLabel === "Extension Reload Required"
       ? "rgba(251,113,133,.22)"
       : runLabel === "Paused"
@@ -2122,7 +2133,7 @@
         <button type="button" data-marketvibe-panel-minimize style="border:1px solid rgba(103,232,249,.45);border-radius:999px;background:rgba(255,255,255,.08);color:white;font-weight:900;padding:7px 10px;cursor:pointer;">Minimize</button>
       </div>
       <div style="display:inline-block;border-radius:999px;background:${badgeColor};color:white;padding:4px 8px;font-weight:900;margin-bottom:8px;">${runLabel}</div>
-      <div style="line-height:1.45;color:#e5eef9;margin-bottom:8px;">${state?.status || "Ready. Internal buyer discovery only. No auto-DM or auto-comment."}</div>
+      <div style="line-height:1.45;color:#e5eef9;margin-bottom:8px;">${state?.status || "Ready. Internal buyer discovery only. No auto-send or auto-comment."}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;color:#cbd5e1;">
         <div>Query: ${search?.query || "not started"}</div>
         <div>Source: ${search?.source || "none"}</div>
@@ -2174,7 +2185,19 @@
     skip.textContent = "Skip current";
     skip.style.cssText = "border:1px solid rgba(251,191,36,.55);border-radius:999px;background:rgba(255,255,255,.08);color:white;font-weight:800;padding:8px 10px;cursor:pointer;";
     skip.addEventListener("click", () => recoverCurrentLeadHuntItem("Skip current"));
-    controls.append(start, pause, skip, stop);
+    const autoDm = document.createElement("button");
+    autoDm.type = "button";
+    autoDm.textContent = autoDmPrepEnabled ? "Auto DM: On" : "Auto DM: Off";
+    autoDm.style.cssText = autoDmPrepEnabled
+      ? "border:1px solid rgba(16,185,129,.7);border-radius:999px;background:rgba(16,185,129,.22);color:#d1fae5;font-weight:900;padding:8px 10px;cursor:pointer;"
+      : "border:1px solid rgba(148,163,184,.42);border-radius:999px;background:rgba(255,255,255,.08);color:white;font-weight:900;padding:8px 10px;cursor:pointer;";
+    autoDm.addEventListener("click", () => {
+      const enabled = !isAutoDmPrepEnabled();
+      setAutoDmPrepEnabled(enabled);
+      showStatus(enabled ? "Auto DM prep enabled. Messages are copied and profile/post pages are opened; send manually." : "Auto DM prep disabled.");
+      renderLeadHuntPanel();
+    });
+    controls.append(start, pause, skip, stop, autoDm);
     panel.appendChild(controls);
   }
 
