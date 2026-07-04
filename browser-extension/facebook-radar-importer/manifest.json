@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "MarketVibe Facebook Radar Importer",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Internal helper that imports Facebook buyer-intent posts and supports manual contact workflow.",
   "permissions": ["activeTab", "storage"],
   "host_permissions": [
@@ -15,7 +15,7 @@
   "content_scripts": [
     {
       "matches": ["https://www.facebook.com/*", "https://m.facebook.com/*", "https://www.google.com/*", "https://www.bing.com/*", "https://www.marketvibe1.com/*", "https://marketvibe1.com/*"],
-      "js": ["content.js", "contact-flow.js"],
+      "js": ["content.js", "contact-flow.js", "lead-hunt-watchdog.js"],
       "run_at": "document_idle"
     }
   ]
