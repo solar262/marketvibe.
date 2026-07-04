@@ -102,9 +102,26 @@
     return profile?.href || getPostUrl(node);
   }
 
+  function isOpenableFacebookContactUrl(rawUrl) {
+    try {
+      const url = new URL(rawUrl, location.origin);
+      if (!/(^|\.)facebook\.com$/i.test(url.hostname)) return false;
+      if (/^about:blank$/i.test(url.href)) return false;
+      if (/\/(?:login|checkpoint|recover|two_factor)\b/i.test(url.pathname)) return false;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   function openContactTarget(node) {
     try {
-      const opened = window.open(getProfileUrl(node), "_blank");
+      const targetUrl = getProfileUrl(node);
+      if (!isOpenableFacebookContactUrl(targetUrl)) {
+        toast("No reliable profile/post URL found for this match.");
+        return false;
+      }
+      const opened = window.open(targetUrl, "_blank");
       if (opened) opened.opener = null;
       return Boolean(opened);
     } catch {
@@ -226,10 +243,13 @@
     if (!key || contactedSet().has(key) || preparedSet().has(key)) return false;
     savePrepared(key);
     markPrepared(node);
-    const opened = openContactTarget(node);
-    const message = opened
-      ? "Auto DM prepared. Inbox message copied and profile/post opened. Send manually."
-      : "Auto DM prepared. Inbox message copied. Open profile/post manually if the browser blocked the tab.";
+    let opened = false;
+    if (!options.automatic) opened = openContactTarget(node);
+    const message = options.automatic
+      ? "Auto DM prepared. Inbox message copied. Use Open profile/post to send manually."
+      : opened
+        ? "Auto DM prepared. Inbox message copied and profile/post opened. Send manually."
+        : "Auto DM prepared. Inbox message copied. Open profile/post manually if the browser blocked the tab.";
     await copyText(createInboxMessage(node), message);
     if (!options.automatic) nextMatch(node);
     return true;

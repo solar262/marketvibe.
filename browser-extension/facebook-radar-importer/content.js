@@ -840,6 +840,10 @@
     localStorage.setItem(LEAD_HUNT_VISITED_URLS_KEY, JSON.stringify(normalized.slice(0, MAX_VISITED_URLS)));
   }
 
+  function resetLeadHuntVisitedUrls() {
+    localStorage.removeItem(LEAD_HUNT_VISITED_URLS_KEY);
+  }
+
   function mergeVisitedUrls(state, urls = []) {
     const merged = Array.from(new Set([
       ...(state?.visitedUrls || []).map(normalizeLeadHuntUrl).filter(Boolean),
@@ -1647,6 +1651,7 @@
       renderLeadHuntPanel();
       return;
     }
+    resetLeadHuntVisitedUrls();
     const searches = buildLeadHuntSearches(config);
     const state = {
       runId: config.runId || newRunId(),
@@ -1671,7 +1676,7 @@
       startedAt: Date.now(),
       currentUrl: location.href,
       scrollAttempts: 0,
-      visitedUrls: getVisitedLeadHuntUrls().slice(-MAX_STATE_VISITED_URLS),
+      visitedUrls: [],
       lastProgressAt: Date.now(),
       lastActiveSignature: "",
       loadingSince: 0,

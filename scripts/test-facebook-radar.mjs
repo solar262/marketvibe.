@@ -702,6 +702,8 @@ assert.match(extensionSource, /function normalizeLeadHuntUrl/, "Autopilot should
 assert.match(extensionSource, /story_fbid/, "Autopilot should canonicalize Facebook story/permalink URLs");
 assert.match(extensionSource, /function markLeadHuntUrlVisited/, "Autopilot should mark visited URLs with statuses");
 assert.match(extensionSource, /function isLeadHuntUrlVisited/, "Autopilot should skip already visited URLs");
+assert.match(extensionSource, /function resetLeadHuntVisitedUrls/, "Fresh Buyer Radar starts should clear stale visited URL state");
+assert.match(extensionSource, /resetLeadHuntVisitedUrls\(\);\s*const searches = buildLeadHuntSearches/s, "Start Buyer Radar should reset stale crawler visited state before building a new run");
 assert.match(extensionSource, /function isNonUsefulLeadHuntUrl/, "Autopilot should detect non-useful result URLs");
 assert.ok(extensionSource.includes("/^\\/images(?:\\/search)?/i"), "Autopilot should skip Bing image result pages");
 assert.ok(extensionSource.includes("^\\/photo(?:\\.php)?$") && extensionSource.includes("^\\/media(?:\\/|$)"), "Autopilot should skip Facebook photo/media pages");
@@ -731,6 +733,9 @@ assert.match(contactFlowSource, /AUTO_DM_PREP_KEY/, "Contact flow should read th
 assert.match(contactFlowSource, /AUTO_DM_PREPARED_KEY/, "Contact flow should remember prepared contacts");
 assert.match(contactFlowSource, /function runAutoDmPrepForVisibleMatches/, "Contact flow should prepare one visible matched post when Auto DM is enabled");
 assert.match(contactFlowSource, /Send manually/, "Contact flow should keep final send manual");
+assert.match(contactFlowSource, /if \(!options\.automatic\) opened = openContactTarget\(node\)/, "Automatic Auto DM prep should not open new tabs");
+assert.match(contactFlowSource, /Use Open profile\/post to send manually/, "Automatic Auto DM prep should tell the user to open the profile manually");
+assert.match(contactFlowSource, /function isOpenableFacebookContactUrl/, "Contact flow should validate profile/post URLs before opening a tab");
 assert.doesNotMatch(contactFlowSource, /\.click\(\)/, "Contact flow must not click Facebook buttons programmatically");
 assert.match(extensionSource, /Start Buyer Radar/, "Extension panel should label the internal buyer-radar workflow");
 assert.match(extensionSource, /Recovered from a blocked, blank, or unavailable page/, "Autopilot should recover from blocked or blank pages");
