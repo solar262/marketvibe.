@@ -1,5 +1,5 @@
-import Link from "next/link";
-import { AlertTriangle, Bot, Database, Play, Route } from "lucide-react";
+import { AlertTriangle, Bot, Database, Route } from "lucide-react";
+import { RunTestHuntButton } from "./RunTestHuntButton";
 import { autopilotStatus } from "@/lib/autopilot";
 import { getPersistenceStats } from "@/lib/lead-persistence";
 
@@ -15,9 +15,7 @@ export default async function AdminAutopilotPage() {
           <h1 className="mt-2 text-3xl font-semibold text-slate-950">Autopilot</h1>
           <p className="mt-2 max-w-2xl text-slate-600">Run scheduled lead hunts, save ranked opportunities to Supabase, and keep outreach manual until sending controls are ready.</p>
         </div>
-        <Link href="/api/cron/lead-hunt?markets=1&leads=2" className="inline-flex items-center justify-center gap-2 rounded-md bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">
-          <Play className="h-4 w-4" /> Run test hunt
-        </Link>
+        <RunTestHuntButton />
       </div>
 
       <section className="mt-6 grid gap-4 md:grid-cols-4">
