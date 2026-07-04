@@ -512,6 +512,19 @@
     if (!evidence || HARD_SKIP_SIGNALS.some((pattern) => pattern.test(evidence)) || OFF_TOPIC_PATTERN.test(evidence) || IMAGE_OR_MEME_PATTERN.test(evidence)) return false;
     if (LOCAL_BUSINESS_OWNER_PATTERN.test(evidence) && !hasServiceSellerContext(evidence)) return false;
     if (GENERIC_BUSINESS_SOURCE_PATTERN.test(meta.sourceName || "") && !hasServiceSellerContext(evidence)) return false;
+
+    // Require first-person request language
+    const firstPersonRequest = /(\bi need\b|\bi'm struggling\b|\bhow do i\b|\bwhere can i find\b|\bany tips\b|\bany suggestions\b|\bcold outreach.*not working\b)/i;
+    if (!firstPersonRequest.test(evidence)) return false;
+
+    // Require acquisition terms
+    const acquisitionTerms = /(clients?|leads?|prospects?|outreach|client acquisition|prospecting)/i;
+    if (!acquisitionTerms.test(evidence)) return false;
+
+    // Reject promotional framing
+    const promoFraming = /(stop waiting|here is how|i can help|we can help|get targeted leads|dm me|message me|buy leads|course|webinar)/i;
+    if (promoFraming.test(evidence)) return false;
+
     return hasServiceSellerContext(evidence) && hasClientAcquisitionPain(evidence);
   }
 
