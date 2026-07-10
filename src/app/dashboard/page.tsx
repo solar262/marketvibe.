@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, BriefcaseBusiness, Download, FileCheck2, LockKeyhole, Radar, ShieldCheck } from "lucide-react";
 import { getPremiumEntitlements, getProofPackItems } from "@/lib/premium-persistence";
 import { premiumProductLabel, type PremiumProductCode } from "@/lib/premium-products";
+import { getDeliveredProspectsForCustomer, type DeliveredProspect } from "@/lib/sales-navigator-persistence";
 
 const products: PremiumProductCode[] = ["proof_pack", "radar", "growth_desk"];
 
@@ -12,12 +13,13 @@ function asProductCode(value: unknown): PremiumProductCode | null {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ email?: string }>;
+  searchParams: Promise<{ email?: string; delivery_token?: string }>;
 }) {
-  const { email: rawEmail } = await searchParams;
+  const { email: rawEmail, delivery_token: deliveryToken } = await searchParams;
   const email = (rawEmail || "").trim().toLowerCase();
   const entitlements = email ? await getPremiumEntitlements(email).catch(() => []) : [];
   const proofItems = email ? await getProofPackItems(email).catch(() => []) : [];
+  const importedItems: DeliveredProspect[] = email && deliveryToken ? await getDeliveredProspectsForCustomer(email, deliveryToken).catch(() => []) : [];
   const activeProducts = new Set(
     entitlements
       .map((item: { product_code?: unknown }) => asProductCode(item.product_code))
@@ -97,8 +99,8 @@ export default async function DashboardPage({
                     <h2 className="text-xl font-semibold">Proof Pack delivery</h2>
                     <p className="mt-1 text-sm text-violet-100/65">Rows are created from verified saved live signals when available.</p>
                   </div>
-                  {proofItems.length > 0 && (
-                    <Link href={`/api/proof-pack/csv?email=${encodeURIComponent(email)}`} className="inline-flex items-center gap-2 rounded-lg border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">
+                  {(proofItems.length > 0 || importedItems.length > 0) && deliveryToken && (
+                    <Link href={`/api/proof-pack/csv?email=${encodeURIComponent(email)}&delivery_token=${encodeURIComponent(deliveryToken)}`} className="inline-flex items-center gap-2 rounded-lg border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">
                       <Download className="h-4 w-4" /> CSV
                     </Link>
                   )}
@@ -117,6 +119,38 @@ export default async function DashboardPage({
                         </div>
                         <p className="mt-2 text-sm leading-6 text-violet-100/65">{item.pain_point}</p>
                         {item.source_url && <Link href={item.source_url} className="mt-3 inline-flex text-sm font-semibold text-violet-200 hover:text-white">Open source</Link>}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+                <h2 className="text-xl font-semibold">Imported customer delivery</h2>
+                <p className="mt-1 text-sm text-violet-100/65">
+                  Imported records require the secure delivery link from the MarketVibe email.
+                </p>
+                <div className="mt-5 grid gap-3">
+                  {importedItems.length === 0 ? (
+                    <p className="rounded-lg border border-white/10 bg-black/20 p-4 text-sm leading-6 text-violet-100/70">
+                      No imported delivery records are visible for this secure link.
+                    </p>
+                  ) : (
+                    importedItems.slice(0, 20).map((item) => (
+                      <div key={`${item.id}-${item.delivered_at}`} className="rounded-lg border border-white/10 bg-black/20 p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <h3 className="font-semibold">{item.company_name}</h3>
+                          <span className="rounded-lg bg-violet-500/20 px-2.5 py-1 text-sm font-semibold text-violet-100">Fit {item.fit_score}</span>
+                        </div>
+                        <p className="mt-1 text-sm text-violet-100/70">{[item.full_name, item.job_title].filter(Boolean).join(" · ")}</p>
+                        <p className="mt-2 text-sm leading-6 text-violet-100/65">{item.evidence_summary}</p>
+                        <p className="mt-2 text-sm font-semibold text-violet-200">Intent: {item.intent_score ?? "Intent not evidenced"}</p>
+                        <p className="mt-2 text-sm leading-6 text-violet-100/65">{item.suggested_outreach_angle}</p>
+                        <div className="mt-3 flex flex-wrap gap-3 text-sm">
+                          {item.company_website && <Link href={item.company_website} className="text-violet-200 hover:text-white">Website</Link>}
+                          {item.linkedin_profile_url && <Link href={item.linkedin_profile_url} className="text-violet-200 hover:text-white">LinkedIn source reference</Link>}
+                          {item.public_signal_url && <Link href={item.public_signal_url} className="text-violet-200 hover:text-white">Public signal</Link>}
+                        </div>
                       </div>
                     ))
                   )}

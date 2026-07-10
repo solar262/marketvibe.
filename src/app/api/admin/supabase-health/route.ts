@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireAdminJson } from "@/lib/admin-api";
 
 export const runtime = "nodejs";
 
@@ -24,6 +25,9 @@ function errorDetails(error: unknown) {
 }
 
 export async function GET() {
+  const unauthorized = await requireAdminJson();
+  if (unauthorized) return unauthorized;
+
   const supabaseUrl = cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_URL);
   const anonKey = cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
   const serviceRoleKey = cleanEnv(process.env.SUPABASE_SERVICE_ROLE_KEY);

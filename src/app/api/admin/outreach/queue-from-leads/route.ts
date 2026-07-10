@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
+import { requireAdminJson } from "@/lib/admin-api";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { queueOutreach } from "@/lib/outreach";
 
 export async function GET(request: Request) {
+  const unauthorized = await requireAdminJson();
+  if (unauthorized) return unauthorized;
+
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase server writes are not configured." }, { status: 500 });
 
