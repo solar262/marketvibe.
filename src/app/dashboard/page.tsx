@@ -1,59 +1,146 @@
 import Link from "next/link";
-import { ArrowRight, Gauge, PackageOpen, Search, Settings, type LucideIcon } from "lucide-react";
-import { leadSettings, sampleLeads } from "@/lib/lead-engine";
+import { ArrowRight, BriefcaseBusiness, Download, FileCheck2, LockKeyhole, Radar, ShieldCheck } from "lucide-react";
+import { getPremiumEntitlements, getProofPackItems } from "@/lib/premium-persistence";
+import { premiumProductLabel, type PremiumProductCode } from "@/lib/premium-products";
 
-export default function DashboardPage() {
-  const highPriority = sampleLeads.filter((lead) => lead.audit.priority === "high").length;
-  const workflowCards: Array<[LucideIcon, string, string, string]> = [
-    [Search, "Search setup", "Country, city, business type, and service category selectors are ready.", "/lead-search"],
-    [Gauge, "Audit scoring", "Scores use the requested CTA, booking, speed, SEO, review, social, mobile, and outdated-signal weights.", "/lead-results"],
-    [PackageOpen, "Lead packs", "Compare Free, Starter, and Pro access for ranked monthly opportunities.", "/lead-packs"],
-    [Settings, "Admin controls", "Daily send limit, prices, free limits, allowed countries, and categories are configurable.", "/admin/settings"],
-  ];
+const products: PremiumProductCode[] = ["proof_pack", "radar", "growth_desk"];
+
+function asProductCode(value: unknown): PremiumProductCode | null {
+  return value === "proof_pack" || value === "radar" || value === "growth_desk" ? value : null;
+}
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ email?: string }>;
+}) {
+  const { email: rawEmail } = await searchParams;
+  const email = (rawEmail || "").trim().toLowerCase();
+  const entitlements = email ? await getPremiumEntitlements(email).catch(() => []) : [];
+  const proofItems = email ? await getProofPackItems(email).catch(() => []) : [];
+  const activeProducts = new Set(
+    entitlements
+      .map((item: { product_code?: unknown }) => asProductCode(item.product_code))
+      .filter((value): value is PremiumProductCode => Boolean(value)),
+  );
+  const hasAccess = activeProducts.size > 0;
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm font-semibold text-emerald-700">Dashboard</p>
-          <h1 className="mt-2 text-3xl font-semibold text-slate-950">Lead Engine Workspace</h1>
-          <p className="mt-2 max-w-2xl text-slate-600">Search markets, review audit scores, open public audit pages, and control outreach compliance before sending anything.</p>
-        </div>
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <Link href="/lead-packs" className="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800">
-            Lead Packs <ArrowRight className="h-4 w-4" />
-          </Link>
-          <Link href="/lead-search" className="inline-flex items-center justify-center gap-2 rounded-md bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">
-            Lead Search <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
-      </div>
-
-      <section className="mt-8 grid gap-4 md:grid-cols-4">
-        {[
-          ["Free", `${leadSettings.freeLeadLimit}`, "Sample previews"],
-          ["Starter", "50", "Leads/month"],
-          ["Pro", "250", "Leads/month"],
-          ["High priority", `${highPriority}`, "Current sample matches"],
-        ].map(([label, value, body]) => (
-          <div key={label} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm font-semibold text-slate-500">{label}</p>
-            <p className="mt-2 text-3xl font-semibold text-slate-950">{value}</p>
-            <p className="mt-1 text-sm text-slate-600">{body}</p>
+    <main className="min-h-screen bg-[#08030f] px-4 py-10 text-white sm:px-6 lg:px-8">
+      <section className="mx-auto max-w-7xl">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-[#a855f7]">Dashboard</p>
+            <h1 className="mt-2 font-serif text-4xl font-semibold tracking-tight">MarketVibe Workspace</h1>
+            <p className="mt-2 max-w-2xl text-violet-100/70">
+              Access is based on active paid entitlements tied to your billing email.
+            </p>
           </div>
-        ))}
-      </section>
-
-      <section className="mt-8 grid gap-4 lg:grid-cols-3">
-        {workflowCards.map(([Icon, title, body, href]) => (
-          <Link key={title} href={href} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md">
-            <Icon className="h-6 w-6 text-emerald-700" />
-            <h2 className="mt-4 font-semibold text-slate-950">{title}</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">{body}</p>
+          <Link href="/pricing" className="inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-violet-950/30 transition hover:brightness-110">
+            Upgrade access <ArrowRight className="h-4 w-4" />
           </Link>
-        ))}
-      </section>
+        </div>
 
+        {!email && (
+          <form action="/dashboard" className="mt-8 max-w-xl rounded-lg border border-white/10 bg-white/5 p-5 shadow-2xl shadow-black/20 backdrop-blur-xl">
+            <LockKeyhole className="h-6 w-6 text-[#a855f7]" />
+            <h2 className="mt-4 text-xl font-semibold">Enter your billing email</h2>
+            <p className="mt-2 text-sm leading-6 text-violet-100/65">
+              MarketVibe will check the server-side entitlement tables for Proof Pack, Radar, or Growth Desk access.
+            </p>
+            <input required name="email" type="email" placeholder="you@example.com" className="mt-5 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-3 text-sm text-white outline-none placeholder:text-violet-100/45 focus:border-violet-300/60 focus:ring-2 focus:ring-violet-400/30" />
+            <button className="mt-4 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-500 px-5 py-3 text-sm font-bold text-white hover:brightness-110">
+              Check access
+            </button>
+          </form>
+        )}
+
+        {email && !hasAccess && (
+          <section className="mt-8 rounded-lg border border-amber-300/20 bg-amber-300/10 p-6 text-amber-50">
+            <LockKeyhole className="h-7 w-7" />
+            <h2 className="mt-4 text-2xl font-semibold">No active paid entitlement found</h2>
+            <p className="mt-2 max-w-2xl leading-7">
+              We checked {email}, but did not find active Proof Pack, Radar, or Growth Desk access. Use the same email from checkout or return to pricing.
+            </p>
+            <Link href="/pricing" className="mt-5 inline-flex rounded-lg bg-white px-5 py-3 text-sm font-semibold text-[#16051f]">
+              View pricing
+            </Link>
+          </section>
+        )}
+
+        {hasAccess && (
+          <>
+            <section className="mt-8 grid gap-4 md:grid-cols-3">
+              {products.map((product) => {
+                const active = activeProducts.has(product);
+                return (
+                  <div key={product} className={`rounded-lg border p-5 shadow-xl shadow-black/10 backdrop-blur-xl ${active ? "border-violet-300/30 bg-white/8" : "border-white/10 bg-white/5 opacity-60"}`}>
+                    {product === "proof_pack" ? <FileCheck2 className="h-6 w-6 text-[#a855f7]" /> : product === "radar" ? <Radar className="h-6 w-6 text-[#a855f7]" /> : <BriefcaseBusiness className="h-6 w-6 text-[#a855f7]" />}
+                    <p className="mt-4 text-sm font-semibold text-violet-200">{premiumProductLabel(product)}</p>
+                    <p className="mt-2 text-2xl font-semibold">{active ? "Active" : "Not active"}</p>
+                    <p className="mt-2 text-sm leading-6 text-violet-100/65">
+                      {product === "proof_pack"
+                        ? `${proofItems.length} delivered proof-pack rows`
+                        : product === "radar"
+                          ? "Recurring buyer-intent dashboard access"
+                          : "Managed niche and territory delivery"}
+                    </p>
+                  </div>
+                );
+              })}
+            </section>
+
+            <section className="mt-8 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+              <div className="rounded-lg border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-xl font-semibold">Proof Pack delivery</h2>
+                    <p className="mt-1 text-sm text-violet-100/65">Rows are created from verified saved live signals when available.</p>
+                  </div>
+                  {proofItems.length > 0 && (
+                    <Link href={`/api/proof-pack/csv?email=${encodeURIComponent(email)}`} className="inline-flex items-center gap-2 rounded-lg border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">
+                      <Download className="h-4 w-4" /> CSV
+                    </Link>
+                  )}
+                </div>
+                <div className="mt-5 grid gap-3">
+                  {proofItems.length === 0 ? (
+                    <p className="rounded-lg border border-white/10 bg-black/20 p-4 text-sm leading-6 text-violet-100/70">
+                      No proof-pack rows are ready yet. If you just submitted onboarding, delivery will complete once verified saved signals are available.
+                    </p>
+                  ) : (
+                    proofItems.slice(0, 10).map((item: { id: string; business_name: string; intent_score: number; pain_point: string; source_url?: string | null }) => (
+                      <div key={item.id} className="rounded-lg border border-white/10 bg-black/20 p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <h3 className="font-semibold">{item.business_name}</h3>
+                          <span className="rounded-lg bg-violet-500/20 px-2.5 py-1 text-sm font-semibold text-violet-100">{item.intent_score}</span>
+                        </div>
+                        <p className="mt-2 text-sm leading-6 text-violet-100/65">{item.pain_point}</p>
+                        {item.source_url && <Link href={item.source_url} className="mt-3 inline-flex text-sm font-semibold text-violet-200 hover:text-white">Open source</Link>}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+                <ShieldCheck className="h-6 w-6 text-[#a855f7]" />
+                <h2 className="mt-4 text-xl font-semibold">Entitlement check</h2>
+                <p className="mt-2 text-sm leading-6 text-violet-100/65">
+                  This workspace did not grant access from a URL plan parameter. It loaded active product rows for {email}.
+                </p>
+                <div className="mt-5 grid gap-2 text-sm text-violet-100/80">
+                  {entitlements.map((item: { id: string; product_code: string; status: string }) => (
+                    <p key={item.id} className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                      {item.product_code} · {item.status}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            </section>
+          </>
+        )}
+      </section>
     </main>
   );
 }

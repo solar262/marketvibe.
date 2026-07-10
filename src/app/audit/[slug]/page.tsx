@@ -132,7 +132,7 @@ export default async function AuditPage({
         <section className="mt-8">
           {lead.sourceStatus !== "live" && (
             <div className="mb-5 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-900">
-              Sample preview. Run Lead Search to create live public-data audit results.
+              Sample preview. Use the MarketVibe engine or Proof Pack flow for current buyer-intent delivery.
             </div>
           )}
           <h2 className="text-xl font-semibold text-slate-950">Visible Issues</h2>
@@ -151,16 +151,16 @@ export default async function AuditPage({
         {!isUnlocked ? (
           <section className="mt-8 rounded-lg border border-slate-200 bg-slate-950 p-6 text-white">
             <LockKeyhole className="h-7 w-7 text-emerald-300" />
-            <h2 className="mt-4 text-2xl font-semibold">Unlock Full Report for this business</h2>
+            <h2 className="mt-4 text-2xl font-semibold">Validate this market with a Proof Pack</h2>
             <p className="mt-2 max-w-2xl text-slate-300">
-              The €19 Full Audit Report unlocks this selected business audit. You get full lead details, all scanner findings, outreach message, fix checklist, suggested service angle, and report-ready content.
+              MarketVibe now sells Proof Pack, Radar, and Growth Desk. The Proof Pack is a one-off €99 buyer-intent sample built from verified saved signals where available.
             </p>
             <div className="mt-5 rounded-md border border-white/10 bg-white/5 p-4 text-sm leading-6 text-slate-200">
-              <strong className="text-white">How buyers can use it:</strong> prepare a stronger pitch, proposal, consultation, or service offer for this business owner. MarketVibe does not guarantee replies, clients, income, or sales.
+              <strong className="text-white">How buyers can use it:</strong> review source-backed opportunities, pain summaries, and outreach angles before committing to recurring Radar delivery. MarketVibe does not guarantee replies, clients, income, or sales.
             </div>
             <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <CheckoutButton product="audit" leadSlug={lead.slug} className="inline-flex items-center justify-center gap-2 rounded-md bg-white px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-slate-100">
-                Pay €19 with Stripe
+              <CheckoutButton product="proof_pack" leadSlug={lead.slug} className="inline-flex items-center justify-center gap-2 rounded-md bg-white px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-slate-100">
+                Buy Proof Pack €99
               </CheckoutButton>
               <Link href="/faq" className="inline-flex items-center justify-center gap-2 rounded-md border border-white/20 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10">
                 <HelpCircle className="h-4 w-4" /> Read Buyer Q&amp;A
@@ -223,7 +223,7 @@ export default async function AuditPage({
         )}
       </div>
 
-      <Link href="/lead-results" className="mt-6 inline-flex text-sm font-semibold text-slate-950 hover:underline">Back to lead results</Link>
+      <Link href="/engine" className="mt-6 inline-flex text-sm font-semibold text-slate-950 hover:underline">Back to engine</Link>
     </main>
   );
 }

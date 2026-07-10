@@ -1,7 +1,7 @@
 const sections = [
   {
     title: "Who we are",
-    body: "MarketVibe Lead Engine helps service sellers find public business opportunities, create audit previews, and manage access to paid reports and lead tools.",
+    body: "MarketVibe helps agencies, consultants, and growth teams review public buyer-intent signals, proof packs, dashboards, and related digital access.",
   },
   {
     title: "Information we collect",
@@ -9,7 +9,7 @@ const sections = [
   },
   {
     title: "How we use information",
-    body: "We use this information to provide the MarketVibe service, send requested lead previews, process purchases, deliver paid access, respond to support requests, improve the website, prevent misuse, and understand which pages and features are working.",
+    body: "We use this information to provide the MarketVibe service, process purchases, deliver paid access, send onboarding and delivery emails, respond to support requests, improve the website, prevent misuse, and understand which pages and features are working.",
   },
   {
     title: "Payments",
@@ -17,11 +17,11 @@ const sections = [
   },
   {
     title: "Email and marketing",
-    body: "If you submit your email address, we may send service emails, requested lead previews, payment/access emails, and relevant MarketVibe follow-up messages. You can unsubscribe from marketing emails where an unsubscribe option is provided, or contact us to request removal.",
+    body: "If you submit your email address, we may send service emails, onboarding emails, payment/access emails, and relevant MarketVibe follow-up messages. You can unsubscribe from marketing emails where an unsubscribe option is provided, or contact us to request removal.",
   },
   {
     title: "Public business data",
-    body: "MarketVibe may display or process publicly visible business information such as business names, websites, public contact pages, generic business emails, phone numbers, social links, and visible website signals. This is used to create lead previews and audit-style reports for users.",
+    body: "MarketVibe may display or process publicly visible business information such as business names, websites, public contact pages, generic business emails, phone numbers, social links, public posts, and visible buyer-intent signals. This is used to create proof packs and dashboard outputs for users.",
   },
   {
     title: "Analytics and cookies",
@@ -49,12 +49,12 @@ export default function PrivacyPage() {
   return (
     <main className="bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_45%,#f8fafc_100%)] px-4 py-12 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-3xl rounded-[2rem] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-950/5 sm:p-8">
-        <p className="text-sm font-semibold text-emerald-700">MarketVibe Lead Engine</p>
+        <p className="text-sm font-semibold text-violet-700">MarketVibe</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">Privacy Policy</h1>
-        <p className="mt-3 text-sm text-slate-500">Last updated: June 2026</p>
+        <p className="mt-3 text-sm text-slate-500">Last updated: July 2026</p>
         <p className="mt-6 leading-7 text-slate-700">
           This Privacy Policy explains how MarketVibe collects, uses, and protects information when you visit the website,
-          request lead previews, use the lead search tools, contact support, or purchase access.
+          request a Proof Pack, use Radar or Growth Desk, contact support, or purchase access.
         </p>
       </div>
 

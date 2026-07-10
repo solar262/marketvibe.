@@ -3,22 +3,22 @@ import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "MarketVibe Terms of Service | Audit Reports and Lead Search",
-  description: "Terms for using MarketVibe Lead Engine, lead search, one-off audit reports, subscriptions, checkout, and buyer responsibilities.",
+  title: "MarketVibe Terms of Service | Proof Pack, Radar, and Growth Desk",
+  description: "Terms for using MarketVibe Proof Pack, Radar, Growth Desk, checkout, digital delivery, and buyer-intent research outputs.",
 };
 
 const sections = [
   {
     title: "Service overview",
-    body: "MarketVibe Lead Engine provides lead-search tools, business opportunity previews, audit-style reports, and related digital access for freelancers, agencies, consultants, and service sellers.",
+    body: "MarketVibe provides buyer-intent research, proof-pack delivery, opportunity dashboards, source context, and related digital access for agencies, consultants, growth teams, and service sellers.",
   },
   {
-    title: "What the €19 Full Audit Report includes",
-    body: "A €19 Full Audit Report unlocks one selected business audit. It may include visible website issues, an opportunity score, contact and booking visibility checks, review/trust-signal notes, a suggested service angle, a ready-to-edit outreach message, and a fix checklist. The audit is for the selected business only and does not include unlimited leads or subscription access.",
+    title: "What the Proof Pack includes",
+    body: "A Proof Pack is a one-off buyer-intent sample. It may include verified saved opportunities, source context where available, pain summaries, intent scores, and outreach angles. MarketVibe does not pad proof packs with fabricated companies or source links.",
   },
   {
-    title: "How audit reports may be used",
-    body: "You may use MarketVibe audit findings to prepare your own pitch, proposal, consultation, service offer, or internal research. You are responsible for how you present, edit, share, or act on the report. You must not present MarketVibe outputs as guaranteed facts, guaranteed results, legal advice, or proof that a business will buy from you.",
+    title: "How MarketVibe outputs may be used",
+    body: "You may use MarketVibe outputs to support your own research, outreach planning, proposals, service offers, or internal prioritization. You are responsible for how you present, edit, share, or act on the information.",
   },
   {
     title: "No guaranteed results",
@@ -38,7 +38,7 @@ const sections = [
   },
   {
     title: "Paid access and subscriptions",
-    body: "Paid audit reports, Starter access, and Pro access are digital products or subscriptions. Prices and included limits may change. Subscription billing is handled by Stripe and continues until cancelled according to Stripe checkout or account billing settings.",
+    body: "Proof Pack is a one-off digital purchase. Radar and Growth Desk are monthly subscriptions. Prices and included delivery may change. Subscription billing is handled by Stripe and continues until cancelled according to Stripe checkout or account billing settings.",
   },
   {
     title: "Refunds and digital delivery",
@@ -46,7 +46,7 @@ const sections = [
   },
   {
     title: "Account and admin access",
-    body: "Admin areas, operator tools, dashboard controls, automation settings, and internal configuration pages are private. Customers should only use public product pages, checkout pages, lead-search tools, and the access links provided after purchase.",
+    body: "Admin areas, operator tools, automation settings, and internal configuration pages are private. Customers should only use public product pages, checkout pages, onboarding pages, dashboards, and the access links provided after purchase.",
   },
   {
     title: "Service availability",
@@ -70,10 +70,10 @@ export default function TermsPage() {
           <ShieldCheck className="h-4 w-4" /> MarketVibe Lead Engine
         </p>
         <h1 className="mt-5 text-3xl font-semibold tracking-tight text-slate-950">Terms of Service</h1>
-        <p className="mt-3 text-sm text-slate-500">Last updated: June 2026</p>
+        <p className="mt-3 text-sm text-slate-500">Last updated: July 2026</p>
         <p className="mt-6 leading-7 text-slate-700">
-          These terms explain how MarketVibe may be used. By using the website, lead-search tools, audit previews,
-          paid reports, or subscription access, you agree to use the service responsibly and lawfully.
+          These terms explain how MarketVibe may be used. By using the website, Proof Pack, Radar,
+          Growth Desk, dashboards, onboarding pages, or subscription access, you agree to use the service responsibly and lawfully.
         </p>
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
           <Link href="/faq" className="inline-flex items-center justify-center rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800">

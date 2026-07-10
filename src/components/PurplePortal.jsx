@@ -462,7 +462,7 @@ function App() {
 function Header({ route, navigate }) {
   return (
     <header className="topbar">
-      <a className="brand" href="/" onClick={(event) => navigate('/', event)} aria-label="MarketVibe home">
+      <button className="brand" type="button" onClick={(event) => navigate('/', event)} aria-label="MarketVibe home">
         <span className="brand-mark">
           <Radar size={22} />
         </span>
@@ -470,7 +470,7 @@ function Header({ route, navigate }) {
           <strong>MarketVibe</strong>
           <small>Buyer-intent radar</small>
         </span>
-      </a>
+      </button>
 
       <nav className="nav-links" aria-label="Primary navigation">
         {navItems.map((item) => (
