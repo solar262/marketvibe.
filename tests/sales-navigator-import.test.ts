@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
+import { createRequire } from "node:module";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import nextConfig from "../next.config";
 import {
   assertSafePublicUrl,
   buildDeliveryCsv,
@@ -20,6 +24,8 @@ import {
   tokenHash,
 } from "../src/lib/sales-navigator-import";
 import { canCustomerAccessDelivery, importProspectsFromRows } from "../src/lib/sales-navigator-persistence";
+
+const localRequire = createRequire(import.meta.url);
 
 async function run() {
 const commaCsv = `First Name,Last Name,Job Title,Company Name,Company Website,LinkedIn Profile URL,Email,Public Signal Text
@@ -113,6 +119,30 @@ for (const route of adminApiRoutes.filter((route) => !route.includes(`${join("ad
   const source = readFileSync(route, "utf8");
   assert.match(source, /requireAdminJson\(\)/, `Admin API route is missing server-side admin protection: ${route}`);
 }
+
+const redirects = await nextConfig.redirects?.();
+assert.equal(
+  redirects?.some((rule) => rule.source === "/admin/import/:path*"),
+  false,
+  "The authenticated CSV Import route must not be redirected back to /admin.",
+);
+
+const adminLayoutSource = readFileSync(join(process.cwd(), "src", "app", "admin", "layout.tsx"), "utf8");
+assert.match(adminLayoutSource, /await\s+requireAdmin\(\)/, "Admin pages must keep server-side admin authentication.");
+
+const adminImportPageSource = readFileSync(join(process.cwd(), "src", "app", "admin", "import", "page.tsx"), "utf8");
+assert.match(adminImportPageSource, /AdminImportConsole/, "The /admin/import route must render the CSV import console.");
+assert.doesNotMatch(adminImportPageSource, /redirect\(\s*["'`]\/admin["'`]/, "The /admin/import page must not redirect to /admin.");
+
+const adminNavSource = readFileSync(join(process.cwd(), "src", "components", "AdminNav.tsx"), "utf8");
+assert.match(adminNavSource, /"CSV Import",\s*"\/admin\/import"/, "Admin navigation must link CSV Import to /admin/import.");
+
+const { AdminImportConsole } = localRequire("../src/components/AdminImportConsole.tsx") as {
+  AdminImportConsole: React.ComponentType;
+};
+const adminImportMarkup = renderToStaticMarkup(React.createElement(AdminImportConsole));
+assert.match(adminImportMarkup, /CSV Import Console/, "The importer route must render the CSV upload/import console.");
+assert.doesNotMatch(adminImportMarkup, /Daily Operations/, "The importer route must not render the admin dashboard.");
 
 const persistenceSource = readFileSync(join(process.cwd(), "src", "lib", "sales-navigator-persistence.ts"), "utf8");
 assert.match(persistenceSource, /status:\s*"email_failed"/, "Delivery failures must be recorded.");
