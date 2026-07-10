@@ -12,13 +12,14 @@ import {
   detectDelimiter,
   inferColumnMapping,
   isPrivateIpAddress,
+  MAX_IMPORT_ROWS,
   normalizeEmail,
   normalizeLinkedInUrl,
   normalizeHttpUrl,
   parseCsvText,
   tokenHash,
 } from "../src/lib/sales-navigator-import";
-import { canCustomerAccessDelivery } from "../src/lib/sales-navigator-persistence";
+import { canCustomerAccessDelivery, importProspectsFromRows } from "../src/lib/sales-navigator-persistence";
 
 async function run() {
 const commaCsv = `First Name,Last Name,Job Title,Company Name,Company Website,LinkedIn Profile URL,Email,Public Signal Text
@@ -88,6 +89,10 @@ assert.equal(isPrivateIpAddress("172.20.1.1"), true);
 assert.equal(isPrivateIpAddress("192.168.1.5"), true);
 await assert.rejects(() => assertSafePublicUrl("http://localhost:3000"), /blocked/i);
 await assert.rejects(() => assertSafePublicUrl("https://www.linkedin.com/in/test"), /blocked/i);
+await assert.rejects(
+  () => importProspectsFromRows({ filename: "too-many.csv", rows: Array.from({ length: MAX_IMPORT_ROWS + 1 }, () => ({})), mapping: {} }),
+  /too many rows/i,
+);
 
 assert.ok(calculateFitScore(linkedinRow) >= 80);
 assert.equal(calculateIntentScore({ ...linkedinRow, public_signal_text: "", public_signal_url: "" }, null), null);
@@ -120,7 +125,7 @@ assert.equal(canCustomerAccessDelivery({ requestedEmail: "other@example.com", ba
 
 const csv = buildDeliveryCsv([
   {
-    full_name: "Avery Stone",
+    full_name: "=Avery Stone",
     job_title: "Head of Operations",
     company_name: "Northstar Test Systems",
     location: "Test City",
@@ -141,6 +146,7 @@ const csv = buildDeliveryCsv([
 ]);
 assert.match(csv, /"Intent Score"/);
 assert.match(csv, /"Intent not evidenced"/);
+assert.match(csv, /"'=Avery Stone"/);
 
 console.log("Sales Navigator CSV importer tests passed.");
 }

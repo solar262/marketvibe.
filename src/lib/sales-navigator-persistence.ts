@@ -12,6 +12,7 @@ import {
   enrichComputedFields,
   evidenceSummary,
   mapRow,
+  MAX_IMPORT_ROWS,
   scanPublicWebsite,
   suggestedOutreachAngle,
   tokenHash,
@@ -74,6 +75,10 @@ export async function importProspectsFromRows({
   rows: Record<string, string>[];
   mapping: ColumnMapping;
 }) {
+  if (rows.length > MAX_IMPORT_ROWS) {
+    throw new Error("CSV has too many rows. Maximum rows per upload is 10,000.");
+  }
+
   const supabase = supabaseOrThrow();
   const computed: ImportedProspectInput[] = [];
   const rejected: Array<{ index: number; reason: string }> = [];

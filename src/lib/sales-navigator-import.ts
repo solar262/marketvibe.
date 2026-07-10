@@ -602,7 +602,12 @@ function extractSocialLinks(html: string, baseUrl: string) {
 }
 
 export function csvEscape(value: unknown) {
-  return `"${String(value ?? "").replaceAll("\"", "\"\"")}"`;
+  return `"${neutralizeCsvFormula(value).replaceAll("\"", "\"\"")}"`;
+}
+
+export function neutralizeCsvFormula(value: unknown) {
+  const text = String(value ?? "");
+  return /^\s*[=+\-@]/.test(text) ? `'${text}` : text;
 }
 
 export function buildDeliveryCsv(rows: Array<Record<string, unknown>>) {
