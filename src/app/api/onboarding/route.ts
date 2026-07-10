@@ -5,6 +5,7 @@ import { recordPremiumOnboarding, saveProofPackItems } from "@/lib/premium-persi
 import { isPremiumProductCode, premiumProductLabel } from "@/lib/premium-products";
 import { verifyPremiumAccess } from "@/lib/premium-access";
 import { appendCustomerAccessParams, createCustomerAccessToken } from "@/lib/customer-access";
+import { createOrUpdateSearchProfileFromOnboarding } from "@/lib/opportunity-engine";
 
 export const runtime = "nodejs";
 
@@ -63,6 +64,23 @@ export async function POST(request: Request) {
     notes: operationalNotes,
   });
 
+  let searchProfileId = "";
+  if (onboarding.onboardingId) {
+    const profile = await createOrUpdateSearchProfileFromOnboarding({
+      onboardingId: onboarding.onboardingId,
+      productCode,
+      email: access.email || email,
+      niche: String(payload.niche || ""),
+      country: String(payload.country || ""),
+      city: String(payload.city || ""),
+      territory: String(payload.territory || ""),
+      serviceOffer: String(payload.serviceOffer || ""),
+      idealBuyer: String(payload.idealBuyer || ""),
+      notes: operationalNotes,
+    });
+    searchProfileId = profile.profileId;
+  }
+
   let savedPackItems = 0;
   if (productCode === "proof_pack" && onboarding.onboardingId) {
     const leads = (await getLatestSavedLeads(80))
@@ -107,6 +125,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     ok: true,
     onboardingId: onboarding.onboardingId,
+    searchProfileId,
     savedPackItems,
     dashboardUrl: appendCustomerAccessParams("/dashboard", access.email || email, createCustomerAccessToken(access.email || email)),
   });

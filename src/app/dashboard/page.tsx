@@ -5,6 +5,8 @@ import { premiumProductLabel, type PremiumProductCode } from "@/lib/premium-prod
 import { getDeliveredProspectsForCustomer, type DeliveredProspect } from "@/lib/sales-navigator-persistence";
 import { resolveCustomerAccess } from "@/lib/customer-access";
 import { BillingPortalButton } from "@/components/BillingPortalButton";
+import { ReplacementRequestForm } from "@/components/ReplacementRequestForm";
+import { getCustomerOpportunityDeliveries } from "@/lib/opportunity-engine";
 
 const products: PremiumProductCode[] = ["proof_pack", "radar", "growth_desk"];
 
@@ -25,6 +27,7 @@ export default async function DashboardPage({
   const entitlements = canLoadPaidWorkspace ? await getPremiumEntitlements(email).catch(() => []) : [];
   const proofItems = canLoadPaidWorkspace ? await getProofPackItems(email).catch(() => []) : [];
   const importedItems: DeliveredProspect[] = email && deliveryToken ? await getDeliveredProspectsForCustomer(email, deliveryToken).catch(() => []) : [];
+  const opportunityItems = canLoadPaidWorkspace ? await getCustomerOpportunityDeliveries(email).catch(() => []) : [];
   const activeProducts = new Set(
     entitlements
       .map((item: { product_code?: unknown }) => asProductCode(item.product_code))
@@ -103,6 +106,58 @@ export default async function DashboardPage({
             )}
 
             <section className="mt-8 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+              {hasAccess && <div className="rounded-lg border border-white/10 bg-white/5 p-5 backdrop-blur-xl lg:col-span-2">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-xl font-semibold">Verified opportunity delivery</h2>
+                    <p className="mt-1 text-sm text-violet-100/65">Source-backed opportunities matched to your onboarding profile.</p>
+                  </div>
+                  {opportunityItems.length > 0 && (
+                    <Link href={`/api/opportunities/csv?${proofCsvParams.toString()}`} className="inline-flex items-center gap-2 rounded-lg border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">
+                      <Download className="h-4 w-4" /> Opportunity CSV
+                    </Link>
+                  )}
+                </div>
+                <div className="mt-5 grid gap-3">
+                  {opportunityItems.length === 0 ? (
+                    <p className="rounded-lg border border-white/10 bg-black/20 p-4 text-sm leading-6 text-violet-100/70">
+                      No autonomous opportunity deliveries are published yet. MarketVibe only publishes records after source, evidence, scoring, freshness, and matching checks pass.
+                    </p>
+                  ) : (
+                    opportunityItems.slice(0, 30).map((assignment: Record<string, unknown>) => {
+                      const item = (assignment.opportunities || {}) as Record<string, unknown>;
+                      const scoreReasons = item.score_reasons && typeof item.score_reasons === "object" ? item.score_reasons as Record<string, unknown> : {};
+                      return (
+                        <div key={String(assignment.id)} className="rounded-lg border border-white/10 bg-black/20 p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <h3 className="font-semibold">{String(item.company_name || "")}</h3>
+                            <span className="rounded-lg bg-violet-500/20 px-2.5 py-1 text-sm font-semibold text-violet-100">Overall {String(item.overall_score || 0)}</span>
+                          </div>
+                          <p className="mt-1 text-sm text-violet-100/70">{[item.contact_full_name, item.contact_job_title].filter(Boolean).map(String).join(" · ") || "No verified decision-maker supplied"}</p>
+                          <p className="mt-2 text-sm leading-6 text-violet-100/65">{String(item.customer_summary || item.source_text || "")}</p>
+                          <div className="mt-3 grid gap-2 text-sm text-violet-100/70 md:grid-cols-4">
+                            <p><span className="font-semibold text-violet-100">Fit:</span> {String(item.fit_score || 0)}</p>
+                            <p><span className="font-semibold text-violet-100">Intent:</span> {String(item.intent_score || 0)}</p>
+                            <p><span className="font-semibold text-violet-100">Evidence:</span> {String(item.evidence_score || 0)}</p>
+                            <p><span className="font-semibold text-violet-100">Freshness:</span> {String(item.freshness_score || 0)}</p>
+                          </div>
+                          <p className="mt-3 text-sm leading-6 text-violet-100/65">
+                            {Array.isArray(scoreReasons.intent) ? scoreReasons.intent.join(" ") : String(item.intent_category || "")}
+                          </p>
+                          <p className="mt-2 text-sm font-semibold text-violet-200">{String(item.recommended_action || "")}</p>
+                          <div className="mt-3 flex flex-wrap gap-3 text-sm">
+                            {item.company_website ? <Link href={String(item.company_website)} className="text-violet-200 hover:text-white">Website</Link> : null}
+                            {item.source_url ? <Link href={String(item.source_url)} className="text-violet-200 hover:text-white">Source evidence</Link> : null}
+                          </div>
+                          <p className="mt-3 text-xs text-violet-100/50">Found {String(item.captured_at || "").slice(0, 10)} · verified {String(item.last_verified_at || "pending").slice(0, 10)} · delivered {String(assignment.delivered_at || "").slice(0, 10)}</p>
+                          <ReplacementRequestForm assignmentId={String(assignment.id)} email={email} accessToken={accessToken} sessionId={sessionId} />
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>}
+
               {hasAccess && <div className="rounded-lg border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>

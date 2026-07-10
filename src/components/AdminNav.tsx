@@ -1,9 +1,11 @@
 import Link from "next/link";
-import { BarChart3, Bot, Database, FileUp, Mail, Search, Settings, ShieldCheck } from "lucide-react";
+import { BarChart3, Bot, Database, FileUp, Mail, Radar, Search, Settings, ShieldCheck } from "lucide-react";
 import { AdminLogoutButton } from "@/components/AdminLogoutButton";
 
 const links = [
   ["Dashboard", "/admin", BarChart3],
+  ["Opportunity Engine", "/admin/opportunity-engine", Radar],
+  ["Inventory", "/admin/inventory", Database],
   ["CSV Import", "/admin/import", FileUp],
   ["Lead Search", "/lead-search", Search],
   ["Autopilot", "/admin/autopilot", Bot],
