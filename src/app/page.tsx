@@ -66,7 +66,7 @@ export default function Home() {
             </div>
 
             <div className="mt-7 grid gap-2 text-xs font-semibold text-violet-100/80 sm:grid-cols-2">
-              {["Verified source context", "No fabricated pack padding", "Stripe checkout", "Brevo delivery"].map((item) => (
+              {["Verified buyer-intent signals", "Clear reasons to reach out", "Practical outreach angles", "Secure dashboard delivery"].map((item) => (
                 <span key={item} className="inline-flex min-w-0 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 backdrop-blur-xl">
                   <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[#a855f7]" /> <span className="truncate">{item}</span>
                 </span>
