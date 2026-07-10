@@ -1,4 +1,5 @@
 import type { AdminLeadSettings, BusinessLead, LeadAudit, LeadSearchInput, ScanFinding } from "./types";
+import { normalizeCustomSearchTerm, type SearchMode } from "./custom-search";
 
 export const countries = ["United Kingdom", "Ireland", "Germany", "France", "Spain", "United States"];
 
@@ -37,6 +38,44 @@ export const leadSettings: AdminLeadSettings = {
   allowedCategories: businessTypes,
 };
 
+export type NormalizedLeadSearchInput = LeadSearchInput & {
+  customSearchTerm: string;
+  searchMode: SearchMode;
+};
+
+function cleanSearchField(value: unknown, fallback: string) {
+  if (typeof value !== "string") return fallback;
+  const cleaned = value.replace(/[\u0000-\u001F\u007F]+/g, " ").replace(/\s+/g, " ").trim();
+  return cleaned || fallback;
+}
+
+export function normalizeLeadSearchInput(input: unknown): NormalizedLeadSearchInput {
+  const candidate = input && typeof input === "object" ? input as Partial<LeadSearchInput> : {};
+  const customSearchTerm = normalizeCustomSearchTerm(candidate.customSearchTerm);
+
+  return {
+    country: cleanSearchField(candidate.country, "United Kingdom"),
+    city: cleanSearchField(candidate.city, "Manchester"),
+    businessType: cleanSearchField(candidate.businessType, "salons"),
+    serviceCategory: cleanSearchField(candidate.serviceCategory, "Web design"),
+    customSearchTerm,
+    searchMode: customSearchTerm ? "custom" : "preset",
+  };
+}
+
+function searchSeed(input: LeadSearchInput) {
+  return normalizeCustomSearchTerm(input.customSearchTerm) || input.businessType;
+}
+
+function businessCategoryLabel(input: LeadSearchInput) {
+  return normalizeCustomSearchTerm(input.customSearchTerm) || input.businessType;
+}
+
+function auditContext(input: LeadSearchInput) {
+  const custom = normalizeCustomSearchTerm(input.customSearchTerm);
+  return custom ? `custom search term "${custom}"` : `${input.businessType} in ${input.city}`;
+}
+
 const baseNames = [
   "Northline",
   "Cedar & Co",
@@ -65,6 +104,7 @@ function categorySingular(category: string) {
 }
 
 function buildAudit(seed: number, name: string, input: LeadSearchInput): LeadAudit {
+  const customSearchTerm = normalizeCustomSearchTerm(input.customSearchTerm);
   const missingCta = seed % 2 === 0;
   const missingBooking = seed % 3 !== 0;
   const slow = seed % 4 === 0;
@@ -89,11 +129,12 @@ function buildAudit(seed: number, name: string, input: LeadSearchInput): LeadAud
   const issues = findings.filter((finding) => finding.found).slice(0, 5).map((finding) => `${finding.label}: ${finding.detail}`);
   const firstIssue = issues[0]?.split(":")[0].toLowerCase() || "online presence gaps";
   const priority = score >= 70 ? "high" : score >= 40 ? "medium" : "low";
-  const service = input.serviceCategory.toLowerCase();
+  const service = customSearchTerm ? "custom market radar" : input.serviceCategory.toLowerCase();
+  const context = auditContext(input);
 
   return {
-    pageTitle: weakMeta ? "" : `${name} | ${categorySingular(input.businessType)} in ${input.city}`,
-    metaDescription: weakMeta ? "" : `Local ${input.businessType} serving customers in ${input.city}.`,
+    pageTitle: weakMeta ? "" : `${name} | ${businessCategoryLabel(input)} in ${input.city}`,
+    metaDescription: weakMeta ? "" : `Public opportunity surfaced from ${context}.`,
     mobileFriendly: !weakMobile,
     pageSpeed: slow ? "slow" : seed % 2 === 0 ? "average" : "fast",
     sslPresent: seed % 7 !== 0,
@@ -108,13 +149,17 @@ function buildAudit(seed: number, name: string, input: LeadSearchInput): LeadAud
     oldCopyrightYear: oldYear,
     score,
     findings,
-    summary: `${name} looks like a ${priority}-priority opportunity because its site shows ${firstIssue} and could convert more local visitors with focused ${service} improvements.`,
+    summary: `${name} looks like a ${priority}-priority opportunity from ${context} because its site shows ${firstIssue} and could convert more local visitors with focused ${service} improvements.`,
     issues,
-    serviceAngle: `Position a practical ${input.serviceCategory.toLowerCase()} improvement around clearer conversion paths, local trust signals, and easier customer contact.`,
-    outreachMessage: `Hi ${name} team,\n\nI was checking ${input.businessType} in ${input.city} and noticed a few small website improvements that could make it easier for customers to contact or book with you. The main thing I spotted was ${firstIssue}.\n\nI put together a short, plain-English audit with the highest-impact fixes. Would you like me to send it over?\n\nBest,\n[Your name]\n\nYou are receiving this because your business contact details appear publicly listed. Reply "unsubscribe" and I will not contact you again.`,
+    serviceAngle: customSearchTerm
+      ? `Position a practical offer around the custom search problem "${customSearchTerm}" and the visible conversion, trust, or contact gaps found in the audit.`
+      : `Position a practical ${input.serviceCategory.toLowerCase()} improvement around clearer conversion paths, local trust signals, and easier customer contact.`,
+    outreachMessage: `Hi ${name} team,\n\nI was checking public opportunities around ${context} and noticed a few small website improvements that could make it easier for customers to contact or book with you. The main thing I spotted was ${firstIssue}.\n\nI put together a short, plain-English audit with the highest-impact fixes. Would you like me to send it over?\n\nBest,\n[Your name]\n\nYou are receiving this because your business contact details appear publicly listed. Reply "unsubscribe" and I will not contact you again.`,
     subjectLine: `Quick website audit for ${name}`,
     priority,
-    suggestedOffer: `Offer a fixed-price ${input.serviceCategory.toLowerCase()} tune-up with clearer calls-to-action, contact visibility, local SEO basics, and review/social proof placement.`,
+    suggestedOffer: customSearchTerm
+      ? `Offer a focused tune-up tied to "${customSearchTerm}" with clearer calls-to-action, contact visibility, local SEO basics, and review/social proof placement.`
+      : `Offer a fixed-price ${input.serviceCategory.toLowerCase()} tune-up with clearer calls-to-action, contact visibility, local SEO basics, and review/social proof placement.`,
     fixChecklist: [
       "Add one prominent call-to-action above the fold.",
       "Make phone, email, and booking/contact routes visible on mobile.",
@@ -205,6 +250,7 @@ async function scanWebsite(website: string): Promise<WebsiteScan> {
 }
 
 function buildLiveAudit(scan: WebsiteScan, name: string, input: LeadSearchInput, email?: string, phone?: string, socialLinks: string[] = []): LeadAudit {
+  const customSearchTerm = normalizeCustomSearchTerm(input.customSearchTerm);
   const html = scan.html;
   const text = stripHtml(html);
   const title = extractFirst(/<title[^>]*>([\s\S]*?)<\/title>/i, html);
@@ -237,6 +283,7 @@ function buildLiveAudit(scan: WebsiteScan, name: string, input: LeadSearchInput,
   const priority = score >= 70 ? "high" : score >= 40 ? "medium" : "low";
   const issues = findings.filter((finding) => finding.found).slice(0, 5).map((finding) => `${finding.label}: ${finding.detail}`);
   const firstIssue = issues[0]?.split(":")[0].toLowerCase() || "online presence gaps";
+  const context = auditContext(input);
 
   return {
     pageTitle: title,
@@ -255,13 +302,17 @@ function buildLiveAudit(scan: WebsiteScan, name: string, input: LeadSearchInput,
     oldCopyrightYear: oldYear,
     score,
     findings,
-    summary: `${name} is a ${priority}-priority live opportunity from public business data because the scanned site shows ${firstIssue}.`,
+    summary: `${name} is a ${priority}-priority live opportunity from ${context} because the scanned site shows ${firstIssue}.`,
     issues,
-    serviceAngle: `Pitch a practical ${input.serviceCategory.toLowerCase()} improvement focused on conversion, contact visibility, local search basics, and trust signals.`,
-    outreachMessage: `Hi ${name} team,\n\nI found your business through publicly available business listing data while checking ${input.businessType} in ${input.city}. I noticed a few website items that may make it harder for customers to contact or book with you, especially ${firstIssue}.\n\nI put together a short, plain-English audit with the main fixes. Would you like me to send it over?\n\nBest,\n[Your name]\n\nYou are receiving this because your business contact details appear publicly listed. Reply "unsubscribe" and I will not contact you again.`,
+    serviceAngle: customSearchTerm
+      ? `Pitch a practical improvement tied to "${customSearchTerm}" and focused on conversion, contact visibility, local search basics, and trust signals.`
+      : `Pitch a practical ${input.serviceCategory.toLowerCase()} improvement focused on conversion, contact visibility, local search basics, and trust signals.`,
+    outreachMessage: `Hi ${name} team,\n\nI found your business through publicly available business listing data while checking ${context}. I noticed a few website items that may make it harder for customers to contact or book with you, especially ${firstIssue}.\n\nI put together a short, plain-English audit with the main fixes. Would you like me to send it over?\n\nBest,\n[Your name]\n\nYou are receiving this because your business contact details appear publicly listed. Reply "unsubscribe" and I will not contact you again.`,
     subjectLine: `Quick website audit for ${name}`,
     priority,
-    suggestedOffer: `Offer a fixed-price ${input.serviceCategory.toLowerCase()} tune-up covering CTA clarity, contact/booking visibility, local SEO metadata, mobile basics, and trust proof.`,
+    suggestedOffer: customSearchTerm
+      ? `Offer a focused tune-up tied to "${customSearchTerm}" covering CTA clarity, contact/booking visibility, local SEO metadata, mobile basics, and trust proof.`
+      : `Offer a fixed-price ${input.serviceCategory.toLowerCase()} tune-up covering CTA clarity, contact/booking visibility, local SEO metadata, mobile basics, and trust proof.`,
     fixChecklist: [
       "Make the primary contact or booking action visible near the top of the page.",
       "Confirm title and meta description are specific to the business and city.",
@@ -289,6 +340,23 @@ function overpassFilter(type: string) {
   return map[type] || ['["shop"]'];
 }
 
+function overpassFiltersForInput(input: LeadSearchInput) {
+  const custom = normalizeCustomSearchTerm(input.customSearchTerm).toLowerCase();
+  if (!custom) return overpassFilter(input.businessType);
+
+  if (/\b(salon|hair|beauty|barber)\b/.test(custom)) return overpassFilter(custom.includes("barber") ? "barbers" : "salons");
+  if (/\b(cafe|coffee)\b/.test(custom)) return overpassFilter("cafes");
+  if (/\b(restaurant|food|takeaway)\b/.test(custom)) return overpassFilter("restaurants");
+  if (/\b(cleaner|cleaning)\b/.test(custom)) return overpassFilter("cleaners");
+  if (/\b(plumber|plumbing)\b/.test(custom)) return overpassFilter("plumbers");
+  if (/\b(roofer|roofing)\b/.test(custom)) return overpassFilter("roofers");
+  if (/\b(dentist|dental)\b/.test(custom)) return overpassFilter("dentists");
+  if (/\b(gym|fitness)\b/.test(custom)) return overpassFilter("gyms");
+  if (/\b(ecommerce|shopify|etsy|store|shop|retail)\b/.test(custom)) return overpassFilter("ecommerce stores");
+
+  return ['["shop"]', '["amenity"]', '["craft"]', '["office"]'];
+}
+
 async function geocodeCity(input: LeadSearchInput) {
   const params = new URLSearchParams({
     q: `${input.city}, ${input.country}`,
@@ -313,7 +381,7 @@ async function geocodeCity(input: LeadSearchInput) {
 function buildOverpassQuery(bbox: string[], input: LeadSearchInput) {
   const [south, north, west, east] = bbox;
   const area = `${south},${west},${north},${east}`;
-  const filters = overpassFilter(input.businessType);
+  const filters = overpassFiltersForInput(input);
   const selectors = filters.flatMap((filter) => [
     `node${filter}["name"]["website"](${area});`,
     `way${filter}["name"]["website"](${area});`,
@@ -326,12 +394,7 @@ function buildOverpassQuery(bbox: string[], input: LeadSearchInput) {
 }
 
 export async function searchLiveLeads(input: LeadSearchInput, limit = 8): Promise<{ leads: BusinessLead[]; sourceNote: string; sourceStatus: "live" | "demo"; sourceUrl?: string }> {
-  const normalized: LeadSearchInput = {
-    country: input.country || "United Kingdom",
-    city: input.city || "Manchester",
-    businessType: input.businessType || "salons",
-    serviceCategory: input.serviceCategory || "Web design",
-  };
+  const normalized = normalizeLeadSearchInput(input);
   const bbox = await geocodeCity(normalized);
   const query = buildOverpassQuery(bbox, normalized);
   const sourceUrl = "https://overpass-api.de/api/interpreter";
@@ -362,6 +425,9 @@ export async function searchLiveLeads(input: LeadSearchInput, limit = 8): Promis
       const socialLinks = [tags["contact:facebook"], tags["contact:instagram"], tags.facebook, tags.instagram].filter(Boolean) as string[];
       const name = tags.name;
       const slug = slugify(`${name}-${normalized.city}-${element.id}`);
+      const profileSearch = normalized.searchMode === "custom"
+        ? `${name} ${normalized.city} ${normalized.customSearchTerm}`
+        : `${name} ${normalized.city}`;
       const lead: BusinessLead = {
         id: String(element.id),
         slug,
@@ -372,12 +438,16 @@ export async function searchLiveLeads(input: LeadSearchInput, limit = 8): Promis
         phone: phones[0],
         city: normalized.city,
         country: normalized.country,
-        businessCategory: normalized.businessType,
-        googleProfileUrl: `https://www.google.com/search?q=${encodeURIComponent(`${name} ${normalized.city}`)}`,
+        businessCategory: businessCategoryLabel(normalized),
+        googleProfileUrl: `https://www.google.com/search?q=${encodeURIComponent(profileSearch)}`,
         socialLinks,
-        source: "LIVE public OpenStreetMap business data via Nominatim geocoding and Overpass API. Website/contact details are only shown when publicly listed or visible on the public business website.",
+        source: normalized.searchMode === "custom"
+          ? `LIVE public OpenStreetMap business data via Nominatim geocoding and Overpass API using custom search seed "${normalized.customSearchTerm}". Website/contact details are only shown when publicly listed or visible on the public business website.`
+          : "LIVE public OpenStreetMap business data via Nominatim geocoding and Overpass API. Website/contact details are only shown when publicly listed or visible on the public business website.",
         sourceStatus: "live",
         sourceUrl,
+        customSearchTerm: normalized.customSearchTerm || undefined,
+        searchMode: normalized.searchMode,
         audit: buildLiveAudit(scan, name, normalized, emails[0], phones[0], socialLinks),
       };
       leads.push(lead);
@@ -389,25 +459,27 @@ export async function searchLiveLeads(input: LeadSearchInput, limit = 8): Promis
 
   return {
     leads: leads.sort((a, b) => b.audit.score - a.audit.score),
-    sourceNote: "LIVE: Results come from public OpenStreetMap data via Nominatim and Overpass, then each listed website is scanned server-side.",
+    sourceNote: normalized.searchMode === "custom"
+      ? `LIVE: Results use custom search seed "${normalized.customSearchTerm}" with public OpenStreetMap data via Nominatim and Overpass, then each listed website is scanned server-side.`
+      : "LIVE: Results come from public OpenStreetMap data via Nominatim and Overpass, then each listed website is scanned server-side.",
     sourceStatus: "live",
     sourceUrl,
   };
 }
 
 export function generateLeads(input: LeadSearchInput, limit = 8): BusinessLead[] {
-  const normalized: LeadSearchInput = {
-    country: input.country || "United Kingdom",
-    city: input.city || "Manchester",
-    businessType: input.businessType || "salons",
-    serviceCategory: input.serviceCategory || "Web design",
-  };
+  const normalized = normalizeLeadSearchInput(input);
+  const seedLabel = searchSeed(normalized);
+  const categoryLabel = businessCategoryLabel(normalized);
 
   return baseNames.slice(0, limit).map((name, index): BusinessLead => {
-    const seed = hash(`${name}-${normalized.city}-${normalized.businessType}`) + index;
-    const brand = `${name} ${categorySingular(normalized.businessType)}`;
+    const seed = hash(`${name}-${normalized.city}-${seedLabel}`) + index;
+    const brand = normalized.searchMode === "custom" ? `${name} Radar Lead` : `${name} ${categorySingular(normalized.businessType)}`;
     const domain = `${slugify(brand)}.${index % 3 === 0 ? "co.uk" : "com"}`;
-    const slug = slugify(`${brand}-${normalized.city}`);
+    const slug = normalized.searchMode === "custom" ? slugify(`${brand}-${normalized.city}-${seedLabel}`) : slugify(`${brand}-${normalized.city}`);
+    const profileSearch = normalized.searchMode === "custom"
+      ? `${brand} ${normalized.city} ${normalized.customSearchTerm}`
+      : `${brand} ${normalized.city}`;
 
     return {
       id: slug,
@@ -419,11 +491,16 @@ export function generateLeads(input: LeadSearchInput, limit = 8): BusinessLead[]
       phone: seed % 3 !== 1 ? `+44 20 ${1000 + seed} ${2000 + index}` : undefined,
       city: normalized.city,
       country: normalized.country,
-      businessCategory: normalized.businessType,
-      googleProfileUrl: `https://www.google.com/search?q=${encodeURIComponent(`${brand} ${normalized.city}`)}`,
+      businessCategory: categoryLabel,
+      googleProfileUrl: `https://www.google.com/search?q=${encodeURIComponent(profileSearch)}`,
       socialLinks: seed % 4 === 1 ? [] : [`https://instagram.com/${slugify(brand)}`, `https://facebook.com/${slugify(brand)}`],
-      source: "Demo public-source connector. Replace with Google Places, Yelp Fusion, DataForSEO, SerpAPI, or an approved local business data provider.",
+      source: normalized.searchMode === "custom"
+        ? `Demo public-source connector using custom search seed "${normalized.customSearchTerm}". Replace with Google Places, Yelp Fusion, DataForSEO, SerpAPI, or an approved local business data provider.`
+        : "Demo public-source connector. Replace with Google Places, Yelp Fusion, DataForSEO, SerpAPI, or an approved local business data provider.",
       sourceStatus: "demo",
+      sourceUrl: normalized.searchMode === "custom" ? `https://www.google.com/search?q=${encodeURIComponent(normalized.customSearchTerm)}` : undefined,
+      customSearchTerm: normalized.customSearchTerm || undefined,
+      searchMode: normalized.searchMode,
       audit: buildAudit(seed, brand, normalized),
     };
   }).sort((a, b) => b.audit.score - a.audit.score);

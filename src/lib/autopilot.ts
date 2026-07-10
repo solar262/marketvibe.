@@ -1,6 +1,7 @@
-import { generateLeads, searchLiveLeads } from "./lead-engine";
+import { generateLeads, normalizeLeadSearchInput, searchLiveLeads } from "./lead-engine";
 import { persistLeadSearch } from "./lead-persistence";
 import { supabaseConnectionStatus } from "./supabase";
+import { normalizeCustomSearchTerm } from "./custom-search";
 import type { BusinessLead, LeadSearchInput } from "./types";
 
 export const autopilotMarkets: LeadSearchInput[] = [
@@ -32,8 +33,11 @@ export function autopilotStatus() {
   };
 }
 
-export async function runLeadHunt({ markets = 1, leads = 2 }: { markets?: number; leads?: number }): Promise<LeadHuntResult[]> {
-  const selectedMarkets = autopilotMarkets.slice(0, Math.max(1, Math.min(markets, autopilotMarkets.length)));
+export async function runLeadHunt({ markets = 1, leads = 2, customSearchTerm = "" }: { markets?: number; leads?: number; customSearchTerm?: string }): Promise<LeadHuntResult[]> {
+  const customTerm = normalizeCustomSearchTerm(customSearchTerm);
+  const selectedMarkets = autopilotMarkets
+    .slice(0, Math.max(1, Math.min(markets, autopilotMarkets.length)))
+    .map((market) => customTerm ? normalizeLeadSearchInput({ ...market, customSearchTerm: customTerm }) : market);
   const leadLimit = Math.max(1, Math.min(leads, 8));
   const results: LeadHuntResult[] = [];
 

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { track } from "@vercel/analytics";
 import { AlertTriangle, CheckCircle2, Copy, ExternalLink, Radar, Search, ShieldCheck, SkipForward } from "lucide-react";
+import { normalizeCustomSearchTerm, searchModeLabel } from "@/lib/custom-search";
 import {
   BUYER_INTENT_QUERY_LIBRARY,
   analyzeFacebookLead,
@@ -45,6 +46,7 @@ export default function FacebookRadarPage() {
   const [targetBuyer, setTargetBuyer] = useState(DEFAULT_BUYER);
   const [niche, setNiche] = useState(DEFAULT_NICHE);
   const [painKeywords, setPainKeywords] = useState(DEFAULT_PAIN);
+  const [customSearchTerm, setCustomSearchTerm] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
   const [postText, setPostText] = useState("");
   const [result, setResult] = useState<FacebookRadarResult | null>(null);
@@ -65,8 +67,14 @@ export default function FacebookRadarPage() {
   const [logs, setLogs] = useState<string[]>([]);
   const [sentLeads, setSentLeads] = useState<FacebookLeadPreview[]>([]);
 
+  const activeCustomSearchTerm = normalizeCustomSearchTerm(customSearchTerm);
+  const searchMode = activeCustomSearchTerm ? "custom" : "preset";
+  const modeText = searchModeLabel(searchMode);
   const allQueries = useMemo(() => [...BUYER_INTENT_QUERY_LIBRARY, ...customQueries], [customQueries]);
-  const searchLinks = useMemo(() => generateFacebookSearchLinks({ targetBuyer, niche, painKeywords: [painKeywords, ...allQueries].join(", ") }), [targetBuyer, niche, painKeywords, allQueries]);
+  const activeTargetBuyer = activeCustomSearchTerm || targetBuyer;
+  const activePainKeywords = activeCustomSearchTerm || painKeywords;
+  const activeScheduleQueries = useMemo(() => activeCustomSearchTerm ? [activeCustomSearchTerm] : allQueries, [activeCustomSearchTerm, allQueries]);
+  const searchLinks = useMemo(() => generateFacebookSearchLinks({ targetBuyer, niche, painKeywords: [painKeywords, ...allQueries].join(", "), customSearchTerm: activeCustomSearchTerm }), [targetBuyer, niche, painKeywords, allQueries, activeCustomSearchTerm]);
   const availableSearchLinks = searchLinks.filter((link) => !searched.includes(link.phrase) && !skippedSearches.includes(link.phrase));
   const activeSearchLink = availableSearchLinks[Math.min(currentSearchIndex, Math.max(availableSearchLinks.length - 1, 0))];
   const sentSignatures = useMemo(() => new Set(sentLeads.map((lead) => lead.id)), [sentLeads]);
@@ -113,7 +121,7 @@ export default function FacebookRadarPage() {
 
   function analyze() {
     const analyzableText = postText.trim() === PASTE_PROMPT ? "" : postText;
-    const next = analyzeFacebookLead({ postText: analyzableText, targetBuyer, painKeywords, sourceUrl });
+    const next = analyzeFacebookLead({ postText: analyzableText, targetBuyer: activeTargetBuyer, painKeywords: activePainKeywords, sourceUrl });
     setResult(next);
     setReplyMode("quick");
     setCopied(false);
@@ -228,6 +236,7 @@ export default function FacebookRadarPage() {
     setTargetBuyer(DEFAULT_BUYER);
     setNiche(DEFAULT_NICHE);
     setPainKeywords(DEFAULT_PAIN);
+    setCustomSearchTerm("");
     setPostText("");
     setSourceUrl("");
     setResetNotice("Search queue reset.");
@@ -267,8 +276,8 @@ export default function FacebookRadarPage() {
 
   function saveSearchPreset() {
     const name = `Preset ${savedPresets.length + 1}`;
-    setSavedPresets((current) => [{ name, queries: allQueries.slice(0, 12) }, ...current]);
-    addLog(`${name} saved with ${Math.min(allQueries.length, 12)} queries.`);
+    setSavedPresets((current) => [{ name, queries: activeScheduleQueries.slice(0, 12) }, ...current]);
+    addLog(`${name} saved with ${Math.min(activeScheduleQueries.length, 12)} queries.`);
   }
 
   function addSchedule(cadence: FacebookRadarSchedule["cadence"]) {
@@ -277,7 +286,7 @@ export default function FacebookRadarPage() {
       name: `${cadence} Facebook buyer-intent search`,
       cadence,
       paused: false,
-      queries: allQueries.slice(0, 10),
+      queries: activeScheduleQueries.slice(0, 10),
     };
     setSchedules((current) => [nextSchedule, ...current]);
     addLog(`Schedule created: ${cadence}. Runs require Facebook API permissions or manual extension use.`);
@@ -310,7 +319,9 @@ export default function FacebookRadarPage() {
           comments: lead.intentRank,
           url: lead.url,
         })),
-        searchPhrase: "manual high-intent preview",
+        searchPhrase: activeCustomSearchTerm || "manual high-intent preview",
+        targetBuyer: activeTargetBuyer,
+        painKeywords: activePainKeywords,
       }),
     });
 
@@ -385,6 +396,20 @@ export default function FacebookRadarPage() {
                 Pain keywords
                 <textarea value={painKeywords} onChange={(event) => setPainKeywords(event.target.value)} rows={2} className="min-h-20 rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/40" />
               </label>
+            </div>
+
+            <div className="mt-3 grid gap-3 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4 md:grid-cols-[1fr_auto] md:items-end">
+              <label className="grid gap-2 text-sm font-semibold text-cyan-50">
+                Custom Search Term
+                <input
+                  value={customSearchTerm}
+                  onBlur={() => setCustomSearchTerm((value) => normalizeCustomSearchTerm(value))}
+                  onChange={(event) => setCustomSearchTerm(event.target.value)}
+                  placeholder="etsy listing removed, shopify product page no sales, agency owner struggling to get clients"
+                  className="rounded-2xl border border-cyan-200/20 bg-slate-950/45 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-200/60"
+                />
+              </label>
+              <span className="rounded-full border border-white/15 bg-white/10 px-4 py-3 text-sm font-bold text-white">{modeText}</span>
             </div>
 
             {mode === "analyze" && (
@@ -629,6 +654,7 @@ export default function FacebookRadarPage() {
               <div>
                 <p className="text-sm font-semibold text-emerald-300">Search queue</p>
                 <h2 className="mt-1 text-2xl font-semibold text-white">Facebook post and group searches</h2>
+                <p className="mt-1 text-sm font-semibold text-cyan-100">{modeText}{activeCustomSearchTerm ? `: ${activeCustomSearchTerm}` : ""}</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <button onClick={resetSearches} className="rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">Reset</button>

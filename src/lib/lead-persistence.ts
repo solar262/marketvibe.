@@ -1,4 +1,5 @@
 import type { BusinessLead, LeadSearchInput } from "./types";
+import { normalizeCustomSearchTerm, type SearchMode } from "./custom-search";
 import { getSupabaseAdmin, supabaseConnectionStatus } from "./supabase";
 
 export type PersistedLeadSearch = {
@@ -11,8 +12,22 @@ function normalizeJsonArray(value: unknown) {
   return Array.isArray(value) ? value : [];
 }
 
-function leadToRow(lead: BusinessLead, searchRunId: string) {
+function discoveryFields(input: { customSearchTerm?: string; searchMode?: SearchMode }) {
+  const customSearchTerm = normalizeCustomSearchTerm(input.customSearchTerm);
   return {
+    custom_search_term: customSearchTerm || null,
+    search_mode: customSearchTerm ? "custom" : input.searchMode === "custom" ? "custom" : "preset",
+  };
+}
+
+function isDiscoveryColumnSchemaError(error: unknown) {
+  const message = String((error as { message?: unknown })?.message || error || "").toLowerCase();
+  return message.includes("custom_search_term") || message.includes("search_mode") || message.includes("schema cache");
+}
+
+function leadToRow(lead: BusinessLead, searchRunId: string, includeDiscoveryColumns = true) {
+  const fields = discoveryFields(lead);
+  const row = {
     search_run_id: searchRunId,
     external_id: lead.id,
     audit_slug: lead.slug,
@@ -32,8 +47,11 @@ function leadToRow(lead: BusinessLead, searchRunId: string) {
     raw_data: {
       googleProfileUrl: lead.googleProfileUrl,
       sourceStatus: lead.sourceStatus,
+      customSearchTerm: fields.custom_search_term,
+      searchMode: fields.search_mode,
     },
   };
+  return includeDiscoveryColumns ? { ...row, ...fields } : row;
 }
 
 function auditToRow(lead: BusinessLead, leadId: string, searchRunId: string) {
@@ -95,33 +113,58 @@ export async function persistLeadSearch({
     return { saved: false, error: "Supabase server writes are not configured. Add NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY." };
   }
 
-  const { data: searchRun, error: searchError } = await supabase
+  const fields = discoveryFields(input);
+  const searchRunRow = {
+    country: input.country,
+    city: input.city,
+    business_type: input.businessType,
+    service_category: input.serviceCategory,
+    source_status: sourceStatus,
+    status: errorMessage ? "failed" : "completed",
+    source_note: sourceNote || null,
+    source_url: sourceUrl || null,
+    result_count: leads.length,
+    error_message: errorMessage || null,
+  };
+  let useDiscoveryColumns = true;
+  let { data: searchRun, error: searchError } = await supabase
     .from("search_runs")
-    .insert({
-      country: input.country,
-      city: input.city,
-      business_type: input.businessType,
-      service_category: input.serviceCategory,
-      source_status: sourceStatus,
-      status: errorMessage ? "failed" : "completed",
-      source_note: sourceNote || null,
-      source_url: sourceUrl || null,
-      result_count: leads.length,
-      error_message: errorMessage || null,
-    })
+    .insert({ ...searchRunRow, ...fields })
     .select("id")
     .single();
+
+  if (searchError && isDiscoveryColumnSchemaError(searchError)) {
+    useDiscoveryColumns = false;
+    const retry = await supabase
+      .from("search_runs")
+      .insert(searchRunRow)
+      .select("id")
+      .single();
+    searchRun = retry.data;
+    searchError = retry.error;
+  }
 
   if (searchError || !searchRun) {
     return { saved: false, error: searchError?.message || "Search run was not saved." };
   }
 
   for (const lead of leads) {
-    const { data: savedLead, error: leadError } = await supabase
+    let { data: savedLead, error: leadError } = await supabase
       .from("leads")
-      .upsert(leadToRow(lead, searchRun.id), { onConflict: "audit_slug" })
+      .upsert(leadToRow(lead, searchRun.id, useDiscoveryColumns), { onConflict: "audit_slug" })
       .select("id")
       .single();
+
+    if (leadError && useDiscoveryColumns && isDiscoveryColumnSchemaError(leadError)) {
+      useDiscoveryColumns = false;
+      const retry = await supabase
+        .from("leads")
+        .upsert(leadToRow(lead, searchRun.id, false), { onConflict: "audit_slug" })
+        .select("id")
+        .single();
+      savedLead = retry.data;
+      leadError = retry.error;
+    }
 
     if (leadError || !savedLead) {
       return { saved: false, searchRunId: searchRun.id, error: leadError?.message || `Lead ${lead.businessName} was not saved.` };
@@ -151,6 +194,9 @@ export async function getAuditBySlugFromSupabase(slug: string): Promise<Business
 
   if (error || !data || !data.leads) return null;
   const leadRow = data.leads as Record<string, unknown>;
+  const rawData = leadRow.raw_data && typeof leadRow.raw_data === "object" ? leadRow.raw_data as Record<string, unknown> : {};
+  const customSearchTerm = normalizeCustomSearchTerm(leadRow.custom_search_term || rawData.customSearchTerm);
+  const searchMode: SearchMode = customSearchTerm || leadRow.search_mode === "custom" || rawData.searchMode === "custom" ? "custom" : "preset";
 
   return {
     id: String(leadRow.external_id || leadRow.id),
@@ -168,6 +214,8 @@ export async function getAuditBySlugFromSupabase(slug: string): Promise<Business
     source: String(leadRow.source),
     sourceStatus: leadRow.source_status === "live" ? "live" : "demo",
     sourceUrl: leadRow.source_url ? String(leadRow.source_url) : undefined,
+    customSearchTerm: customSearchTerm || undefined,
+    searchMode,
     audit: {
       pageTitle: String(data.page_title || ""),
       metaDescription: String(data.meta_description || ""),

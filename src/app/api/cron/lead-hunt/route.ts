@@ -7,7 +7,8 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const markets = Number(url.searchParams.get("markets") || "1");
   const leads = Number(url.searchParams.get("leads") || "2");
-  const results = await runLeadHunt({ markets, leads });
+  const customSearchTerm = url.searchParams.get("customSearchTerm") || url.searchParams.get("custom_search_term") || "";
+  const results = await runLeadHunt({ markets, leads, customSearchTerm });
   const savedLeadCount = results.reduce((total, result) => total + (result.saved ? result.leads.length : 0), 0);
 
   return NextResponse.json({

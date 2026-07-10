@@ -37,6 +37,7 @@
   const HIGH_INTENT_IMPORT_THRESHOLD = 78;
   const STUCK_RECOVERY_MS = 45000;
   const LOADING_RECOVERY_MS = 30000;
+  const AUTO_RESTART_DELAY_MS = 30000;
   const ACTION_TIMEOUT_MS = 15000;
   const CONTROL_POLL_MS = 2000;
   const OUTREACH_MODES = ["off", "draft-only", "manual-approval", "allowed-adapters"];
@@ -1111,23 +1112,37 @@
       nodes.push(node);
     };
 
+    // First add any explicit dialogs/modals and return early if they exist.
+    // Scanning with elementsFromPoint can be expensive on heavy Facebook pages
+    // (causing the page to become unresponsive), so when a dialog is open
+    // we only inspect the dialog content.
     document.querySelectorAll('[role="dialog"], [aria-modal="true"]').forEach(addNode);
+    if (nodes.length) {
+      return nodes.slice(0, MAX_VISIBLE_SCAN_NODES).filter((node) => getPostText(node).length >= 35);
+    }
 
+    // Throttled sampling across the viewport to avoid long-running loops.
     if (typeof document.elementsFromPoint === "function") {
       const xSamples = [0.34, 0.5, 0.66].map((ratio) => Math.max(12, Math.round(window.innerWidth * ratio)));
-      for (let y = 72; y <= window.innerHeight - 48; y += 150) {
-        for (const x of xSamples) {
-          for (const element of document.elementsFromPoint(x, y)) {
-            const candidate = element instanceof Element ? element.closest(candidateSelector) : null;
+      const maxRows = Math.min(4, Math.max(1, Math.floor(window.innerHeight / 300)));
+      for (let row = 0; row < maxRows; row += 1) {
+        // spread rows evenly, leave top/bottom padding
+        const y = 72 + Math.round((window.innerHeight - 120) * (row / Math.max(1, maxRows - 1)));
+        try {
+          const elements = document.elementsFromPoint(xSamples[1], y);
+          for (const el of elements) {
+            const candidate = el instanceof Element ? el.closest(candidateSelector) : null;
             if (candidate) addNode(candidate);
             if (nodes.length >= MAX_VISIBLE_SCAN_NODES) break;
           }
-          if (nodes.length >= MAX_VISIBLE_SCAN_NODES) break;
+        } catch (e) {
+          // elementsFromPoint may throw on some browsers/pages; ignore and continue
         }
         if (nodes.length >= MAX_VISIBLE_SCAN_NODES) break;
       }
     }
 
+    // Final fallback: query a small set of article-like elements.
     if (!nodes.length) {
       for (const node of Array.from(document.querySelectorAll('[role="article"], div[aria-posinset]')).slice(0, MAX_VISIBLE_SCAN_NODES)) addNode(node);
     }
@@ -1560,13 +1575,14 @@
     if (extensionReloadRequired) return true;
     const state = getLeadHuntState();
     if (!state?.runId) return false;
+    if (!state.active && !state.paused && autoRestartStoppedLeadHunt(state)) return true;
     try {
       const response = await fetchWithTimeout(STATUS_API_URL, { headers: await internalHeaders({ "Content-Type": "application/json" }) }, 8000);
       if (!response.ok) return false;
       const remote = await response.json();
       if (!remote || remote.runId !== state.runId) return false;
       if (remote.active === false && state.active) {
-        stopLeadHunt(remote.status || "Stopped from MarketVibe dashboard.", { sync: false });
+        stopLeadHunt(remote.status || "Stopped from MarketVibe dashboard.", { sync: false, autoRestartDisabled: true });
         return true;
       }
       if (remote.paused && !state.paused) {
@@ -1632,7 +1648,16 @@
     clearLeadHuntTimers();
     stopLeadHuntControlPoller();
     if (state) {
-      const stoppedState = { ...state, active: false, paused: false, currentLock: "", status: message, stoppedAt: Date.now(), nextActionAt: 0 };
+      const stoppedState = {
+        ...state,
+        active: false,
+        paused: false,
+        currentLock: "",
+        status: message,
+        stoppedAt: Date.now(),
+        nextActionAt: 0,
+        autoRestartDisabled: options.autoRestartDisabled === true,
+      };
       if (options.sync === false) {
         localStorage.setItem(LEAD_HUNT_KEY, JSON.stringify(stoppedState));
         renderLeadHuntPanel();
@@ -1643,6 +1668,37 @@
     logLeadHunt("hunt completed", { message });
     postLeadHuntEvent("LEAD_HUNT_STOP", { message, sourceUrl: location.href });
     showStatus(message);
+  }
+
+  function shouldAutoRestartStoppedState(state) {
+    return Boolean(
+      state &&
+      !state.active &&
+      !state.paused &&
+      !state.extensionReloadRequired &&
+      !state.autoRestartDisabled &&
+      Number(state.stoppedAt || 0) > 0 &&
+      Date.now() - Number(state.stoppedAt || 0) >= AUTO_RESTART_DELAY_MS
+    );
+  }
+
+  function autoRestartStoppedLeadHunt(state) {
+    if (!shouldAutoRestartStoppedState(state)) return false;
+    const nextState = {
+      ...state,
+      active: true,
+      paused: false,
+      currentLock: "",
+      status: "Buyer Radar auto-restart after 30 seconds stopped.",
+      nextActionAt: Date.now() + 250,
+      stoppedAt: 0,
+      autoRestartDisabled: false,
+      errors: [`Auto-restarted after 30 seconds stopped.`, ...(state.errors || [])].slice(0, 8),
+    };
+    saveLeadHuntState(nextState);
+    postLeadHuntEvent("LEAD_HUNT_AUTO_RESTART", { message: "Buyer Radar auto-restart after 30-second stop", runId: state.runId || "", sourceUrl: location.href });
+    ensureLeadHuntRunner("auto restart stopped lead hunt");
+    return true;
   }
 
   function leadHuntDelay(state) {
@@ -1783,7 +1839,7 @@
     }
     const state = getLeadHuntState();
     if (state) {
-      const resumedState = { ...state, active: true, paused: false, currentLock: "", importAuthStatus: /key connected|internal api key/i.test(message) ? "Connected" : state.importAuthStatus || "", status: message, nextActionAt: Date.now() + 250 };
+      const resumedState = { ...state, active: true, paused: false, currentLock: "", importAuthStatus: /key connected|internal api key/i.test(message) ? "Connected" : state.importAuthStatus || "", status: message, nextActionAt: Date.now() + 250, autoRestartDisabled: false };
       if (options.sync === false) {
         localStorage.setItem(LEAD_HUNT_KEY, JSON.stringify(resumedState));
         renderLeadHuntPanel();
@@ -2351,6 +2407,11 @@
     const runtimeEnd = state?.active && !state?.extensionReloadRequired && !extensionReloadRequired ? Date.now() : Number(state?.stoppedAt || Date.now());
     const runtimeSeconds = state?.startedAt ? Math.max(0, Math.round((runtimeEnd - state.startedAt) / 1000)) : 0;
     const autoDmPrepEnabled = isAutoDmPrepEnabled();
+    const autoRestartNotice = !state?.active && !state?.paused && state?.stoppedAt
+      ? state.autoRestartDisabled
+        ? "Auto-restart disabled."
+        : `Auto-restart after ${Math.ceil(Math.max(0, AUTO_RESTART_DELAY_MS - (Date.now() - Number(state.stoppedAt || 0))) / 1000)}s.`
+      : "";
     const badgeColor = runLabel === "Extension Reload Required"
       ? "rgba(251,113,133,.22)"
       : runLabel === "Paused"
@@ -2389,6 +2450,7 @@
       </div>
       <div style="display:inline-block;border-radius:999px;background:${badgeColor};color:white;padding:4px 8px;font-weight:900;margin-bottom:8px;">${runLabel}</div>
       <div style="line-height:1.45;color:#e5eef9;margin-bottom:8px;">${state?.status || "Ready. Internal buyer discovery only. No auto-send or auto-comment."}</div>
+      ${autoRestartNotice ? `<div style="line-height:1.45;color:#a5f3fc;margin-bottom:8px;font-size:12px;">${autoRestartNotice}</div>` : ""}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;color:#cbd5e1;">
         <div>Query: ${search?.query || "not started"}</div>
         <div>Source: ${search?.source || "none"}</div>
@@ -2425,6 +2487,27 @@
     start.textContent = "Start Buyer Radar";
     start.style.cssText = "border:0;border-radius:999px;background:#10b981;color:#03131f;font-weight:900;padding:8px 10px;cursor:pointer;";
     start.addEventListener("click", () => startLeadHunt(defaultLeadHuntConfig()));
+    const restart = document.createElement("button");
+    restart.type = "button";
+    restart.textContent = "Restart now";
+    restart.style.cssText = "border:1px solid rgba(59,130,246,.55);border-radius:999px;background:linear-gradient(90deg,#3b82f6,#60a5fa);color:white;font-weight:800;padding:8px 10px;cursor:pointer;";
+    restart.addEventListener("click", () => {
+      const state = getLeadHuntState();
+      try {
+        if (state && !state.active) {
+          // Resume an existing stopped run (user-initiated restart overrides autoRestartDisabled)
+          resumeLeadHunt("Restarted by user.");
+        } else if (!state) {
+          // No prior state: start a fresh run
+          startLeadHunt(defaultLeadHuntConfig());
+        } else {
+          showStatus("Buyer Radar already running.");
+        }
+      } catch (e) {
+        showStatus("Restart failed: " + (e && e.message ? e.message : "unknown"));
+      }
+      renderLeadHuntPanel();
+    });
     const pause = document.createElement("button");
     pause.type = "button";
     pause.textContent = state?.paused ? "Resume" : "Pause";
@@ -2434,7 +2517,7 @@
     stop.type = "button";
     stop.textContent = "Stop";
     stop.style.cssText = "border:1px solid rgba(251,113,133,.55);border-radius:999px;background:rgba(255,255,255,.08);color:white;font-weight:800;padding:8px 10px;cursor:pointer;";
-    stop.addEventListener("click", () => stopLeadHunt());
+    stop.addEventListener("click", () => stopLeadHunt("Buyer Radar stopped by user.", { autoRestartDisabled: true }));
     const skip = document.createElement("button");
     skip.type = "button";
     skip.textContent = "Skip current";
@@ -2452,7 +2535,8 @@
       showStatus(enabled ? "Auto DM prep enabled. Messages are copied and profile/post pages are opened; send manually." : "Auto DM prep disabled.");
       renderLeadHuntPanel();
     });
-    controls.append(start, pause, skip, stop, autoDm);
+    restart.disabled = Boolean(state?.active);
+    controls.append(start, restart, pause, skip, stop, autoDm);
     panel.appendChild(controls);
   }
 
@@ -2761,8 +2845,11 @@
   installStoredKeyResumeListener();
   parseLeadHuntLaunch();
   ensureLeadHuntControlPoller();
-  if (getLeadHuntState()?.active) {
+  const initialState = getLeadHuntState();
+  if (initialState?.active) {
     ensureLeadHuntRunner("active state detected");
+  } else if (autoRestartStoppedLeadHunt(initialState)) {
+    // restarted automatically after being stopped for 30+ seconds.
   }
   renderRecentImports();
   renderQueueControls();

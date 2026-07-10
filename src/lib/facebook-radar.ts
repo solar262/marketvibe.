@@ -25,6 +25,7 @@ export type FacebookRadarSearchInput = {
   targetBuyer: string;
   niche: string;
   painKeywords: string;
+  customSearchTerm?: string;
 };
 
 export type FacebookRadarSearchLink = {
@@ -253,6 +254,20 @@ export function createDefaultFacebookFilters(): FacebookRadarFilters {
 }
 
 export function generateFacebookSearchLinks(input: FacebookRadarSearchInput): FacebookRadarSearchLink[] {
+  const customSearchTerm = cleanText(input.customSearchTerm || "");
+  if (customSearchTerm) {
+    const fitScore = Math.max(55, marketVibeSearchScore(customSearchTerm));
+    return [{
+      phrase: customSearchTerm,
+      fitScore,
+      goodSignals: SEARCH_GOOD_SIGNALS,
+      skipSignals: SEARCH_SKIP_SIGNALS,
+      reason: `Custom search seed: "${customSearchTerm}". Use visible Facebook results only and continue only when posts show buyer intent.`,
+      postsUrl: facebookPostsUrl(customSearchTerm),
+      groupsUrl: facebookGroupsUrl(customSearchTerm),
+    }];
+  }
+
   const painTerms = splitTerms(input.painKeywords);
   const niches = nicheVariants([input.targetBuyer, input.niche, input.painKeywords].join(" "));
   const precisePains = [

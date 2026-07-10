@@ -1,3 +1,5 @@
+import type { SearchMode } from "./custom-search";
+
 export type Category = {
   id: string;
   name: string;
@@ -77,6 +79,8 @@ export type LeadSearchInput = {
   city: string;
   businessType: string;
   serviceCategory: string;
+  customSearchTerm?: string;
+  searchMode?: SearchMode;
 };
 
 export type ScanFinding = {
@@ -129,6 +133,8 @@ export type BusinessLead = {
   source: string;
   sourceStatus?: "live" | "demo";
   sourceUrl?: string;
+  customSearchTerm?: string;
+  searchMode?: SearchMode;
   audit: LeadAudit;
 };
 

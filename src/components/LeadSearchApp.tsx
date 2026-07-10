@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { ArrowRight, Building2, Globe2, Loader2, MapPin, Search, ShieldCheck } from "lucide-react";
 import { track } from "@vercel/analytics";
 import { businessTypes, countries, serviceCategories } from "@/lib/lead-engine";
+import { normalizeCustomSearchTerm, searchModeLabel } from "@/lib/custom-search";
 import type { BusinessLead, LeadSearchInput } from "@/lib/types";
 
 const defaultInput: LeadSearchInput = {
@@ -12,6 +13,8 @@ const defaultInput: LeadSearchInput = {
   city: "Manchester",
   businessType: "salons",
   serviceCategory: "Web design",
+  customSearchTerm: "",
+  searchMode: "preset",
 };
 
 const SEARCH_STATE_KEY = "marketvibe_lead_search_state_v1";
@@ -51,28 +54,36 @@ export function LeadSearchApp({ initialLeads = [] }: { initialLeads?: BusinessLe
   const [loading, setLoading] = useState(false);
   const [sourceNote, setSourceNote] = useState(() => readSavedSearchState()?.sourceNote || (initialLeads.length ? "Sample previews are shown until you run a live public data search." : ""));
   const [sourceStatus, setSourceStatus] = useState<"live" | "demo" | "idle">(() => readSavedSearchState()?.sourceStatus || (initialLeads.length ? "demo" : "idle"));
+  const customSearchTerm = normalizeCustomSearchTerm(input.customSearchTerm);
+  const searchMode = customSearchTerm ? "custom" : "preset";
+  const modeText = searchModeLabel(searchMode);
 
   useEffect(() => {
     writeSavedSearchState({ input, leads, sourceNote, sourceStatus });
   }, [input, leads, sourceNote, sourceStatus]);
 
   async function runSearch() {
+    const requestInput: LeadSearchInput = { ...input, customSearchTerm, searchMode };
+    setInput(requestInput);
     setLoading(true);
-    track("lead_search_submit", input);
-    const response = await fetch("/api/leads", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    });
-    const data = await response.json();
-    const nextLeads = data.leads || [];
-    const nextSourceNote = data.sourceNote || "";
-    const nextSourceStatus = data.sourceStatus || "idle";
-    setLeads(nextLeads);
-    setSourceNote(nextSourceNote);
-    setSourceStatus(nextSourceStatus);
-    writeSavedSearchState({ input, leads: nextLeads, sourceNote: nextSourceNote, sourceStatus: nextSourceStatus });
-    setLoading(false);
+    track("lead_search_submit", { ...requestInput, searchMode });
+    try {
+      const response = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestInput),
+      });
+      const data = await response.json();
+      const nextLeads = data.leads || [];
+      const nextSourceNote = data.sourceNote || "";
+      const nextSourceStatus = data.sourceStatus || "idle";
+      setLeads(nextLeads);
+      setSourceNote(nextSourceNote);
+      setSourceStatus(nextSourceStatus);
+      writeSavedSearchState({ input: requestInput, leads: nextLeads, sourceNote: nextSourceNote, sourceStatus: nextSourceStatus });
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -85,6 +96,10 @@ export function LeadSearchApp({ initialLeads = [] }: { initialLeads?: BusinessLe
         </div>
 
         <div className="mt-6 grid gap-4">
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+            <span className="text-sm font-semibold text-emerald-950">Search Mode</span>
+            <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-emerald-900 shadow-sm">{modeText}</span>
+          </div>
           <label className="grid gap-2 text-sm font-semibold text-slate-700">
             Country
             <select className="rounded-xl border border-slate-300 bg-white px-3 py-3 font-normal shadow-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100" value={input.country} onChange={(event) => setInput({ ...input, country: event.target.value })}>
@@ -107,6 +122,16 @@ export function LeadSearchApp({ initialLeads = [] }: { initialLeads?: BusinessLe
               {serviceCategories.map((category) => <option key={category}>{category}</option>)}
             </select>
           </label>
+          <label className="grid gap-2 text-sm font-semibold text-slate-700">
+            Custom Search Term
+            <input
+              className="rounded-xl border border-slate-300 px-3 py-3 font-normal shadow-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+              value={input.customSearchTerm || ""}
+              onBlur={() => setInput((current) => ({ ...current, customSearchTerm: normalizeCustomSearchTerm(current.customSearchTerm), searchMode }))}
+              onChange={(event) => setInput({ ...input, customSearchTerm: event.target.value })}
+              placeholder="etsy listing removed, shopify product page no sales, agency owner struggling to get clients"
+            />
+          </label>
         </div>
 
         <button onClick={runSearch} disabled={loading} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-950/15 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70">
@@ -126,6 +151,7 @@ export function LeadSearchApp({ initialLeads = [] }: { initialLeads?: BusinessLe
             <p className="text-sm font-semibold text-emerald-700">Dashboard results</p>
             <h2 className="mt-1 text-2xl font-semibold text-slate-950">Lead opportunities</h2>
             <p className="mt-1 text-sm text-slate-600">{leads.length ? `${leads.length} businesses ranked by sales opportunity score.` : "Run a search to generate leads."}</p>
+            <p className="mt-2 text-sm font-semibold text-emerald-700">{modeText}{customSearchTerm ? `: ${customSearchTerm}` : ""}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {sourceStatus !== "idle" && (
@@ -153,6 +179,9 @@ export function LeadSearchApp({ initialLeads = [] }: { initialLeads?: BusinessLe
                     <MapPin className="h-4 w-4 text-emerald-700" /> {lead.city}, {lead.country}
                     <Building2 className="h-4 w-4 text-emerald-700" /> {lead.businessCategory}
                   </p>
+                  {lead.searchMode === "custom" && lead.customSearchTerm && (
+                    <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-emerald-700">Custom search: {lead.customSearchTerm}</p>
+                  )}
                   <p className="mt-4 text-sm leading-6 text-slate-700">{lead.audit.summary}</p>
                   <div className="mt-4 grid min-w-0 gap-2 text-sm text-slate-600 sm:grid-cols-2">
                     <span className="min-w-0 break-words">Website: <a className="font-medium text-slate-950 underline" href={lead.website} target="_blank" rel="noreferrer">{lead.website}</a></span>

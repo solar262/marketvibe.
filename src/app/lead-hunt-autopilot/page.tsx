@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Download, ExternalLink, Pause, Play, RefreshCw, Square } from "lucide-react";
+import { normalizeCustomSearchTerm, searchModeLabel } from "@/lib/custom-search";
 
 type SourceKey = "facebook" | "google" | "bing";
 type OutreachMode = "off" | "draft-only" | "manual-approval" | "allowed-adapters";
@@ -94,6 +95,7 @@ export default function LeadHuntAutopilotPage() {
   const [delayMs, setDelayMs] = useState(3500);
   const [confidenceThreshold, setConfidenceThreshold] = useState(78);
   const [outreachMode, setOutreachMode] = useState<OutreachMode>("draft-only");
+  const [customSearchTerm, setCustomSearchTerm] = useState("");
   const [status, setStatus] = useState("Ready. Click Run Buyer Radar to launch the browser extension workflow.");
   const [internalKey, setInternalKey] = useState("");
   const [internalKeyStatus, setInternalKeyStatus] = useState<InternalKeyStatus>("Missing key");
@@ -129,6 +131,10 @@ export default function LeadHuntAutopilotPage() {
     if (sources.bing) labels.push("Bing indexed Facebook results");
     return labels;
   }, [sources]);
+  const activeCustomSearchTerm = normalizeCustomSearchTerm(customSearchTerm);
+  const searchMode = activeCustomSearchTerm ? "custom" : "preset";
+  const modeText = searchModeLabel(searchMode);
+  const activeQueries = useMemo(() => activeCustomSearchTerm ? [activeCustomSearchTerm] : LEAD_HUNT_QUERIES, [activeCustomSearchTerm]);
 
   async function refreshImports() {
     const response = await fetch("/api/internal-marketing-leads", { cache: "no-store" });
@@ -262,17 +268,18 @@ export default function LeadHuntAutopilotPage() {
 
   function runLeadHunt() {
     const runId = globalThis.crypto?.randomUUID?.() || `hunt-${Date.now()}`;
+    const firstQuery = activeQueries[0] || LEAD_HUNT_QUERIES[0];
     setRuntimeSeconds(0);
     setLiveProgress({
       runId,
       active: true,
       paused: false,
       recoveryNeeded: false,
-      query: LEAD_HUNT_QUERIES[0],
+      query: firstQuery,
       source: enabledSourceLabels[0] || "No source enabled",
       currentUrl: "",
       currentItem: 1,
-      totalQueued: Math.min(maxSearches, LEAD_HUNT_QUERIES.length * enabledSourceLabels.length),
+      totalQueued: Math.min(maxSearches, activeQueries.length * enabledSourceLabels.length),
       completed: 0,
       imported: 0,
       skipped: 0,
@@ -287,12 +294,14 @@ export default function LeadHuntAutopilotPage() {
     setStatus("Buyer Radar launched. The extension will open internal buyer-intent searches, collect high-confidence service-seller matches, and stop at your caps.");
     const config = {
       runId,
-      queries: LEAD_HUNT_QUERIES,
+      queries: activeQueries,
+      customSearchTerm: activeCustomSearchTerm,
+      searchMode,
       sources,
       caps: { maxSearches, maxImportedLeads, delayMs, confidenceThreshold },
       outreach: { mode: outreachMode, adapters: [] as string[] },
     };
-    window.open(`https://www.facebook.com/search/posts/?q=${encodeURIComponent(LEAD_HUNT_QUERIES[0])}#marketvibeLeadHunt=${encodeURIComponent(JSON.stringify(config))}`, "_blank", "noopener,noreferrer");
+    window.open(`https://www.facebook.com/search/posts/?q=${encodeURIComponent(firstQuery)}#marketvibeLeadHunt=${encodeURIComponent(JSON.stringify(config))}`, "_blank", "noopener,noreferrer");
   }
 
   async function pauseLeadHunt() {
@@ -484,6 +493,20 @@ export default function LeadHuntAutopilotPage() {
         <div className="mt-6 grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
           <section className="rounded-[2rem] border border-white/10 bg-white/[0.06] p-5">
             <h2 className="text-2xl font-semibold">Queue setup</h2>
+            <div className="mt-4 grid gap-3 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label htmlFor="buyer-radar-custom-search-term" className="text-sm font-bold text-cyan-50">Custom Search Term</label>
+                <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-black text-white">{modeText}</span>
+              </div>
+              <input
+                id="buyer-radar-custom-search-term"
+                value={customSearchTerm}
+                onBlur={() => setCustomSearchTerm((value) => normalizeCustomSearchTerm(value))}
+                onChange={(event) => setCustomSearchTerm(event.target.value)}
+                placeholder="etsy listing removed, shopify product page no sales, agency owner struggling to get clients"
+                className="rounded-2xl border border-cyan-200/20 bg-slate-950/60 px-4 py-3 text-white placeholder:text-slate-500"
+              />
+            </div>
             <div className="mt-4 grid gap-3">
               {([
                 ["facebook", "Facebook Search"],
@@ -536,6 +559,12 @@ export default function LeadHuntAutopilotPage() {
 
           <section className="rounded-[2rem] border border-white/10 bg-white/[0.06] p-5">
             <h2 className="text-2xl font-semibold">Query presets</h2>
+            <p className="mt-2 text-sm font-bold text-cyan-100">{modeText}{activeCustomSearchTerm ? `: ${activeCustomSearchTerm}` : ""}</p>
+            {activeCustomSearchTerm && (
+              <div className="mt-4 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 text-sm font-semibold text-cyan-50">
+                Active custom queue: {activeCustomSearchTerm}
+              </div>
+            )}
             <div className="mt-4 grid gap-2 sm:grid-cols-2">
               {LEAD_HUNT_QUERIES.map((query) => (
                 <div key={query} className="rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm font-semibold text-slate-100">{query}</div>
