@@ -1,86 +1,114 @@
 import Stripe from "stripe";
 import { addContactToMarketVibeList, addOrUpdateContact, scheduleBuyerSequence, sendTransactionalEmail } from "./brevo";
+import {
+  isLegacyProductCode,
+  isPremiumProductCode,
+  legacyProductMap,
+  onboardingPathForProduct,
+  premiumProductLabel,
+  premiumProducts,
+  type CheckoutProductCode,
+  type PremiumProductCode,
+} from "./premium-products";
+import {
+  recordCompletedPremiumOrder,
+  upsertPremiumEntitlement,
+} from "./premium-persistence";
 
-export type MarketVibeProduct = "audit" | "starter" | "pro";
+export type MarketVibeProduct = CheckoutProductCode;
 
 type DeliveryInput = {
   email: string;
-  product: MarketVibeProduct;
+  product: PremiumProductCode;
+  requestedProduct?: CheckoutProductCode;
   leadSlug?: string;
   sessionId?: string;
 };
 
-const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://marketvibe1.com";
+const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.marketvibe1.com";
 
-function productLabel(product: MarketVibeProduct) {
-  if (product === "starter") return "MarketVibe Starter";
-  if (product === "pro") return "MarketVibe Pro";
-  return "MarketVibe Full Audit Report";
+function accessUrl(product: PremiumProductCode, requestedProduct?: CheckoutProductCode, leadSlug?: string, sessionId?: string, email?: string) {
+  if (requestedProduct === "audit" && leadSlug) return `${baseUrl}/audit/${leadSlug}?unlocked=1`;
+  if (product === "proof_pack") return `${baseUrl}${onboardingPathForProduct("proof_pack", sessionId, email)}`;
+  if (product === "growth_desk") return `${baseUrl}${onboardingPathForProduct("growth_desk", sessionId, email)}`;
+  return `${baseUrl}/dashboard?email=${encodeURIComponent(email || "")}`;
 }
 
-function accessUrl(product: MarketVibeProduct, leadSlug?: string) {
-  if (product === "audit" && leadSlug) return `${baseUrl}/audit/${leadSlug}?unlocked=1`;
-  if (product === "starter" || product === "pro") return `${baseUrl}/dashboard?plan=${product}`;
-  return `${baseUrl}/lead-search`;
-}
-
-export function classifyStripeSession(session: Stripe.Checkout.Session): MarketVibeProduct {
-  const product = session.metadata?.product;
-  if (product === "starter" || product === "pro" || product === "audit") return product;
+export function classifyStripeSession(session: Stripe.Checkout.Session): PremiumProductCode {
+  const product = session.metadata?.product_code || session.metadata?.product || session.metadata?.plan;
+  if (isPremiumProductCode(product)) return product;
+  if (isLegacyProductCode(product)) return legacyProductMap[product];
 
   if (session.mode === "subscription") {
     const amount = session.amount_total || 0;
-    return amount >= 4900 ? "pro" : "starter";
+    return amount >= premiumProducts.growth_desk.amount ? "growth_desk" : "radar";
   }
 
-  return "audit";
+  return "proof_pack";
 }
 
-export async function sendBuyerDeliveryEmail({ email, product, leadSlug, sessionId }: DeliveryInput) {
+export function requestedProductFromSession(session: Stripe.Checkout.Session): CheckoutProductCode {
+  const requested = session.metadata?.requested_product || session.metadata?.product || session.metadata?.plan;
+  if (isPremiumProductCode(requested) || isLegacyProductCode(requested)) return requested;
+  return classifyStripeSession(session);
+}
+
+export async function sendBuyerDeliveryEmail({ email, product, requestedProduct, leadSlug, sessionId }: DeliveryInput) {
   const normalizedEmail = email.trim().toLowerCase();
-  const label = productLabel(product);
-  const access = accessUrl(product, leadSlug);
-  const leadSearchUrl = `${baseUrl}/lead-search`;
+  const label = premiumProductLabel(product);
+  const access = accessUrl(product, requestedProduct, leadSlug, sessionId, normalizedEmail);
   const pricingUrl = `${baseUrl}/pricing`;
   const supportUrl = `${baseUrl}/contact`;
+  const dashboardUrl = `${baseUrl}/dashboard?email=${encodeURIComponent(normalizedEmail)}`;
 
   await addOrUpdateContact(normalizedEmail, {
     SOURCE: "stripe_buyer",
     PRODUCT: product,
     PLAN: product,
+    REQUESTED_PRODUCT: requestedProduct || product,
     LEAD_SLUG: leadSlug || "",
     STRIPE_SESSION_ID: sessionId || "",
-    FUNNEL_STAGE: "buyer",
+    FUNNEL_STAGE: "premium_buyer",
   });
   await addContactToMarketVibeList(normalizedEmail, {
     SOURCE: "stripe_buyer",
     PRODUCT: product,
     PLAN: product,
     STRIPE_SESSION_ID: sessionId || "",
-    FUNNEL_STAGE: "buyer",
+    FUNNEL_STAGE: "premium_buyer",
   });
+
+  const nextStep =
+    product === "proof_pack"
+      ? "Complete the onboarding form so we can prepare your buyer-intent pack without padding it with unverified results."
+      : product === "growth_desk"
+        ? "Complete the onboarding form so we can set up your niche, territory, and managed opportunity workflow."
+        : "Open your dashboard to start reviewing scored buyer-intent opportunities.";
 
   const htmlContent = `
     <p>Hi,</p>
-    <p>Your ${label} access is ready.</p>
-    <p><a href="${access}">Open your MarketVibe access</a></p>
-    <p>You can also run new searches here: <a href="${leadSearchUrl}">${leadSearchUrl}</a></p>
-    <p>To upgrade or compare plans: <a href="${pricingUrl}">${pricingUrl}</a></p>
-    <p>If anything looks wrong, use support here: <a href="${supportUrl}">${supportUrl}</a></p>
+    <p>Your ${label} purchase is confirmed.</p>
+    <p>${nextStep}</p>
+    <p><a href="${access}">Continue with ${label}</a></p>
+    <p>Dashboard: <a href="${dashboardUrl}">${dashboardUrl}</a></p>
+    <p>Pricing and upgrades: <a href="${pricingUrl}">${pricingUrl}</a></p>
+    <p>Support: <a href="${supportUrl}">${supportUrl}</a></p>
     <p>MarketVibe</p>
   `;
 
   const textContent = `Hi,
 
-Your ${label} access is ready.
+Your ${label} purchase is confirmed.
 
-Open your MarketVibe access:
+${nextStep}
+
+Continue:
 ${access}
 
-Run new searches:
-${leadSearchUrl}
+Dashboard:
+${dashboardUrl}
 
-Upgrade or compare plans:
+Pricing and upgrades:
 ${pricingUrl}
 
 Support:
@@ -90,7 +118,7 @@ MarketVibe`;
 
   await sendTransactionalEmail({
     to: normalizedEmail,
-    subject: `Your ${label} access is ready`,
+    subject: `Your ${label} purchase is confirmed`,
     htmlContent,
     textContent,
   });
@@ -102,14 +130,26 @@ export async function deliverStripeSession(session: Stripe.Checkout.Session) {
   if (!email) return { ok: false, error: "Stripe session has no customer email." };
 
   const product = classifyStripeSession(session);
-  const leadSlug = session.metadata?.leadSlug || session.client_reference_id || undefined;
+  const requestedProduct = requestedProductFromSession(session);
+  const leadSlug = session.metadata?.leadSlug || session.metadata?.lead_slug || session.client_reference_id || undefined;
+
+  await recordCompletedPremiumOrder(session);
+  await upsertPremiumEntitlement({
+    email,
+    productCode: product,
+    status: "active",
+    stripeCustomerId: typeof session.customer === "string" ? session.customer : undefined,
+    stripeSubscriptionId: typeof session.subscription === "string" ? session.subscription : undefined,
+    metadata: session.metadata || {},
+  });
 
   await sendBuyerDeliveryEmail({
     email,
     product,
+    requestedProduct,
     leadSlug,
     sessionId: session.id,
   });
 
-  return { ok: true, email, product, leadSlug: leadSlug || "" };
+  return { ok: true, email, product, requestedProduct, leadSlug: leadSlug || "" };
 }

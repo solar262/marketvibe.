@@ -15,12 +15,6 @@ export default function ImpressumPage() {
         <p className="mt-2 text-slate-700">Contact email: hello@marketvibe1.com</p>
         <p className="mt-2 text-slate-700">Region: EU / Austria-based online service</p>
       </div>
-      <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-5 text-amber-950">
-        <h2 className="font-semibold">Important</h2>
-        <p className="mt-2 leading-7">
-          The exact legal operator name, postal address, VAT number, and registration details should be added here if required for the business setup.
-        </p>
-      </div>
     </main>
   );
 }

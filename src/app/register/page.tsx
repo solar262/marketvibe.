@@ -2,7 +2,7 @@ import Link from "next/link";
 import { inputClass } from "@/lib/ui";
 
 export default function RegisterPage() {
-  return <AuthShell title="Register" action="Create account" note="In production, connect this form to Supabase Auth and assign Free, Starter, or Pro plan limits after Stripe checkout." />;
+  return <AuthShell title="Register" action="Create account" note="In production, connect this form to Supabase Auth and assign Proof Pack, Radar, or Growth Desk entitlements after Stripe checkout." />;
 }
 
 function AuthShell({ title, action, note }: { title: string; action: string; note: string }) {
