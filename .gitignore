@@ -1,0 +1,12 @@
+node_modules
+dist
+.playwright-cli
+*.log
+.env
+data/*.sqlite
+data/*.sqlite-*
+data/mail
+public/proofpacks/*.pdf
+public/proofpacks/*.csv
+.DS_Store
+*.local
