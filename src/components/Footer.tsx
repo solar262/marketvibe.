@@ -25,6 +25,11 @@ export function Footer() {
             <Link href="/privacy">Privacy</Link>
             <Link href="/terms">Terms</Link>
             <Link href="/refund-policy">Refund Policy</Link>
+            <Link href="/billing-help">Billing Help</Link>
+            <Link href="/acceptable-use">Acceptable Use</Link>
+            <Link href="/data-requests">Data Requests</Link>
+            <Link href="/security">Security</Link>
+            <Link href="/cookies">Cookies</Link>
             <Link href="/impressum">Legal Notice</Link>
           </div>
         </div>

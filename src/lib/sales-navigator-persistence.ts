@@ -2,6 +2,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { sendTransactionalEmail } from "@/lib/brevo";
 import { getPremiumEntitlements } from "@/lib/premium-persistence";
 import type { PremiumProductCode } from "@/lib/premium-products";
+import { appendCustomerAccessParams, createCustomerAccessToken } from "@/lib/customer-access";
 import {
   buildDeliveryCsv,
   buildDedupeKey,
@@ -473,7 +474,9 @@ export async function publishProspects({
   if (csvReadyError) throw csvReadyError;
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.marketvibe1.com";
-  const dashboardUrl = `${baseUrl}/dashboard?email=${encodeURIComponent(email)}&delivery_token=${encodeURIComponent(token)}`;
+  const accessToken = createCustomerAccessToken(email);
+  const dashboardPath = appendCustomerAccessParams("/dashboard", email, accessToken);
+  const dashboardUrl = `${baseUrl}${dashboardPath}&delivery_token=${encodeURIComponent(token)}`;
   const csvUrl = `${baseUrl}/api/proof-pack/csv?email=${encodeURIComponent(email)}&delivery_token=${encodeURIComponent(token)}`;
 
   try {

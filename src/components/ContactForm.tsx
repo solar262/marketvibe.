@@ -5,16 +5,31 @@ import { inputClass } from "@/lib/ui";
 
 export function ContactForm({ offer }: { offer: string }) {
   const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (loading) return;
+    setLoading(true);
+    setError("");
+    setSent(false);
     const form = new FormData(event.currentTarget);
-    await fetch("/api/contact", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(Object.fromEntries(form.entries())),
-    });
-    setSent(true);
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(Object.fromEntries(form.entries())),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Message could not be sent.");
+      setSent(true);
+      event.currentTarget.reset();
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "Message could not be sent.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -41,8 +56,11 @@ export function ContactForm({ offer }: { offer: string }) {
         Message
         <textarea required name="message" rows={5} className={inputClass} />
       </label>
-      <button className="rounded-md bg-stone-950 px-4 py-3 text-sm font-semibold text-white">Send message</button>
-      {sent && <p className="rounded-md bg-violet-50 p-3 text-sm text-violet-900">Message sent.</p>}
+      <button disabled={loading} className="rounded-md bg-stone-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">
+        {loading ? "Sending..." : "Send message"}
+      </button>
+      {sent && <p className="rounded-md bg-violet-50 p-3 text-sm text-violet-900">Message received. We will reply by email when operator review is needed.</p>}
+      {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     </form>
   );
 }

@@ -25,16 +25,16 @@ const features = [
   [Radar, "Radar feeds", "Ongoing delivery for agencies and growth teams that need fresher opportunity flow."],
 ] as const;
 
-const testimonials = [
-  ["Agency founder", "The proof pack made it clear which niches were worth pursuing before we added another sales tool."],
-  ["SEO consultant", "The signals gave us a cleaner reason to contact prospects instead of opening with a generic audit."],
-  ["Growth operator", "Radar turned scattered public pain into a weekly list the team could actually work from."],
+const safeguards = [
+  ["Source-backed delivery", "Opportunities are delivered with source context where available, and unevidenced intent is labelled instead of invented."],
+  ["Operator review", "Proof Pack and imported CSV delivery stay behind review, assignment, and publish steps before customer access."],
+  ["Responsible outreach", "MarketVibe outputs are research support. Customers are responsible for lawful, accurate, non-spam outreach."],
 ] as const;
 
 const metrics = [
-  ["Signals delivered", "12.4k"],
-  ["Agencies onboard", "37"],
-  ["Pipeline value", "€2.1m"],
+  ["Proof Pack", "€99 one-off"],
+  ["Radar", "€299/month"],
+  ["Growth Desk", "€750/month"],
 ] as const;
 
 export default function Home() {
@@ -142,11 +142,11 @@ export default function Home() {
       <section className="border-b border-white/10 bg-[linear-gradient(180deg,#10071c_0%,#08030f_100%)]">
         <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
           <div className="grid gap-4 lg:grid-cols-3">
-            {testimonials.map(([name, quote]) => (
-              <figure key={name} className="rounded-lg border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
-                <blockquote className="text-sm leading-6 text-violet-50/80">&ldquo;{quote}&rdquo;</blockquote>
-                <figcaption className="mt-4 text-sm font-semibold text-violet-200">{name}</figcaption>
-              </figure>
+            {safeguards.map(([name, body]) => (
+              <article key={name} className="rounded-lg border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+                <h3 className="text-sm font-semibold text-violet-200">{name}</h3>
+                <p className="mt-3 text-sm leading-6 text-violet-50/80">{body}</p>
+              </article>
             ))}
           </div>
           <div className="mt-6 grid gap-4 md:grid-cols-3">

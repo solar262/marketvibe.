@@ -34,7 +34,7 @@ export const premiumProducts: Record<PremiumProductCode, PremiumProduct> = {
     mode: "subscription",
     description: "Ongoing buyer-intent dashboard access with scored opportunities, pain summaries, saved opportunities, and CSV export.",
     entitlement: "radar",
-    successDestination: "/dashboard",
+    successDestination: "/onboarding/radar",
   },
   growth_desk: {
     code: "growth_desk",

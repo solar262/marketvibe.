@@ -4,6 +4,7 @@ import { sendTransactionalEmail } from "@/lib/brevo";
 import { recordPremiumOnboarding, saveProofPackItems } from "@/lib/premium-persistence";
 import { isPremiumProductCode, premiumProductLabel } from "@/lib/premium-products";
 import { verifyPremiumAccess } from "@/lib/premium-access";
+import { appendCustomerAccessParams, createCustomerAccessToken } from "@/lib/customer-access";
 
 export const runtime = "nodejs";
 
@@ -31,6 +32,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `${key} is required.` }, { status: 400 });
     }
   }
+  if (payload.acknowledgement !== "yes") {
+    return NextResponse.json({ error: "The acknowledgement is required." }, { status: 400 });
+  }
+
+  const operationalNotes = [
+    String(payload.notes || "").trim(),
+    String(payload.exclusions || "").trim() ? `Exclusions: ${String(payload.exclusions).trim()}` : "",
+    String(payload.opportunityPreferences || "").trim() ? `Opportunity preferences: ${String(payload.opportunityPreferences).trim()}` : "",
+    String(payload.dashboardChecklist || "").trim() ? `Dashboard checklist: ${String(payload.dashboardChecklist).trim()}` : "",
+    String(payload.exportPreferences || "").trim() ? `Export preferences: ${String(payload.exportPreferences).trim()}` : "",
+    String(payload.dealValue || "").trim() ? `Typical deal value: ${String(payload.dealValue).trim()}` : "",
+    String(payload.deliveryRecipients || "").trim() ? `Delivery recipients: ${String(payload.deliveryRecipients).trim()}` : "",
+    String(payload.reportingPreference || "").trim() ? `Reporting preference: ${String(payload.reportingPreference).trim()}` : "",
+  ].filter(Boolean).join("\n\n");
 
   const onboarding = await recordPremiumOnboarding({
     productCode,
@@ -45,7 +60,7 @@ export async function POST(request: Request) {
     territory: String(payload.territory || ""),
     serviceOffer: String(payload.serviceOffer || ""),
     idealBuyer: String(payload.idealBuyer || ""),
-    notes: String(payload.notes || ""),
+    notes: operationalNotes,
   });
 
   let savedPackItems = 0;
@@ -68,6 +83,8 @@ export async function POST(request: Request) {
   }
 
   try {
+    const accessToken = createCustomerAccessToken(access.email || email);
+    const dashboardUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://www.marketvibe1.com"}${appendCustomerAccessParams("/dashboard", access.email || email, accessToken)}`;
     await sendTransactionalEmail({
       to: access.email || email,
       subject: `${premiumProductLabel(productCode)} onboarding received`,
@@ -79,9 +96,9 @@ export async function POST(request: Request) {
             : "We are processing verified opportunities. We will not pad your pack with fabricated companies or source links."
           : "Your access is being prepared from your niche and territory details."
         }</p>
-        <p><a href="${process.env.NEXT_PUBLIC_APP_URL || "https://www.marketvibe1.com"}/dashboard?email=${encodeURIComponent(access.email || email)}">Open your dashboard</a></p>
+        <p><a href="${dashboardUrl}">Open your dashboard</a></p>
       `,
-      textContent: `Your ${premiumProductLabel(productCode)} onboarding has been received.\n\nOpen your dashboard:\n${process.env.NEXT_PUBLIC_APP_URL || "https://www.marketvibe1.com"}/dashboard?email=${encodeURIComponent(access.email || email)}`,
+      textContent: `Your ${premiumProductLabel(productCode)} onboarding has been received.\n\nOpen your dashboard:\n${dashboardUrl}`,
     });
   } catch (error) {
     console.warn("premium_onboarding_email_failed", error);
@@ -91,6 +108,6 @@ export async function POST(request: Request) {
     ok: true,
     onboardingId: onboarding.onboardingId,
     savedPackItems,
-    dashboardUrl: `/dashboard?email=${encodeURIComponent(access.email || email)}`,
+    dashboardUrl: appendCustomerAccessParams("/dashboard", access.email || email, createCustomerAccessToken(access.email || email)),
   });
 }

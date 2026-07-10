@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CheckCircle2, HelpCircle, ShieldCheck } from "lucide-react";
+import { supportAnswers } from "@/lib/support-content";
+import { SupportAssistant } from "@/components/SupportAssistant";
 
 export const metadata: Metadata = {
   title: "MarketVibe FAQ | Proof Pack, Radar, and Growth Desk",
@@ -15,41 +17,6 @@ const proofPoints = [
   "Server-side entitlements",
   "Brevo onboarding and delivery e-mails",
 ];
-
-const questions = [
-  [
-    "What is the Proof Pack?",
-    "Proof Pack is a one-off buyer-intent sample. After checkout, onboarding captures your niche and territory so MarketVibe can prepare a focused pack from verified saved signals where available.",
-  ],
-  [
-    "What is Radar?",
-    "Radar is monthly buyer-intent dashboard access for teams that want recurring opportunity review, intent scoring, pain summaries, filtering, and export support.",
-  ],
-  [
-    "What is Growth Desk?",
-    "Growth Desk is managed monthly delivery for a focused niche or territory, with priority filtering, reporting, and support.",
-  ],
-  [
-    "Am I guaranteed to get clients?",
-    "No. MarketVibe does not guarantee replies, clients, income, rankings, revenue, or sales. It helps you research and prioritize opportunities with better context.",
-  ],
-  [
-    "What happens after I pay?",
-    "Stripe returns you to MarketVibe. The webhook records the order, creates an entitlement, sends a Brevo access e-mail, and routes Proof Pack or Growth Desk buyers through onboarding.",
-  ],
-  [
-    "Does the dashboard trust URL plan parameters?",
-    "No. Dashboard access checks server-side paid entitlements tied to the billing email rather than granting access from a plan query string.",
-  ],
-  [
-    "Where does the information come from?",
-    "MarketVibe uses saved public signal data and visible source context where available. Proof Packs should not be padded with fabricated companies or source links.",
-  ],
-  [
-    "Who is MarketVibe for?",
-    "MarketVibe is built for agencies, consultants, growth operators, and service sellers who need better buyer-intent context before outreach.",
-  ],
-] as const;
 
 export default function FAQPage() {
   return (
@@ -74,6 +41,9 @@ export default function FAQPage() {
             <Link href="/sample" className="mt-6 inline-flex w-full items-center justify-center rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-500 px-5 py-3 text-sm font-semibold text-white hover:brightness-110">
               Get proof pack
             </Link>
+            <Link href="/contact?offer=support" className="mt-3 inline-flex w-full items-center justify-center rounded-lg border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10">
+              Contact support
+            </Link>
           </div>
 
           <div className="min-w-0">
@@ -85,11 +55,16 @@ export default function FAQPage() {
               </p>
             </div>
 
+            <div className="mt-6">
+              <SupportAssistant />
+            </div>
+
             <section className="mt-6 grid gap-4">
-              {questions.map(([question, answer]) => (
-                <article key={question} className="min-w-0 rounded-lg border border-white/10 bg-white/5 p-5 shadow-lg shadow-black/10 backdrop-blur-xl">
-                  <h2 className="font-semibold text-white">{question}</h2>
-                  <p className="mt-2 text-sm leading-6 text-violet-100/65">{answer}</p>
+              {supportAnswers.map((item) => (
+                <article key={item.question} className="min-w-0 rounded-lg border border-white/10 bg-white/5 p-5 shadow-lg shadow-black/10 backdrop-blur-xl">
+                  <h2 className="font-semibold text-white">{item.question}</h2>
+                  <p className="mt-2 text-sm leading-6 text-violet-100/65">{item.answer}</p>
+                  {item.href && <Link href={item.href} className="mt-3 inline-flex text-sm font-semibold text-violet-200 hover:text-white">Related page</Link>}
                 </article>
               ))}
             </section>

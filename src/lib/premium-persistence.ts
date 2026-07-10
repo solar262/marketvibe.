@@ -129,12 +129,17 @@ export async function updateEntitlementForSubscription(subscription: Stripe.Subs
   const stripeSubscriptionId = subscription.id;
   const active = subscription.status === "active" || subscription.status === "trialing";
   const status = statusOverride || (active ? "active" : subscription.status === "past_due" ? "past_due" : "cancelled");
+  const subscriptionTiming = subscription as unknown as { current_period_end?: number; cancel_at_period_end?: boolean };
+  const periodEnd = typeof subscriptionTiming.current_period_end === "number"
+    ? new Date(subscriptionTiming.current_period_end * 1000).toISOString()
+    : null;
+  const cancelAtPeriodEnd = Boolean(subscriptionTiming.cancel_at_period_end);
 
   const { error } = await supabase
     .from("premium_entitlements")
     .update({
       status,
-      ends_at: status === "active" ? null : new Date().toISOString(),
+      ends_at: status === "active" ? (cancelAtPeriodEnd ? periodEnd : null) : periodEnd || new Date().toISOString(),
       updated_at: new Date().toISOString(),
       metadata: { stripe_status: subscription.status },
     })
@@ -171,6 +176,7 @@ export async function getPremiumEntitlement(email: string, productCode: PremiumP
     .eq("customer_email", normalizedEmail(email))
     .eq("product_code", productCode)
     .eq("status", "active")
+    .or(`ends_at.is.null,ends_at.gt.${new Date().toISOString()}`)
     .maybeSingle();
 
   if (error) throw error;
@@ -186,6 +192,7 @@ export async function getPremiumEntitlements(email: string) {
     .select("*")
     .eq("customer_email", normalizedEmail(email))
     .eq("status", "active")
+    .or(`ends_at.is.null,ends_at.gt.${new Date().toISOString()}`)
     .order("created_at", { ascending: false });
 
   if (error) throw error;

@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { buildCheckoutSessionParams } from "../src/lib/premium-checkout";
 import { classifyStripeSession, requestedProductFromSession } from "../src/lib/buyer-delivery";
 import { normalizeCheckoutProduct, premiumProducts } from "../src/lib/premium-products";
+import { createCustomerAccessToken, verifyCustomerAccessToken } from "../src/lib/customer-access";
 
 function fakeSession(input: Partial<Stripe.Checkout.Session>): Stripe.Checkout.Session {
   return input as Stripe.Checkout.Session;
@@ -90,5 +91,11 @@ assert.equal(
   requestedProductFromSession(fakeSession({ mode: "payment", metadata: { requested_product: "audit", product_code: "proof_pack" } })),
   "audit",
 );
+
+process.env.CUSTOMER_ACCESS_SECRET = "test-customer-access-secret";
+const token = createCustomerAccessToken("Buyer@Example.com");
+assert.ok(token);
+assert.equal(verifyCustomerAccessToken("buyer@example.com", token), true);
+assert.equal(verifyCustomerAccessToken("other@example.com", token), false);
 
 console.log("Premium product checkout and classification tests passed.");

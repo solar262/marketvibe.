@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getProofPackItems } from "@/lib/premium-persistence";
 import { verifyPremiumAccess } from "@/lib/premium-access";
 import { buildCustomerDeliveryCsv } from "@/lib/sales-navigator-persistence";
+import { csvEscape } from "@/lib/sales-navigator-import";
+import { resolveCustomerAccess } from "@/lib/customer-access";
 
 export const runtime = "nodejs";
 
@@ -10,6 +12,7 @@ export async function GET(request: Request) {
   const email = url.searchParams.get("email") || "";
   const deliveryToken = url.searchParams.get("delivery_token") || "";
   const sessionId = url.searchParams.get("session_id") || "";
+  const accessToken = url.searchParams.get("access_token") || "";
   if (!email) return NextResponse.json({ error: "email is required." }, { status: 400 });
 
   if (deliveryToken) {
@@ -25,16 +28,14 @@ export async function GET(request: Request) {
     });
   }
 
-  if (!sessionId) {
-    return NextResponse.json({ error: "A secure delivery token or paid session is required." }, { status: 403 });
-  }
-
-  const access = await verifyPremiumAccess({ productCode: "proof_pack", sessionId, email });
-  if (!access.ok) {
+  const access = sessionId
+    ? await verifyPremiumAccess({ productCode: "proof_pack", sessionId, email })
+    : await resolveCustomerAccess({ email, accessToken });
+  if (!access.ok || access.email.trim().toLowerCase() !== email.trim().toLowerCase()) {
     return NextResponse.json({ error: "Paid access could not be verified." }, { status: 403 });
   }
 
-  const items = await getProofPackItems(email);
+  const items = await getProofPackItems(access.email);
   const rows = [
     ["business_name", "website", "source_url", "intent_score", "pain_point", "outreach_angle"],
     ...items.map((item) => [
@@ -46,7 +47,7 @@ export async function GET(request: Request) {
       item.outreach_angle,
     ]),
   ];
-  const csv = rows.map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(",")).join("\n");
+  const csv = rows.map((row) => row.map(csvEscape).join(",")).join("\n");
   return new Response(csv, {
     headers: {
       "content-type": "text/csv; charset=utf-8",
