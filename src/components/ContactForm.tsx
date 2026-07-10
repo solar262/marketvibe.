@@ -4,17 +4,35 @@ import { useState } from "react";
 import { inputClass } from "@/lib/ui";
 
 export function ContactForm({ offer }: { offer: string }) {
-  const [sent, setSent] = useState(false);
+  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [errorMessage, setErrorMessage] = useState("");
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    await fetch("/api/contact", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(Object.fromEntries(form.entries())),
-    });
-    setSent(true);
+    setStatus("sending");
+    setErrorMessage("");
+
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(Object.fromEntries(form.entries())),
+      });
+
+      const result = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(result?.error || "Your message could not be sent. Please try again.");
+      }
+
+      formElement.reset();
+      setStatus("sent");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Your message could not be sent. Please try again.");
+      setStatus("error");
+    }
   }
 
   return (
@@ -41,8 +59,18 @@ export function ContactForm({ offer }: { offer: string }) {
         Message
         <textarea required name="message" rows={5} className={inputClass} />
       </label>
-      <button className="rounded-md bg-stone-950 px-4 py-3 text-sm font-semibold text-white">Send message</button>
-      {sent && <p className="rounded-md bg-violet-50 p-3 text-sm text-violet-900">Message sent.</p>}
+      <button
+        disabled={status === "sending"}
+        className="rounded-md bg-stone-950 px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {status === "sending" ? "Sending…" : "Send message"}
+      </button>
+      {status === "sent" && (
+        <p className="rounded-md bg-violet-50 p-3 text-sm text-violet-900">Message sent.</p>
+      )}
+      {status === "error" && (
+        <p className="rounded-md bg-red-50 p-3 text-sm text-red-800">{errorMessage}</p>
+      )}
     </form>
   );
 }
