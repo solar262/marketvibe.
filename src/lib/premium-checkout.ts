@@ -1,5 +1,6 @@
 import Stripe from "stripe";
 import { hydrateCart, orderNumber } from "@/lib/checkout";
+import { resolveProofPackPrice } from "@/lib/proof-pack-pricing";
 import type { CartItem } from "@/lib/types";
 import {
   isLegacyProductCode,
@@ -27,6 +28,7 @@ export type BuildCheckoutInput = {
   cart?: CartItem[];
   customer?: { email?: string; name?: string };
   product?: unknown;
+  niche?: string;
   leadSlug?: string;
   returnOrigin: string;
   order?: string;
@@ -36,6 +38,7 @@ export function buildCheckoutSessionParams({
   cart = [],
   customer,
   product,
+  niche = "",
   leadSlug = "",
   returnOrigin,
   order = orderNumber(),
@@ -83,6 +86,8 @@ export function buildCheckoutSessionParams({
 
   const successDestination = premiumProduct.successDestination;
   const successUrl = `${returnOrigin}/payment-success?order=${order}&product=${premiumProductCode}&session_id={CHECKOUT_SESSION_ID}`;
+  const proofPackPrice = premiumProductCode === "proof_pack" ? resolveProofPackPrice(niche) : null;
+  const unitAmount = proofPackPrice?.amount || premiumProduct.amount;
 
   return {
     mode: premiumProduct.mode,
@@ -97,7 +102,7 @@ export function buildCheckoutSessionParams({
             name: legacyProduct ? legacyProductLabels[legacyProduct] : premiumProduct.stripeName,
             description: premiumProduct.description,
           },
-          unit_amount: premiumProduct.amount,
+          unit_amount: unitAmount,
           ...(premiumProduct.mode === "subscription" ? { recurring: { interval: "month" as const } } : {}),
         },
       },
@@ -112,6 +117,10 @@ export function buildCheckoutSessionParams({
       plan: premiumProductCode,
       entitlement: premiumProduct.entitlement,
       success_destination: successDestination,
+      niche: niche.trim(),
+      amount_total: String(unitAmount),
+      pricing_key: proofPackPrice?.matchedKey || "",
+      pricing_source: proofPackPrice?.source || "",
       leadSlug,
       lead_slug: leadSlug,
     },

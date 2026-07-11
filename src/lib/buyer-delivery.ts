@@ -12,6 +12,7 @@ import {
 } from "./premium-products";
 import {
   recordCompletedPremiumOrder,
+  recordPaidSampleRequestFromSession,
   upsertPremiumEntitlement,
 } from "./premium-persistence";
 import { appendCustomerAccessParams, createCustomerAccessToken } from "./customer-access";
@@ -138,6 +139,9 @@ export async function deliverStripeSession(session: Stripe.Checkout.Session) {
   const leadSlug = session.metadata?.leadSlug || session.metadata?.lead_slug || session.client_reference_id || undefined;
 
   await recordCompletedPremiumOrder(session);
+  if (product === "proof_pack") {
+    await recordPaidSampleRequestFromSession(session);
+  }
   await upsertPremiumEntitlement({
     email,
     productCode: product,

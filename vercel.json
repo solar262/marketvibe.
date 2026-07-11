@@ -13,6 +13,14 @@
       "schedule": "0 6 * * *"
     },
     {
+      "path": "/api/cron/proof-pack-delivery",
+      "schedule": "15 8 * * *"
+    },
+    {
+      "path": "/api/cron/daily-radar-email",
+      "schedule": "45 8 * * *"
+    },
+    {
       "path": "/api/cron/opportunity-discovery",
       "schedule": "0 7 * * *"
     },

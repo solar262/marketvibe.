@@ -23,6 +23,20 @@ export type PremiumOnboardingInput = {
   notes?: string;
 };
 
+export type PaidSampleRequestRow = {
+  customer_email: string;
+  customer_name: string | null;
+  niche: string | null;
+  product_code: "proof_pack";
+  amount_total: number;
+  currency: string;
+  status: "paid";
+  stripe_session_id: string;
+  stripe_customer_id: string | null;
+  paid_at: string;
+  metadata: Record<string, unknown>;
+};
+
 export async function markStripeEventProcessing(event: Stripe.Event) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { shouldProcess: true, skipped: true };
@@ -119,6 +133,83 @@ export async function upsertPremiumEntitlement({
 
   if (error) throw error;
   return { saved: true };
+}
+
+function stripeCustomerId(session: Stripe.Checkout.Session) {
+  return typeof session.customer === "string" ? session.customer : null;
+}
+
+export function sampleRequestRowFromStripeSession(session: Stripe.Checkout.Session): PaidSampleRequestRow | null {
+  const rawProduct = session.metadata?.product_code || session.metadata?.product || "";
+  if (rawProduct !== "proof_pack" && rawProduct !== "audit") return null;
+
+  const productCode = normalizeCheckoutProduct(rawProduct);
+  if (productCode !== "proof_pack") return null;
+
+  const email = normalizedEmail(session.customer_details?.email || session.customer_email || "");
+  if (!email || !session.id) return null;
+
+  return {
+    customer_email: email,
+    customer_name: session.metadata?.customer_name || session.customer_details?.name || null,
+    niche: session.metadata?.niche || null,
+    product_code: "proof_pack",
+    amount_total: session.amount_total || premiumProducts.proof_pack.amount,
+    currency: session.currency || premiumProducts.proof_pack.currency,
+    status: "paid",
+    stripe_session_id: session.id,
+    stripe_customer_id: stripeCustomerId(session),
+    paid_at: new Date().toISOString(),
+    metadata: { ...(session.metadata || {}) },
+  };
+}
+
+export async function recordPaidSampleRequestFromSession(session: Stripe.Checkout.Session) {
+  const supabase = getSupabaseAdmin();
+  const row = sampleRequestRowFromStripeSession(session);
+  if (!supabase || !row) return { saved: false, requestId: null };
+
+  const { data: existing, error: existingError } = await supabase
+    .from("sample_requests")
+    .select("id,status")
+    .eq("stripe_session_id", row.stripe_session_id)
+    .maybeSingle();
+
+  if (existingError) throw existingError;
+
+  const updatedAt = new Date().toISOString();
+  if (existing?.id) {
+    const update: Record<string, unknown> = {
+      customer_email: row.customer_email,
+      customer_name: row.customer_name,
+      niche: row.niche,
+      product_code: row.product_code,
+      amount_total: row.amount_total,
+      currency: row.currency,
+      stripe_customer_id: row.stripe_customer_id,
+      paid_at: row.paid_at,
+      metadata: row.metadata,
+      updated_at: updatedAt,
+    };
+    if (String(existing.status || "") !== "pdf_sent") update.status = "paid";
+
+    const { error } = await supabase.from("sample_requests").update(update).eq("id", existing.id);
+    if (error) throw error;
+    return { saved: true, requestId: existing.id as string };
+  }
+
+  const { data, error } = await supabase
+    .from("sample_requests")
+    .insert({
+      ...row,
+      created_at: updatedAt,
+      updated_at: updatedAt,
+    })
+    .select("id")
+    .single();
+
+  if (error) throw error;
+  return { saved: true, requestId: data?.id || null };
 }
 
 export async function updateEntitlementForSubscription(subscription: Stripe.Subscription, statusOverride?: "past_due" | "cancelled" | "inactive") {

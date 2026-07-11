@@ -9,6 +9,7 @@ export async function POST(request: Request) {
     cart?: unknown;
     customer?: { email?: string; name?: string };
     product?: unknown;
+    niche?: string;
     leadSlug?: string;
   };
 
@@ -23,6 +24,7 @@ export async function POST(request: Request) {
     cart: Array.isArray(payload.cart) ? payload.cart : [],
     customer: payload.customer,
     product: payload.product,
+    niche: String(payload.niche || ""),
     leadSlug: payload.leadSlug || "",
     returnOrigin,
   });

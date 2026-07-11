@@ -18,6 +18,7 @@ export function SampleCheckoutForm() {
     const form = new FormData(event.currentTarget);
     const email = String(form.get("email") || "");
     const name = String(form.get("name") || "");
+    const niche = String(form.get("niche") || "");
     track("proof_pack_form_submit", { product: "proof_pack" });
 
     try {
@@ -27,6 +28,7 @@ export function SampleCheckoutForm() {
         body: JSON.stringify({
           product: "proof_pack",
           customer: { email, name },
+          niche,
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -45,7 +47,7 @@ export function SampleCheckoutForm() {
         <p className="text-sm font-semibold text-violet-200">Proof Pack</p>
         <h2 className="mt-1 text-2xl font-semibold text-white">Start checkout</h2>
         <p className="mt-2 text-sm leading-6 text-violet-100/65">
-          Pay €99 by card, then complete onboarding so your pack can be built from verified saved signals.
+          Pay by card, then complete onboarding so your pack can be built from verified saved signals.
         </p>
       </div>
       <div className="mt-6 grid gap-4">
