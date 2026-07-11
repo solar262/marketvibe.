@@ -1,11 +1,17 @@
 type BrevoAttributes = Record<string, string | number | boolean | null | undefined>;
 
+type TransactionalAttachment = {
+  name: string;
+  content: string;
+};
+
 type TransactionalEmailInput = {
   to: string;
   subject: string;
   htmlContent: string;
   textContent: string;
   scheduledAt?: string;
+  attachments?: TransactionalAttachment[];
 };
 
 type SequenceEmail = {
@@ -101,9 +107,20 @@ export async function addContactToMarketVibeList(email: string, attributes: Brev
   });
 }
 
-export async function sendTransactionalEmail({ to, subject, htmlContent, textContent, scheduledAt }: TransactionalEmailInput) {
+export async function sendTransactionalEmail({
+  to,
+  subject,
+  htmlContent,
+  textContent,
+  scheduledAt,
+  attachments = [],
+}: TransactionalEmailInput) {
   const config = brevoConfig();
   if (!config.senderEmail) throw new Error("Brevo sender email is not configured.");
+
+  const attachment = attachments
+    .filter((item) => item.name.trim() && item.content.trim())
+    .map((item) => ({ name: item.name.trim(), content: item.content.trim() }));
 
   return brevoFetch("/smtp/email", {
     method: "POST",
@@ -114,6 +131,7 @@ export async function sendTransactionalEmail({ to, subject, htmlContent, textCon
       htmlContent,
       textContent,
       ...(scheduledAt ? { scheduledAt } : {}),
+      ...(attachment.length ? { attachment } : {}),
     }),
   });
 }
@@ -153,27 +171,27 @@ export async function scheduleFreeLeadSequence(to: string, firstName = "") {
   return scheduleSequence(to, [
     {
       delayDays: 1,
-      subject: "Validate buyer-intent quality with a Proof Pack",
-      htmlContent: `<p>${greeting}</p><p>A focused Proof Pack helps you review real buyer-intent context before committing to recurring Radar delivery.</p><p><a href="${proofPackUrl}">Get a Proof Pack</a></p><p><a href="${engineUrl}">See the MarketVibe engine</a></p>`,
-      textContent: `${greeting}\n\nA focused Proof Pack helps you review real buyer-intent context before committing to recurring Radar delivery.\n\nGet a Proof Pack:\n${proofPackUrl}\n\nSee the MarketVibe engine:\n${engineUrl}`,
+      subject: "Validate property opportunity quality with a Proof Pack",
+      htmlContent: `<p>${greeting}</p><p>A focused Proof Pack lets you review verified property and construction opportunity evidence before committing to recurring Radar delivery.</p><p><a href="${proofPackUrl}">Get a Proof Pack</a></p><p><a href="${engineUrl}">See the MarketVibe engine</a></p>`,
+      textContent: `${greeting}\n\nA focused Proof Pack lets you review verified property and construction opportunity evidence before committing to recurring Radar delivery.\n\nGet a Proof Pack:\n${proofPackUrl}\n\nSee the MarketVibe engine:\n${engineUrl}`,
     },
     {
       delayDays: 3,
-      subject: "How MarketVibe turns public pain into opportunity",
-      htmlContent: `<p>${greeting}</p><p>MarketVibe scores urgency, relevance, source quality, and pain clarity so outreach starts from context rather than guesswork.</p><p><a href="${engineUrl}">Review the engine</a></p><p><a href="${pricingUrl}">Compare premium plans</a></p>`,
-      textContent: `${greeting}\n\nMarketVibe scores urgency, relevance, source quality, and pain clarity so outreach starts from context rather than guesswork.\n\nReview the engine:\n${engineUrl}\n\nCompare premium plans:\n${pricingUrl}`,
+      subject: "How MarketVibe qualifies property and construction opportunities",
+      htmlContent: `<p>${greeting}</p><p>MarketVibe scores fit, intent, evidence, and freshness so each opportunity starts from a legitimate public signal rather than a generic company profile.</p><p><a href="${engineUrl}">Review the engine</a></p><p><a href="${pricingUrl}">Compare premium plans</a></p>`,
+      textContent: `${greeting}\n\nMarketVibe scores fit, intent, evidence, and freshness so each opportunity starts from a legitimate public signal rather than a generic company profile.\n\nReview the engine:\n${engineUrl}\n\nCompare premium plans:\n${pricingUrl}`,
     },
     {
       delayDays: 5,
       subject: "Proof Pack first, Radar when the signal fits",
-      htmlContent: `<p>${greeting}</p><p>Start with a one-off Proof Pack. If the signals fit your market, Radar gives you recurring buyer-intent delivery.</p><p><a href="${proofPackUrl}">Start with Proof Pack</a></p><p><a href="${pricingUrl}">Compare Radar and Growth Desk</a></p>`,
-      textContent: `${greeting}\n\nStart with a one-off Proof Pack. If the signals fit your market, Radar gives you recurring buyer-intent delivery.\n\nStart with Proof Pack:\n${proofPackUrl}\n\nCompare Radar and Growth Desk:\n${pricingUrl}`,
+      htmlContent: `<p>${greeting}</p><p>Start with a one-off Proof Pack. If the verified property and construction signals fit your market, Radar gives you recurring opportunity delivery.</p><p><a href="${proofPackUrl}">Start with Proof Pack</a></p><p><a href="${pricingUrl}">Compare Radar and Growth Desk</a></p>`,
+      textContent: `${greeting}\n\nStart with a one-off Proof Pack. If the verified property and construction signals fit your market, Radar gives you recurring opportunity delivery.\n\nStart with Proof Pack:\n${proofPackUrl}\n\nCompare Radar and Growth Desk:\n${pricingUrl}`,
     },
     {
       delayDays: 7,
       subject: "Choose the right MarketVibe product",
-      htmlContent: `<p>${greeting}</p><p>Proof Pack is a one-off validation purchase, Radar is recurring dashboard access, and Growth Desk is managed delivery for focused niches and territories.</p><p><a href="${pricingUrl}">View pricing</a></p>`,
-      textContent: `${greeting}\n\nProof Pack is a one-off validation purchase, Radar is recurring dashboard access, and Growth Desk is managed delivery for focused niches and territories.\n\nView pricing:\n${pricingUrl}`,
+      htmlContent: `<p>${greeting}</p><p>Proof Pack is a one-off validation purchase, Radar is recurring opportunity delivery, and Growth Desk is managed delivery for focused property and construction territories.</p><p><a href="${pricingUrl}">View pricing</a></p>`,
+      textContent: `${greeting}\n\nProof Pack is a one-off validation purchase, Radar is recurring opportunity delivery, and Growth Desk is managed delivery for focused property and construction territories.\n\nView pricing:\n${pricingUrl}`,
     },
   ]);
 }
@@ -184,14 +202,14 @@ export async function scheduleBuyerSequence(to: string, firstName = "") {
     {
       delayDays: 2,
       subject: "Get more value from your MarketVibe access",
-      htmlContent: `<p>${greeting}</p><p>Use your access to compare buyer-intent signals before choosing where to spend outreach time. Stronger source context usually makes for clearer first messages.</p><p><a href="${dashboardUrl}">Open your dashboard</a></p><p><a href="${pricingUrl}">Review premium options</a></p>`,
-      textContent: `${greeting}\n\nUse your access to compare buyer-intent signals before choosing where to spend outreach time. Stronger source context usually makes for clearer first messages.\n\nOpen your dashboard:\n${dashboardUrl}\n\nReview premium options:\n${pricingUrl}`,
+      htmlContent: `<p>${greeting}</p><p>Use your access to compare verified property and construction signals before choosing where to spend outreach or acquisition time.</p><p><a href="${dashboardUrl}">Open your dashboard</a></p><p><a href="${pricingUrl}">Review premium options</a></p>`,
+      textContent: `${greeting}\n\nUse your access to compare verified property and construction signals before choosing where to spend outreach or acquisition time.\n\nOpen your dashboard:\n${dashboardUrl}\n\nReview premium options:\n${pricingUrl}`,
     },
     {
       delayDays: 6,
       subject: "Your next MarketVibe opportunity is waiting",
-      htmlContent: `<p>${greeting}</p><p>Your next opportunity can come from a different niche, territory, or buyer pain. Keep the workflow focused and use source-backed context to prioritize.</p><p><a href="${dashboardUrl}">Open your dashboard</a></p><p><a href="${pricingUrl}">See MarketVibe pricing</a></p>`,
-      textContent: `${greeting}\n\nYour next opportunity can come from a different niche, territory, or buyer pain. Keep the workflow focused and use source-backed context to prioritize.\n\nOpen your dashboard:\n${dashboardUrl}\n\nSee MarketVibe pricing:\n${pricingUrl}`,
+      htmlContent: `<p>${greeting}</p><p>Your next opportunity can come from a planning application, tender, land instruction, permit, procurement notice, or other verified property signal.</p><p><a href="${dashboardUrl}">Open your dashboard</a></p><p><a href="${pricingUrl}">See MarketVibe pricing</a></p>`,
+      textContent: `${greeting}\n\nYour next opportunity can come from a planning application, tender, land instruction, permit, procurement notice, or other verified property signal.\n\nOpen your dashboard:\n${dashboardUrl}\n\nSee MarketVibe pricing:\n${pricingUrl}`,
     },
   ]);
 }
