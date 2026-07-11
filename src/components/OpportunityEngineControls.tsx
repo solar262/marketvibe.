@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Loader2, Pause, Play, RefreshCw, Rocket, Search, ShieldCheck, Target } from "lucide-react";
 
 const actions = [
-  ["create-property-profile", "Create property profile and run discovery", Target],
+  ["create-property-profile", "Clean property inventory and run discovery", Target],
   ["run-discovery", "Run discovery now", Search],
   ["run-verification", "Run verification now", ShieldCheck],
   ["refresh-stale", "Refresh stale records", RefreshCw],

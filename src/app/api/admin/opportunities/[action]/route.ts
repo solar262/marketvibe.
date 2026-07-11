@@ -7,10 +7,13 @@ import {
   publishDueOpportunityDeliveries,
   refreshStaleOpportunities,
   requestOpportunityReplacement,
-  runOpportunityDiscovery,
   runOpportunityVerification,
   setOpportunityAutomationPaused,
 } from "@/lib/opportunity-engine";
+import {
+  PROPERTY_PROFILE_NICHE,
+  runPropertyDiscoveryWithIntegrity,
+} from "@/lib/property-opportunity-integrity";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -23,7 +26,7 @@ async function createPropertyOpportunityProfile() {
     customer_email: "admin@marketvibe.local",
     product_code: "radar",
     status: "active",
-    niche: "High-value property and construction opportunities",
+    niche: PROPERTY_PROFILE_NICHE,
     target_service: "Property development, construction, renovation, land, planning, buyer and seller opportunities",
     target_industries: [
       "property development",
@@ -49,9 +52,9 @@ async function createPropertyOpportunityProfile() {
       "project director",
       "general contractor",
     ],
-    minimum_fit_score: 35,
-    minimum_intent_score: 25,
-    minimum_evidence_score: 30,
+    minimum_fit_score: 50,
+    minimum_intent_score: 80,
+    minimum_evidence_score: 65,
     maximum_record_age_days: 60,
     opportunity_quantity: 25,
     delivery_frequency: "weekly",
@@ -62,19 +65,24 @@ async function createPropertyOpportunityProfile() {
     metadata: {
       name: "MarketVibe Property Opportunity Profile",
       created_by: "admin_one_click_profile",
+      source_policy: "verified_public_opportunity_signals_only",
       buyer_type: "High-ticket property, construction, development, renovation, and real-estate service businesses",
       opportunity_signals: [
         "looking for builder",
         "need contractor",
-        "planning permission",
+        "request for proposal",
+        "tender",
+        "procurement",
+        "planning application",
+        "permit issued",
         "land for sale",
+        "development proposal",
         "new build",
-        "property development",
         "commercial development",
-        "luxury renovation",
-        "property buyer",
-        "property seller",
-        "real estate investment",
+        "luxury renovation project",
+        "buyer requirement",
+        "seller instruction",
+        "real estate investment opportunity",
       ],
     },
     updated_at: new Date().toISOString(),
@@ -88,13 +96,15 @@ async function createPropertyOpportunityProfile() {
 
   if (error || !data) throw error || new Error("Property opportunity profile could not be created.");
 
-  let discovery: unknown = null;
+  let discovery: Awaited<ReturnType<typeof runPropertyDiscoveryWithIntegrity>> | null = null;
   let discoveryError = "";
   try {
-    discovery = await runOpportunityDiscovery({ trigger: "admin", profileId: String(data.id) });
+    discovery = await runPropertyDiscoveryWithIntegrity({ trigger: "admin", profileId: String(data.id) });
   } catch (error) {
     discoveryError = error instanceof Error ? error.message : "Initial discovery could not run.";
   }
+
+  const removed = (discovery?.integrity.before.rejected || 0) + (discovery?.integrity.after.rejected || 0);
 
   return {
     ok: true,
@@ -103,8 +113,8 @@ async function createPropertyOpportunityProfile() {
     discovery,
     discoveryError,
     message: discoveryError
-      ? `Property opportunity profile is active. Initial discovery needs attention: ${discoveryError}`
-      : "Property opportunity profile is active and the first discovery run completed.",
+      ? `Property opportunity profile is active. Discovery needs attention: ${discoveryError}`
+      : `Property opportunity profile is active. ${removed} non-opportunity records were removed and discovery completed.`,
   };
 }
 
@@ -117,7 +127,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ act
 
   try {
     if (action === "create-property-profile") return NextResponse.json(await createPropertyOpportunityProfile());
-    if (action === "run-discovery") return NextResponse.json(await runOpportunityDiscovery({ trigger: "admin", profileId: body.profileId }));
+    if (action === "run-discovery") return NextResponse.json(await runPropertyDiscoveryWithIntegrity({ trigger: "admin", profileId: body.profileId }));
     if (action === "run-verification") return NextResponse.json(await runOpportunityVerification({ trigger: "admin" }));
     if (action === "refresh-stale") return NextResponse.json(await refreshStaleOpportunities({ trigger: "admin" }));
     if (action === "fill-shortages") return NextResponse.json(await fillCustomerShortages({ trigger: "admin", profileId: body.profileId }));
