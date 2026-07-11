@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart3, Bot, Database, FileUp, Mail, Radar, Search, Settings, ShieldCheck, Workflow } from "lucide-react";
+import { BarChart3, Bot, Database, FileUp, Mail, Radar, Settings, ShieldCheck, Workflow } from "lucide-react";
 import { AdminLogoutButton } from "@/components/AdminLogoutButton";
 
 const links = [
@@ -9,7 +9,6 @@ const links = [
   ["Opportunity Engine", "/admin/opportunity-engine", Radar],
   ["Inventory", "/admin/inventory", Database],
   ["CSV Import", "/admin/import", FileUp],
-  ["Lead Search", "/lead-search", Search],
   ["Autopilot", "/admin/autopilot", Bot],
   ["Email", "/admin/email", Mail],
   ["Outreach", "/admin/outreach", Mail],
@@ -24,7 +23,7 @@ export function AdminNav() {
     <aside className="border-b border-slate-200 bg-white lg:min-h-screen lg:w-64 lg:border-b-0 lg:border-r">
       <div className="px-4 py-5">
         <p className="text-sm font-semibold text-slate-950">MarketVibe Admin</p>
-        <p className="text-xs text-slate-500">Lead engine console</p>
+        <p className="text-xs text-slate-500">Opportunity intelligence console</p>
       </div>
       <nav className="flex flex-wrap gap-1 px-3 pb-3 lg:grid">
         {links.map(([label, href, Icon]) => (
