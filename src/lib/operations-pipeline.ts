@@ -3,6 +3,7 @@ import {
   buildDedupeKey,
   domainFromUrl,
   enrichComputedFields,
+  fingerprintRawRow,
   hasAnyUsableSourceReference,
   mapRow,
   normalizeDomain,
@@ -10,6 +11,7 @@ import {
   normalizeLinkedInUrl,
   normalizeText,
   validateMappedRow,
+  type ImportField,
   type ImportedProspectInput,
   type ImportPreview,
 } from "@/lib/sales-navigator-import";
@@ -111,8 +113,62 @@ export type MemoryJob = {
   lastError: string;
 };
 
+type BuyerCompanyLookup = {
+  id: string;
+  buyer_status: BuyerPipelineState | string | null;
+  source_imported_prospect_id?: string | null;
+  source_import_batch_id?: string | null;
+  original_filename?: string | null;
+  file_checksum?: string | null;
+  row_fingerprint?: string | null;
+};
+
+type ExistingPipelineJob = {
+  id: string;
+  queue_status: string;
+};
+
+type ImportedProspectDbRow = Partial<Record<ImportField, string | null>> & {
+  id: string;
+  batch_id: string;
+  dedupe_key?: string | null;
+  raw_row?: Record<string, unknown> | null;
+  fit_score?: number | null;
+  intent_score?: number | null;
+  evidence_status?: string | null;
+  evidence_summary?: string | null;
+  enrichment_status?: string | null;
+  website_scan?: Record<string, unknown> | null;
+};
+
+type ImportBatchDbRow = {
+  id: string;
+  original_filename?: string | null;
+  source_format?: string | null;
+  worksheet_name?: string | null;
+  file_checksum?: string | null;
+  row_fingerprints?: string[] | null;
+};
+
+const ACTIVE_PIPELINE_JOB_STATES = new Set(["queued", "running", "retry_scheduled"]);
+const RECOVERABLE_PIPELINE_JOB_STATES = new Set(["completed", "failed", "permanent_failure"]);
+const BUYER_STATES_THAT_NEED_PIPELINE_JOB = new Set<BuyerPipelineState>([
+  "discovered",
+  "structurally_validated",
+  "deduplicated",
+  "website_verification_queued",
+  "retry_scheduled",
+  "refresh_queued",
+]);
+
 function nowIso() {
   return new Date().toISOString();
+}
+
+function chunk<T>(items: T[], size: number) {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) chunks.push(items.slice(index, index + size));
+  return chunks;
 }
 
 export function canonicalCompanyName(value: string) {
@@ -161,6 +217,313 @@ function buyerEvidenceUrls(row: ImportedProspectInput) {
   return [row.company_website, row.public_signal_url, row.company_linkedin_url, row.linkedin_profile_url].filter(Boolean);
 }
 
+export function shouldQueueBuyerPipelineJobForState(state: string | null | undefined) {
+  return BUYER_STATES_THAT_NEED_PIPELINE_JOB.has((state || "website_verification_queued") as BuyerPipelineState);
+}
+
+export function shouldReactivateBuyerPipelineJob(queueStatus: string | null | undefined) {
+  return RECOVERABLE_PIPELINE_JOB_STATES.has(queueStatus || "");
+}
+
+function sourceFormatFromBatch(value: string | null | undefined): PersistedImportMetadata["sourceFormat"] {
+  if (value === "xlsx" || value === "quick_paste") return value;
+  return "csv";
+}
+
+function rawRowFromProspect(prospect: ImportedProspectDbRow) {
+  if (!prospect.raw_row || typeof prospect.raw_row !== "object" || Array.isArray(prospect.raw_row)) return {};
+  return Object.fromEntries(Object.entries(prospect.raw_row).map(([key, value]) => [key, String(value ?? "")]));
+}
+
+function mappedRowFromProspect(prospect: ImportedProspectDbRow): Record<ImportField, string> {
+  return {
+    first_name: String(prospect.first_name || ""),
+    last_name: String(prospect.last_name || ""),
+    full_name: String(prospect.full_name || ""),
+    job_title: String(prospect.job_title || ""),
+    company_name: String(prospect.company_name || ""),
+    company_website: String(prospect.company_website || ""),
+    company_domain: String(prospect.company_domain || ""),
+    linkedin_profile_url: String(prospect.linkedin_profile_url || ""),
+    company_linkedin_url: String(prospect.company_linkedin_url || ""),
+    location: String(prospect.location || ""),
+    country: String(prospect.country || ""),
+    city: String(prospect.city || ""),
+    industry: String(prospect.industry || ""),
+    company_size: String(prospect.company_size || ""),
+    public_email: String(prospect.public_email || ""),
+    public_phone: String(prospect.public_phone || ""),
+    public_signal_url: String(prospect.public_signal_url || ""),
+    public_signal_text: String(prospect.public_signal_text || ""),
+    source_note: String(prospect.source_note || ""),
+  };
+}
+
+function importPersistenceRowFromProspect(prospect: ImportedProspectDbRow): ImportPersistenceRow {
+  const rawRow = rawRowFromProspect(prospect);
+  const enriched = enrichComputedFields(mappedRowFromProspect(prospect), rawRow, null);
+  const dedupeKey = String(prospect.dedupe_key || enriched.dedupe_key);
+  return {
+    row: {
+      ...enriched,
+      dedupe_key: dedupeKey,
+      fit_score: Number(prospect.fit_score ?? enriched.fit_score),
+      intent_score: prospect.intent_score == null ? enriched.intent_score : Number(prospect.intent_score),
+      evidence_status: (prospect.evidence_status as ImportedProspectInput["evidence_status"]) || enriched.evidence_status,
+      evidence_summary: String(prospect.evidence_summary || enriched.evidence_summary),
+      enrichment_status: (prospect.enrichment_status as ImportedProspectInput["enrichment_status"]) || enriched.enrichment_status,
+      website_scan: (prospect.website_scan as ImportedProspectInput["website_scan"]) || enriched.website_scan,
+    },
+    prospectId: String(prospect.id),
+    dedupeKey,
+    rowFingerprint: fingerprintRawRow(rawRow),
+  };
+}
+
+function buyerCompanyInsert(row: ImportedProspectInput, item: ImportPersistenceRow, metadata: PersistedImportMetadata, state: BuyerPipelineState, score: BuyerScore) {
+  return {
+    identity_key: buildBuyerCompanyIdentity(row),
+    source_imported_prospect_id: item.prospectId || null,
+    source_import_batch_id: metadata.batchId,
+    original_filename: metadata.filename,
+    file_checksum: metadata.fileChecksum || null,
+    row_fingerprint: item.rowFingerprint || null,
+    company_name: row.company_name,
+    website: row.company_website || null,
+    canonical_domain: normalizeDomain(row.company_domain || domainFromUrl(row.company_website)) || null,
+    country: row.country || null,
+    city: row.city || null,
+    operating_locations: [row.location, row.city, row.country].filter(Boolean),
+    sector: row.industry || null,
+    employee_range_estimate: row.company_size || null,
+    company_profile_urls: [row.company_linkedin_url, row.linkedin_profile_url].filter(Boolean),
+    public_evidence_urls: buyerEvidenceUrls(row),
+    public_evidence_summary: row.public_signal_text || row.source_note || "Company imported from a structurally valid file row.",
+    source_provider: metadata.sourceFormat === "xlsx" ? "uploaded_xlsx" : "uploaded_csv",
+    source_date: nowIso(),
+    website_status: state === "website_verification_queued" ? "queued" : "skipped",
+    buyer_status: state,
+    contact_status: "unresolved",
+    likely_buyer_type: row.industry || null,
+    sector_fit_score: score.sectorFit,
+    geography_fit_score: score.geographyFit,
+    capacity_score: score.capacity,
+    commercial_fit_score: score.commercialFit,
+    freshness_score: score.freshness,
+    overall_buyer_score: score.overall,
+    score_breakdown: score,
+    qualification_reason: score.qualificationReason || null,
+    rejection_reason: score.rejectionReason || null,
+    updated_at: nowIso(),
+  };
+}
+
+async function writeBuyerAuditEvent({
+  supabase,
+  eventType,
+  companyId,
+  sourceState,
+  destinationState,
+  reason,
+  payload,
+}: {
+  supabase: SupabaseClient;
+  eventType: string;
+  companyId: string;
+  sourceState: string;
+  destinationState: string;
+  reason: string;
+  payload: Record<string, unknown>;
+}) {
+  const { error } = await supabase.from("marketvibe_audit_events").insert({
+    event_type: eventType,
+    actor_type: "system",
+    related_record_type: "buyer_company",
+    related_record_id: companyId,
+    source_state: sourceState,
+    destination_state: destinationState,
+    reason,
+    event_payload: payload,
+  });
+  if (error) throw error;
+}
+
+async function insertCompanyEvidence(supabase: SupabaseClient, companyId: string, item: ImportPersistenceRow) {
+  const row = item.row;
+  const { error } = await supabase.from("marketvibe_company_evidence").insert({
+    buyer_company_id: companyId,
+    evidence_type: "imported_source_row",
+    source_url: row.public_signal_url || row.company_website || row.company_linkedin_url || row.linkedin_profile_url || null,
+    evidence_summary: row.public_signal_text || row.source_note || "Company imported from owner-supplied file.",
+    evidence_checksum: item.rowFingerprint || null,
+    raw_payload: row.raw_row,
+  });
+  if (error) throw error;
+}
+
+async function queueBuyerPipelineJob({
+  supabase,
+  companyId,
+  allowReactivate,
+}: {
+  supabase: SupabaseClient;
+  companyId: string;
+  allowReactivate: boolean;
+}) {
+  const { data: existing, error } = await supabase
+    .from("marketvibe_job_queue")
+    .select("id,queue_status")
+    .eq("job_name", "website_verification")
+    .eq("related_record_type", "buyer_company")
+    .eq("related_record_id", companyId)
+    .maybeSingle();
+  if (error) throw error;
+
+  const existingJob = existing as ExistingPipelineJob | null;
+  const timestamp = nowIso();
+  if (existingJob) {
+    if (ACTIVE_PIPELINE_JOB_STATES.has(existingJob.queue_status)) return { queued: false, alreadyActive: true };
+    if (!allowReactivate || !shouldReactivateBuyerPipelineJob(existingJob.queue_status)) return { queued: false, alreadyActive: false };
+
+    const { error: updateError } = await supabase
+      .from("marketvibe_job_queue")
+      .update({
+        queue_status: "queued",
+        run_after: timestamp,
+        retry_count: 0,
+        last_error: null,
+        locked_by: null,
+        locked_at: null,
+        updated_at: timestamp,
+      })
+      .eq("id", existingJob.id);
+    if (updateError) throw updateError;
+    return { queued: true, alreadyActive: false };
+  }
+
+  const { error: insertError } = await supabase.from("marketvibe_job_queue").insert({
+    job_name: "website_verification",
+    related_record_type: "buyer_company",
+    related_record_id: companyId,
+    queue_status: "queued",
+    run_after: timestamp,
+    updated_at: timestamp,
+  });
+  if (insertError?.code === "23505") return { queued: false, alreadyActive: true };
+  if (insertError) throw insertError;
+  return { queued: true, alreadyActive: false };
+}
+
+async function updateExistingCompanyImportReference(supabase: SupabaseClient, company: BuyerCompanyLookup, item: ImportPersistenceRow, metadata: PersistedImportMetadata) {
+  const update: Record<string, unknown> = { updated_at: nowIso() };
+  if (!company.source_imported_prospect_id && item.prospectId) update.source_imported_prospect_id = item.prospectId;
+  if (!company.source_import_batch_id) update.source_import_batch_id = metadata.batchId;
+  if (!company.original_filename) update.original_filename = metadata.filename;
+  if (!company.file_checksum && metadata.fileChecksum) update.file_checksum = metadata.fileChecksum;
+  if (!company.row_fingerprint && item.rowFingerprint) update.row_fingerprint = item.rowFingerprint;
+  if (Object.keys(update).length === 1) return;
+
+  const { error } = await supabase.from("marketvibe_buyer_companies").update(update).eq("id", company.id);
+  if (error) throw error;
+}
+
+async function recordExistingCompanyImport({
+  supabase,
+  company,
+  item,
+  metadata,
+}: {
+  supabase: SupabaseClient;
+  company: BuyerCompanyLookup;
+  item: ImportPersistenceRow;
+  metadata: PersistedImportMetadata;
+}) {
+  await updateExistingCompanyImportReference(supabase, company, item, metadata);
+  const buyerStatus = (company.buyer_status || "deduplicated") as BuyerPipelineState;
+  const shouldQueue = shouldQueueBuyerPipelineJobForState(buyerStatus);
+  const queueResult = shouldQueue
+    ? await queueBuyerPipelineJob({ supabase, companyId: company.id, allowReactivate: true })
+    : { queued: false, alreadyActive: false };
+  const eventType = queueResult.queued ? "buyer_company_refresh_queued" : "buyer_company_duplicate_import";
+  const reason = queueResult.queued
+    ? "Duplicate import row matched an existing recoverable buyer company, so processing was refreshed without creating another company."
+    : "Duplicate import row matched an existing buyer company. Existing processing history was retained.";
+
+  await writeBuyerAuditEvent({
+    supabase,
+    eventType,
+    companyId: company.id,
+    sourceState: buyerStatus,
+    destinationState: queueResult.queued ? "refresh_queued" : buyerStatus,
+    reason,
+    payload: { batchId: metadata.batchId, dedupeKey: item.dedupeKey, rowFingerprint: item.rowFingerprint, filename: metadata.filename },
+  });
+
+  return { created: false, duplicate: true, queued: queueResult.queued };
+}
+
+async function persistBuyerCompanyFromImportRow({
+  supabase,
+  metadata,
+  item,
+  duplicateImport,
+}: {
+  supabase: SupabaseClient;
+  metadata: PersistedImportMetadata;
+  item: ImportPersistenceRow;
+  duplicateImport: boolean;
+}) {
+  const row = item.row;
+  const identityKey = buildBuyerCompanyIdentity(row);
+  const { data: existing, error: existingError } = await supabase
+    .from("marketvibe_buyer_companies")
+    .select("id,buyer_status,source_imported_prospect_id,source_import_batch_id,original_filename,file_checksum,row_fingerprint")
+    .eq("identity_key", identityKey)
+    .maybeSingle();
+  if (existingError) throw existingError;
+  if (existing) {
+    return recordExistingCompanyImport({ supabase, company: existing as BuyerCompanyLookup, item, metadata });
+  }
+
+  const score = scoreBuyerCompany(row);
+  const state = initialBuyerState(row);
+  const { data: insertedCompany, error: insertError } = await supabase
+    .from("marketvibe_buyer_companies")
+    .insert(buyerCompanyInsert(row, item, metadata, state, score))
+    .select("id,buyer_status")
+    .single();
+  if (insertError?.code === "23505") {
+    const { data: racedCompany, error: racedError } = await supabase
+      .from("marketvibe_buyer_companies")
+      .select("id,buyer_status,source_imported_prospect_id,source_import_batch_id,original_filename,file_checksum,row_fingerprint")
+      .eq("identity_key", identityKey)
+      .maybeSingle();
+    if (racedError) throw racedError;
+    if (racedCompany) return recordExistingCompanyImport({ supabase, company: racedCompany as BuyerCompanyLookup, item, metadata });
+  }
+  if (insertError || !insertedCompany) throw insertError || new Error("Buyer company could not be persisted.");
+
+  const companyId = String(insertedCompany.id);
+  await writeBuyerAuditEvent({
+    supabase,
+    eventType: "buyer_company_imported",
+    companyId,
+    sourceState: "discovered",
+    destinationState: state,
+    reason: duplicateImport
+      ? "Structurally valid duplicate import row had no buyer-company record, so the missing buyer company was backfilled and queued."
+      : "Structurally valid imported company was queued for automated buyer-stock processing.",
+    payload: { batchId: metadata.batchId, filename: metadata.filename, sourceFormat: metadata.sourceFormat, dedupeKey: item.dedupeKey },
+  });
+  await insertCompanyEvidence(supabase, companyId, item);
+
+  const queueResult = shouldQueueBuyerPipelineJobForState(state)
+    ? await queueBuyerPipelineJob({ supabase, companyId, allowReactivate: false })
+    : { queued: false, alreadyActive: false };
+
+  return { created: true, duplicate: false, queued: queueResult.queued };
+}
+
 export async function persistImportedBuyerCompanies(input: {
   supabase: SupabaseClient;
   metadata: PersistedImportMetadata;
@@ -173,108 +536,123 @@ export async function persistImportedBuyerCompanies(input: {
   let queuedJobs = 0;
 
   for (const item of input.insertedRows) {
-    const row = item.row;
-    const identityKey = buildBuyerCompanyIdentity(row);
-    const score = scoreBuyerCompany(row);
-    const state = initialBuyerState(row);
-    const { data: company, error } = await supabase
-      .from("marketvibe_buyer_companies")
-      .upsert({
-        identity_key: identityKey,
-        source_imported_prospect_id: item.prospectId || null,
-        source_import_batch_id: metadata.batchId,
-        original_filename: metadata.filename,
-        file_checksum: metadata.fileChecksum || null,
-        row_fingerprint: item.rowFingerprint || null,
-        company_name: row.company_name,
-        website: row.company_website || null,
-        canonical_domain: normalizeDomain(row.company_domain || domainFromUrl(row.company_website)) || null,
-        country: row.country || null,
-        city: row.city || null,
-        operating_locations: [row.location, row.city, row.country].filter(Boolean),
-        sector: row.industry || null,
-        employee_range_estimate: row.company_size || null,
-        company_profile_urls: [row.company_linkedin_url, row.linkedin_profile_url].filter(Boolean),
-        public_evidence_urls: buyerEvidenceUrls(row),
-        public_evidence_summary: row.public_signal_text || row.source_note || "Company imported from a structurally valid file row.",
-        source_provider: metadata.sourceFormat === "xlsx" ? "uploaded_xlsx" : "uploaded_csv",
-        source_date: nowIso(),
-        website_status: state === "website_verification_queued" ? "queued" : "skipped",
-        buyer_status: state,
-        contact_status: "unresolved",
-        likely_buyer_type: row.industry || null,
-        sector_fit_score: score.sectorFit,
-        geography_fit_score: score.geographyFit,
-        capacity_score: score.capacity,
-        commercial_fit_score: score.commercialFit,
-        freshness_score: score.freshness,
-        overall_buyer_score: score.overall,
-        score_breakdown: score,
-        qualification_reason: score.qualificationReason || null,
-        rejection_reason: score.rejectionReason || null,
-        updated_at: nowIso(),
-      }, { onConflict: "identity_key" })
-      .select("id,buyer_status")
-      .single();
-    if (error || !company) throw error || new Error("Buyer company could not be persisted.");
-    companiesCreated += 1;
-
-    await supabase.from("marketvibe_audit_events").insert({
-      event_type: "buyer_company_imported",
-      actor_type: "system",
-      related_record_type: "buyer_company",
-      related_record_id: company.id,
-      source_state: "discovered",
-      destination_state: state,
-      reason: "Structurally valid imported company was queued for automated buyer-stock processing.",
-      event_payload: { batchId: metadata.batchId, filename: metadata.filename, sourceFormat: metadata.sourceFormat },
-    });
-    await supabase.from("marketvibe_company_evidence").insert({
-      buyer_company_id: company.id,
-      evidence_type: "imported_source_row",
-      source_url: row.public_signal_url || row.company_website || row.company_linkedin_url || row.linkedin_profile_url || null,
-      evidence_summary: row.public_signal_text || row.source_note || "Company imported from owner-supplied file.",
-      evidence_checksum: item.rowFingerprint || null,
-      raw_payload: row.raw_row,
-    });
-    if (state === "website_verification_queued") {
-      await supabase.from("marketvibe_job_queue").upsert({
-        job_name: "website_verification",
-        related_record_type: "buyer_company",
-        related_record_id: company.id,
-        queue_status: "queued",
-        updated_at: nowIso(),
-      }, { onConflict: "job_name,related_record_type,related_record_id" });
-      queuedJobs += 1;
-    }
+    const result = await persistBuyerCompanyFromImportRow({ supabase, metadata, item, duplicateImport: false });
+    if (result.created) companiesCreated += 1;
+    if (result.duplicate) duplicateCompanies += 1;
+    if (result.queued) queuedJobs += 1;
   }
 
   for (const item of input.duplicateRows) {
-    const identityKey = buildBuyerCompanyIdentity(item.row);
-    const { data: company } = await supabase
-      .from("marketvibe_buyer_companies")
-      .select("id,buyer_status")
-      .eq("identity_key", identityKey)
-      .maybeSingle();
-    if (!company) continue;
-    duplicateCompanies += 1;
-    await supabase.from("marketvibe_audit_events").insert({
-      event_type: "buyer_company_duplicate_import",
-      actor_type: "system",
-      related_record_type: "buyer_company",
-      related_record_id: company.id,
-      source_state: company.buyer_status || "deduplicated",
-      destination_state: company.buyer_status || "deduplicated",
-      reason: "Duplicate import row matched an existing buyer company. Existing processing history was retained.",
-      event_payload: { batchId: metadata.batchId, dedupeKey: item.dedupeKey, rowFingerprint: item.rowFingerprint },
-    });
+    const result = await persistBuyerCompanyFromImportRow({ supabase, metadata, item, duplicateImport: true });
+    if (result.created) companiesCreated += 1;
+    if (result.duplicate) duplicateCompanies += 1;
+    if (result.queued) queuedJobs += 1;
   }
 
   return { companiesCreated, duplicateCompanies, queuedJobs };
 }
 
+export async function backfillImportedBuyerCompanies({
+  supabase,
+  batchId,
+  limit = 500,
+}: {
+  supabase: SupabaseClient;
+  batchId?: string;
+  limit?: number;
+}) {
+  let selectedBatch: ImportBatchDbRow | null = null;
+  let selectedProspects: ImportedProspectDbRow[] = [];
+
+  if (batchId) {
+    const { data: batch, error: batchError } = await supabase
+      .from("premium_import_batches")
+      .select("id,original_filename,source_format,worksheet_name,file_checksum,row_fingerprints")
+      .eq("id", batchId)
+      .maybeSingle();
+    if (batchError) throw batchError;
+    selectedBatch = batch as ImportBatchDbRow | null;
+  } else {
+    const { data: batches, error: batchesError } = await supabase
+      .from("premium_import_batches")
+      .select("id,original_filename,source_format,worksheet_name,file_checksum,row_fingerprints")
+      .eq("status", "completed")
+      .order("created_at", { ascending: false })
+      .limit(25);
+    if (batchesError) throw batchesError;
+
+    for (const batch of (batches || []) as ImportBatchDbRow[]) {
+      const { data: prospects, error: prospectsError } = await supabase
+        .from("premium_imported_prospects")
+        .select("*")
+        .eq("batch_id", batch.id)
+        .order("created_at", { ascending: true })
+        .limit(limit);
+      if (prospectsError) throw prospectsError;
+      if ((prospects || []).length > 0) {
+        selectedBatch = batch;
+        selectedProspects = prospects as ImportedProspectDbRow[];
+        break;
+      }
+    }
+  }
+
+  if (!selectedBatch) {
+    return { batchId: null, filename: null, examined: 0, missingBuyerCompanies: 0, companiesCreated: 0, duplicateCompanies: 0, queuedJobs: 0 };
+  }
+
+  if (selectedProspects.length === 0) {
+    const { data: prospects, error: prospectsError } = await supabase
+      .from("premium_imported_prospects")
+      .select("*")
+      .eq("batch_id", selectedBatch.id)
+      .order("created_at", { ascending: true })
+      .limit(limit);
+    if (prospectsError) throw prospectsError;
+    selectedProspects = (prospects || []) as ImportedProspectDbRow[];
+  }
+
+  const persistenceRows = selectedProspects.map(importPersistenceRowFromProspect);
+  const identities = Array.from(new Set(persistenceRows.map((item) => buildBuyerCompanyIdentity(item.row))));
+  const existingIdentities = new Set<string>();
+  for (const identityChunk of chunk(identities, 500)) {
+    const { data, error } = await supabase
+      .from("marketvibe_buyer_companies")
+      .select("identity_key")
+      .in("identity_key", identityChunk);
+    if (error) throw error;
+    (data || []).forEach((row) => existingIdentities.add(String(row.identity_key)));
+  }
+
+  const missingRows = persistenceRows.filter((item) => !existingIdentities.has(buildBuyerCompanyIdentity(item.row)));
+  const result = missingRows.length > 0
+    ? await persistImportedBuyerCompanies({
+      supabase,
+      metadata: {
+        batchId: selectedBatch.id,
+        filename: selectedBatch.original_filename || "existing-import-backfill",
+        sourceFormat: sourceFormatFromBatch(selectedBatch.source_format),
+        worksheetName: selectedBatch.worksheet_name || undefined,
+        fileChecksum: selectedBatch.file_checksum || undefined,
+        rowFingerprints: selectedBatch.row_fingerprints || undefined,
+      },
+      insertedRows: missingRows,
+      duplicateRows: [],
+    })
+    : { companiesCreated: 0, duplicateCompanies: 0, queuedJobs: 0 };
+
+  return {
+    batchId: selectedBatch.id,
+    filename: selectedBatch.original_filename || null,
+    examined: selectedProspects.length,
+    missingBuyerCompanies: missingRows.length,
+    ...result,
+  };
+}
+
 export async function runBuyerPipelineWorker({ supabase, limit = 50, workerId = "marketvibe-worker" }: { supabase: SupabaseClient; limit?: number; workerId?: string }) {
   const lockExpiresAt = new Date(Date.now() + 10 * 60_000).toISOString();
+  await supabase.from("marketvibe_job_locks").delete().eq("job_name", "website_verification").lte("expires_at", nowIso());
   const { error: lockError } = await supabase.from("marketvibe_job_locks").insert({
     job_name: "website_verification",
     locked_by: workerId,
@@ -298,12 +676,28 @@ export async function runBuyerPipelineWorker({ supabase, limit = 50, workerId = 
       .select("*")
       .eq("job_name", "website_verification")
       .in("queue_status", ["queued", "retry_scheduled"])
-      .lte("run_after", nowIso())
+      .or(`run_after.is.null,run_after.lte.${nowIso()}`)
       .order("created_at", { ascending: true })
       .limit(limit);
     if (error) throw error;
 
     for (const job of jobs || []) {
+      const claimedAt = nowIso();
+      const { data: claimedJob, error: claimError } = await supabase
+        .from("marketvibe_job_queue")
+        .update({
+          queue_status: "running",
+          locked_by: workerId,
+          locked_at: claimedAt,
+          updated_at: claimedAt,
+        })
+        .eq("id", job.id)
+        .in("queue_status", ["queued", "retry_scheduled"])
+        .select("id")
+        .maybeSingle();
+      if (claimError) throw claimError;
+      if (!claimedJob) continue;
+
       const { data: company, error: companyError } = await supabase
         .from("marketvibe_buyer_companies")
         .select("*")
@@ -312,7 +706,13 @@ export async function runBuyerPipelineWorker({ supabase, limit = 50, workerId = 
       if (companyError) throw companyError;
       if (!company) {
         failed += 1;
-        await supabase.from("marketvibe_job_queue").update({ queue_status: "permanent_failure", last_error: "Buyer company no longer exists.", updated_at: nowIso() }).eq("id", job.id);
+        await supabase.from("marketvibe_job_queue").update({
+          queue_status: "permanent_failure",
+          last_error: "Buyer company no longer exists.",
+          locked_by: null,
+          locked_at: null,
+          updated_at: nowIso(),
+        }).eq("id", job.id);
         continue;
       }
 
@@ -366,7 +766,12 @@ export async function runBuyerPipelineWorker({ supabase, limit = 50, workerId = 
         job_run_id: run.id,
         retry_count: Number(job.retry_count || 0),
       });
-      await supabase.from("marketvibe_job_queue").update({ queue_status: "completed", updated_at: nowIso() }).eq("id", job.id);
+      await supabase.from("marketvibe_job_queue").update({
+        queue_status: "completed",
+        locked_by: null,
+        locked_at: null,
+        updated_at: nowIso(),
+      }).eq("id", job.id);
       processed += 1;
     }
 

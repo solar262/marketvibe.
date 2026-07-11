@@ -25,7 +25,7 @@ import {
   tokenHash,
   validateMappedRow,
 } from "../src/lib/sales-navigator-import";
-import { InMemoryOperationsStore } from "../src/lib/operations-pipeline";
+import { InMemoryOperationsStore, shouldQueueBuyerPipelineJobForState, shouldReactivateBuyerPipelineJob } from "../src/lib/operations-pipeline";
 import { canCustomerAccessDelivery, importProspectsFromRows } from "../src/lib/sales-navigator-persistence";
 
 const localRequire = createRequire(import.meta.url);
@@ -191,6 +191,11 @@ assert.equal(companyOnlyPreview.stats.rowsMissingAllUsableSourceReferences, 0);
 assert.equal(companyOnlyPreview.previewRows[0].first_name, "");
 assert.equal(companyOnlyPreview.previewRows[0].job_title, "");
 assert.equal(companyOnlyPreview.previewRows[0].dedupe_key, "company_domain:company only 1:company-only-1.example.com");
+assert.equal(shouldQueueBuyerPipelineJobForState("website_verification_queued"), true);
+assert.equal(shouldQueueBuyerPipelineJobForState("refresh_queued"), true);
+assert.equal(shouldQueueBuyerPipelineJobForState("qualified"), false);
+assert.equal(shouldReactivateBuyerPipelineJob("completed"), true);
+assert.equal(shouldReactivateBuyerPipelineJob("queued"), false);
 
 const attachedWorkbookPath = process.env.MARKETVIBE_XLSX_ACCEPTANCE_FILE || "C:\\Users\\qwerty\\Downloads\\marketvibe_us_builder_buyers_50.xlsx";
 if (existsSync(attachedWorkbookPath)) {
@@ -321,6 +326,8 @@ assert.doesNotMatch(opportunityEngineSource, /B2B Pipeline Buyers|SEO agency|web
 const persistenceSource = readFileSync(join(process.cwd(), "src", "lib", "sales-navigator-persistence.ts"), "utf8");
 assert.match(persistenceSource, /status:\s*"email_failed"/, "Delivery failures must be recorded.");
 assert.match(persistenceSource, /throw new Error\(emailError instanceof Error/, "Delivery email failures must throw instead of returning false success.");
+const cronBuyerPipelineSource = readFileSync(join(process.cwd(), "src", "app", "api", "cron", "buyer-pipeline", "route.ts"), "utf8");
+assert.match(cronBuyerPipelineSource, /backfillImportedBuyerCompanies/, "Buyer-pipeline cron must backfill imported prospects before queue recovery.");
 
 const token = "test-token";
 const hash = tokenHash(token);
