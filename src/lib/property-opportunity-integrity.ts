@@ -1,4 +1,3 @@
-import { runOpportunityDiscovery } from "@/lib/opportunity-engine";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 export const PROPERTY_PROFILE_NICHE = "High-value property and construction opportunities";
@@ -61,7 +60,7 @@ export async function enforcePropertyOpportunityIntegrity() {
         verification_status: "REJECTED",
         review_status: "rejected",
         rejection_reason: "not_a_verified_property_opportunity_signal",
-        quality_flags: ["property_integrity_guard", "not_opportunity_signal", "directory_business_record"],
+        quality_flags: ["property_integrity_guard", "legacy_lead_engine_quarantined", "not_opportunity_signal"],
         updated_at: new Date().toISOString(),
       })
       .in("id", rejectedIds);
@@ -83,12 +82,24 @@ export async function runPropertyDiscoveryWithIntegrity({
   trigger?: DiscoveryTrigger;
   profileId?: string;
 } = {}) {
-  const before = await enforcePropertyOpportunityIntegrity();
-  const discovery = await runOpportunityDiscovery({ trigger, profileId });
-  const after = await enforcePropertyOpportunityIntegrity();
+  const integrity = await enforcePropertyOpportunityIntegrity();
 
   return {
-    ...discovery,
-    integrity: { before, after },
+    ok: true,
+    skipped: true,
+    trigger,
+    profileId: profileId || null,
+    source_policy: "dedicated_property_sources_only",
+    discovery_status: "awaiting_dedicated_property_sources",
+    records_discovered: 0,
+    records_rejected: integrity.rejected,
+    records_qualified: 0,
+    records_added_to_inventory: 0,
+    duplicate_count: 0,
+    stale_records: 0,
+    customer_shortages: 0,
+    source_failures: [],
+    integrity: { before: integrity, after: integrity },
+    message: "Legacy local-business discovery is quarantined. Property discovery will only use dedicated property and construction sources.",
   };
 }
