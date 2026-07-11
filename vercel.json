@@ -9,6 +9,10 @@
       "schedule": "30 6 * * *"
     },
     {
+      "path": "/api/cron/buyer-pipeline",
+      "schedule": "*/15 * * * *"
+    },
+    {
       "path": "/api/cron/opportunity-discovery",
       "schedule": "0 7 * * *"
     },

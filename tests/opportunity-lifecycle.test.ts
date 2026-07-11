@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { isCronAuthorized } from "../src/lib/cron-auth";
-import { buildOpportunityDeliveryCsv } from "../src/lib/opportunity-engine";
+import { buildOpportunityDeliveryCsv, parseQuickPasteUrls, quickPasteCandidateFromUrl } from "../src/lib/opportunity-engine";
 import { opportunityConfigForProduct } from "../src/lib/opportunity-products";
 import { formatSupabaseServerEnvError, SUPABASE_SERVICE_ROLE_KEY_ENV, supabaseConnectionStatus } from "../src/lib/supabase";
 import {
@@ -22,26 +22,26 @@ const now = new Date("2026-07-10T12:00:00Z");
 
 const baseOpportunity: OpportunityInput = {
   id: "opp-1",
-  company_name: "Bright Works Studio",
+  company_name: "Bright Works Construction",
   company_domain: "brightworks.example.co.uk",
   company_website: "https://brightworks.example.co.uk",
   company_location: "Manchester",
   company_country: "United Kingdom",
-  company_industry: "Marketing services",
-  company_description: "B2B marketing agency expanding delivery capacity.",
+  company_industry: "Construction services",
+  company_description: "High-end renovation contractor expanding project delivery capacity.",
   contact_full_name: "Avery Stone",
   contact_job_title: "Head of Operations",
   public_email: "avery@brightworks.example.co.uk",
   public_phone: "+44 20 1111 2222",
   source_type: "public_news_feed",
   source_name: "Public RSS",
-  source_url: "https://news.example.co.uk/bright-works-expansion",
-  source_title: "Bright Works requests supplier recommendations for expansion",
-  source_text: "Bright Works is looking for supplier recommendations and quotes for marketing support after opening a new Manchester location.",
+  source_url: "https://news.example.co.uk/bright-works-extension-project",
+  source_title: "Bright Works requests supplier recommendations for luxury renovation project",
+  source_text: "Bright Works is looking for supplier recommendations and quotes for luxury renovation support after winning a Manchester house extension project.",
   source_published_at: "2026-07-08T10:00:00Z",
   captured_at: "2026-07-09T10:00:00Z",
   last_verified_at: "2026-07-09T10:00:00Z",
-  niche: "marketing",
+  niche: "construction",
   target_location: "Manchester, United Kingdom",
 };
 
@@ -49,9 +49,9 @@ const profile: CustomerSearchProfile = {
   customer_email: "buyer@example.com",
   product_code: "radar",
   status: "active",
-  niche: "marketing",
-  target_service: "Lead generation",
-  target_industries: ["marketing"],
+  niche: "construction",
+  target_service: "Qualified property opportunities",
+  target_industries: ["construction", "property"],
   target_locations: ["Manchester", "United Kingdom"],
   company_sizes: [],
   target_job_roles: ["operations", "marketing"],
@@ -67,7 +67,7 @@ const profile: CustomerSearchProfile = {
   replacement_policy: "objective_failures",
 };
 
-assert.equal(buildOpportunityDedupeKey(baseOpportunity), "source:https://news.example.co.uk/bright-works-expansion");
+assert.equal(buildOpportunityDedupeKey(baseOpportunity), "source:https://news.example.co.uk/bright-works-extension-project");
 assert.equal(isFakeOrExampleDomain("example.com"), true);
 assert.equal(isFakeOrExampleDomain("marketvibe1.com"), false);
 
@@ -92,6 +92,30 @@ const profileOnlyScores = calculateOpportunityScores(profileOnly, profile, now);
 const profileOnlyQualification = qualifyOpportunity(profileOnly, profileOnlyScores, profile, now);
 assert.equal(profileOnlyQualification.qualified, false);
 assert.match(profileOnlyQualification.rejection_reason, /profile_only|empty_evidence|intent_below/i);
+
+const pastedUrls = parseQuickPasteUrls([
+  "www.linkedin.com/sales/lead/ACwAA-test",
+  "https://www.linkedin.com/sales/lead/ACwAA-test/",
+  "not a url",
+  "https://example.org/company",
+].join("\n"));
+assert.equal(pastedUrls.accepted.length, 2);
+assert.equal(pastedUrls.rejected.length, 2);
+assert.equal(pastedUrls.accepted[0].url, "https://linkedin.com/sales/lead/ACwAA-test");
+
+const pastedCandidate = quickPasteCandidateFromUrl({
+  url: pastedUrls.accepted[0].url,
+  niche: "Property developers",
+  location: "United Kingdom",
+  sourceNote: "Copied from admin browser.",
+  capturedAt: now.toISOString(),
+});
+assert.equal(pastedCandidate.source_type, "sales_navigator_url");
+assert.equal(pastedCandidate.company_name, "Unknown company");
+assert.equal(pastedCandidate.company_website, null);
+assert.equal(pastedCandidate.evidence_status, "profile_only");
+assert.equal(pastedCandidate.raw_payload?.no_scraping, true);
+assert.equal(pastedCandidate.raw_payload?.no_linkedin_fetch, true);
 
 const stale = { ...baseOpportunity, source_published_at: "2025-01-01T00:00:00Z" };
 assert.equal(shouldExpireOpportunity(stale, 45, now), true);
@@ -123,7 +147,7 @@ const matchable: MatchableOpportunity = {
 const second: MatchableOpportunity = {
   ...matchable,
   id: "opp-2",
-  company_name: "North City Marketing",
+  company_name: "North City Property",
   company_domain: "northcity.example.co.uk",
   company_website: "https://northcity.example.co.uk",
   source_url: "https://news.example.co.uk/north-city-tender",
@@ -183,7 +207,7 @@ const csv = buildOpportunityDeliveryCsv([
   },
 ]);
 assert.match(csv, /"Company","Website"/);
-assert.match(csv, /Bright Works Studio/);
+assert.match(csv, /Bright Works Construction/);
 assert.doesNotMatch(csv, /internal_notes|do not expose/);
 
 console.log("Opportunity lifecycle tests passed.");

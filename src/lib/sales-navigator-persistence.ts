@@ -3,6 +3,7 @@ import { sendTransactionalEmail } from "@/lib/brevo";
 import { getPremiumEntitlements } from "@/lib/premium-persistence";
 import type { PremiumProductCode } from "@/lib/premium-products";
 import { appendCustomerAccessParams, createCustomerAccessToken } from "@/lib/customer-access";
+import { persistImportedBuyerCompanies, type ImportPersistenceRow } from "@/lib/operations-pipeline";
 import {
   buildDeliveryCsv,
   buildDedupeKey,
@@ -12,11 +13,14 @@ import {
   deliveryToken,
   enrichComputedFields,
   evidenceSummary,
+  hasAnyUsableSourceReference,
   mapRow,
   MAX_IMPORT_ROWS,
+  fingerprintRawRow,
   scanPublicWebsite,
   suggestedOutreachAngle,
   tokenHash,
+  validateMappedRow,
   type ColumnMapping,
   type ImportedProspectInput,
   type ImportField,
@@ -71,10 +75,18 @@ export async function importProspectsFromRows({
   filename,
   rows,
   mapping,
+  sourceFormat = "csv",
+  worksheetName,
+  fileChecksum,
+  rowFingerprints,
 }: {
   filename: string;
   rows: Record<string, string>[];
   mapping: ColumnMapping;
+  sourceFormat?: "csv" | "xlsx" | "quick_paste";
+  worksheetName?: string;
+  fileChecksum?: string;
+  rowFingerprints?: string[];
 }) {
   if (rows.length > MAX_IMPORT_ROWS) {
     throw new Error("CSV has too many rows. Maximum rows per upload is 10,000.");
@@ -91,15 +103,11 @@ export async function importProspectsFromRows({
   rows.forEach((raw, index) => {
     const mapped = mapRow(raw, mapping);
     if (!mapped.company_name) missingCompany += 1;
-    const hasReference = Boolean(mapped.linkedin_profile_url || mapped.company_linkedin_url || mapped.company_website || mapped.company_domain || mapped.public_email || mapped.public_signal_url || mapped.public_signal_text);
-    if (!hasReference) missingReferences += 1;
+    if (!hasAnyUsableSourceReference(mapped)) missingReferences += 1;
+    const validationError = validateMappedRow(mapped);
     const dedupe = buildDedupeKey(mapped);
-    if (!mapped.company_name) {
-      rejected.push({ index, reason: "Company is required." });
-      return;
-    }
-    if (!hasReference) {
-      rejected.push({ index, reason: "At least one source reference is required." });
+    if (validationError) {
+      rejected.push({ index, reason: validationError });
       return;
     }
     if (!dedupe) {
@@ -115,17 +123,18 @@ export async function importProspectsFromRows({
   });
 
   const dedupeKeys = computed.map((row) => row.dedupe_key);
-  const existing = new Set<string>();
+  const existing = new Map<string, string>();
   for (const keyChunk of chunk(dedupeKeys, 500)) {
     const { data, error } = await supabase
       .from("premium_imported_prospects")
-      .select("dedupe_key")
+      .select("id,dedupe_key")
       .in("dedupe_key", keyChunk);
     if (error) throw error;
-    (data || []).forEach((row) => existing.add(String(row.dedupe_key)));
+    (data || []).forEach((row) => existing.set(String(row.dedupe_key), String(row.id)));
   }
 
   const rowsToInsert = computed.filter((row) => !existing.has(row.dedupe_key));
+  const duplicateComputedRows = computed.filter((row) => existing.has(row.dedupe_key));
   duplicateRows += computed.length - rowsToInsert.length;
 
   const { data: batch, error: batchError } = await supabase
@@ -140,18 +149,53 @@ export async function importProspectsFromRows({
       duplicate_rows: duplicateRows,
       rejected_rows: rejected.length,
       mapping,
+      source_format: sourceFormat,
+      worksheet_name: worksheetName || null,
+      file_checksum: fileChecksum || null,
+      row_fingerprints: rowFingerprints || [],
       error_summary: { rejected, missingCompany, missingReferences },
     })
     .select("id")
     .single();
   if (batchError || !batch) throw batchError || new Error("Import batch could not be created.");
 
+  const insertedByDedupeKey = new Map<string, string>();
   if (rowsToInsert.length > 0) {
     const insertRows = rowsToInsert.map((row) => prospectToDbRow(row, batch.id));
     for (const insertChunk of chunk(insertRows, 500)) {
-      const { error } = await supabase.from("premium_imported_prospects").insert(insertChunk);
+      const { data, error } = await supabase.from("premium_imported_prospects").insert(insertChunk).select("id,dedupe_key");
       if (error) throw error;
+      (data || []).forEach((row) => insertedByDedupeKey.set(String(row.dedupe_key), String(row.id)));
     }
+  }
+
+  let pipelineResult = { companiesCreated: 0, duplicateCompanies: 0, queuedJobs: 0 };
+  if (computed.length > 0) {
+    const insertedRows: ImportPersistenceRow[] = rowsToInsert.map((row) => ({
+      row,
+      prospectId: insertedByDedupeKey.get(row.dedupe_key),
+      dedupeKey: row.dedupe_key,
+      rowFingerprint: fingerprintRawRow(row.raw_row),
+    }));
+    const duplicateRowsForPipeline: ImportPersistenceRow[] = duplicateComputedRows.map((row) => ({
+      row,
+      prospectId: existing.get(row.dedupe_key),
+      dedupeKey: row.dedupe_key,
+      rowFingerprint: fingerprintRawRow(row.raw_row),
+    }));
+    pipelineResult = await persistImportedBuyerCompanies({
+      supabase,
+      metadata: {
+        batchId: String(batch.id),
+        filename,
+        sourceFormat,
+        worksheetName,
+        fileChecksum,
+        rowFingerprints,
+      },
+      insertedRows,
+      duplicateRows: duplicateRowsForPipeline,
+    });
   }
 
   const { error: updateError } = await supabase
@@ -159,6 +203,12 @@ export async function importProspectsFromRows({
     .update({
       status: "completed",
       imported_rows: rowsToInsert.length,
+      import_summary: {
+        sourceRecordsPersisted: rowsToInsert.length,
+        buyerCompaniesCreated: pipelineResult.companiesCreated,
+        duplicateCompanies: pipelineResult.duplicateCompanies,
+        websiteVerificationJobsQueued: pipelineResult.queuedJobs,
+      },
       completed_at: new Date().toISOString(),
     })
     .eq("id", batch.id);
@@ -171,6 +221,9 @@ export async function importProspectsFromRows({
     importedRows: rowsToInsert.length,
     duplicateRows,
     rejectedRows: rejected.length,
+    buyerCompaniesCreated: pipelineResult.companiesCreated,
+    duplicateCompanies: pipelineResult.duplicateCompanies,
+    websiteVerificationJobsQueued: pipelineResult.queuedJobs,
   };
 }
 

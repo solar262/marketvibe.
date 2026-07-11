@@ -37,6 +37,55 @@ type SourceCandidate = OpportunityInput & {
   raw_payload?: Record<string, unknown>;
 };
 
+const QUICK_PASTE_PROFILE_NAME = "Property Pipeline Buyers";
+const QUICK_PASTE_PROFILE_KEYWORDS = [
+  "high-end builder",
+  "real estate agent",
+  "estate agency",
+  "property developer",
+  "construction company",
+  "renovation contractor",
+  "luxury home contractor",
+  "commercial property broker",
+];
+const QUICK_PASTE_OPPORTUNITY_SIGNAL_KEYWORDS = [
+  "looking for builder",
+  "need contractor",
+  "home renovation",
+  "house extension",
+  "planning permission",
+  "property seller",
+  "property buyer",
+  "moving house",
+  "land for sale",
+  "new build",
+  "property investment",
+  "luxury renovation",
+];
+const QUICK_PASTE_BUYER_TYPE = "High-ticket property, construction, and real estate service businesses";
+const QUICK_PASTE_MAX_URLS = 500;
+
+export type QuickPasteImportInput = {
+  urls: string;
+  niche?: string;
+  location?: string;
+  sourceNote?: string;
+  publicSignalText?: string;
+};
+
+export type QuickPasteImportCandidate = SourceCandidate & {
+  pasted_url: string;
+};
+
+export type QuickPasteImportResult = {
+  importedRows: number;
+  duplicateRows: number;
+  rejectedRows: number;
+  rejected: Array<{ line: number; reason: string; value: string }>;
+  profileId?: string;
+  inventoryUrl: string;
+};
+
 type RunCounters = {
   records_discovered: number;
   records_rejected: number;
@@ -56,6 +105,137 @@ function supabaseOrThrow() {
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+function sourceTypeFromPastedUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./, "");
+    if (host === "linkedin.com" || host.endsWith(".linkedin.com")) {
+      return parsed.pathname.includes("/sales/") ? "sales_navigator_url" : "linkedin_profile_or_company_url";
+    }
+    return "admin_pasted_public_url";
+  } catch {
+    return "admin_pasted_public_url";
+  }
+}
+
+function isLinkedInUrl(url: string) {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, "");
+    return host === "linkedin.com" || host.endsWith(".linkedin.com");
+  } catch {
+    return false;
+  }
+}
+
+export function parseQuickPasteUrls(urls: string) {
+  const rejected: Array<{ line: number; reason: string; value: string }> = [];
+  const seen = new Set<string>();
+  const accepted: Array<{ line: number; url: string; original: string }> = [];
+  const lines = urls.split(/\r?\n/);
+
+  if (lines.length > QUICK_PASTE_MAX_URLS) {
+    rejected.push({
+      line: QUICK_PASTE_MAX_URLS + 1,
+      reason: `Maximum ${QUICK_PASTE_MAX_URLS} pasted URLs per import.`,
+      value: "",
+    });
+  }
+
+  for (const [index, rawLine] of lines.slice(0, QUICK_PASTE_MAX_URLS).entries()) {
+    const original = rawLine.trim();
+    if (!original) continue;
+    const normalized = normalizeUrl(original);
+    if (!normalized) {
+      rejected.push({ line: index + 1, reason: "Invalid URL.", value: original });
+      continue;
+    }
+    if (seen.has(normalized)) {
+      rejected.push({ line: index + 1, reason: "Duplicate URL in pasted list.", value: original });
+      continue;
+    }
+    seen.add(normalized);
+    accepted.push({ line: index + 1, url: normalized, original });
+  }
+
+  return { accepted, rejected };
+}
+
+function defaultQuickPasteProfileRow() {
+  return {
+    customer_email: "admin@marketvibe.local",
+    product_code: "radar" as const,
+    status: "active" as const,
+    niche: QUICK_PASTE_PROFILE_NAME,
+    target_service: QUICK_PASTE_BUYER_TYPE,
+    target_industries: QUICK_PASTE_PROFILE_KEYWORDS,
+    target_locations: [],
+    company_sizes: [],
+    target_job_roles: ["owner", "founder", "ceo", "director", "property developer", "estate agent", "broker", "project manager", "construction manager"],
+    minimum_fit_score: 20,
+    minimum_intent_score: 0,
+    minimum_evidence_score: 0,
+    maximum_record_age_days: 90,
+    opportunity_quantity: 25,
+    delivery_frequency: "weekly" as const,
+    exclusivity_mode: "customer_exclusive" as const,
+    exclusivity_period_days: 14,
+    allow_profile_only: false,
+    replacement_policy: "admin_review" as const,
+    metadata: {
+      name: QUICK_PASTE_PROFILE_NAME,
+      keywords: QUICK_PASTE_PROFILE_KEYWORDS,
+      buyer_type: QUICK_PASTE_BUYER_TYPE,
+      opportunity_signal_keywords: QUICK_PASTE_OPPORTUNITY_SIGNAL_KEYWORDS,
+      created_by: "quick_paste_import",
+    },
+    updated_at: nowIso(),
+  };
+}
+
+export function quickPasteCandidateFromUrl(input: {
+  url: string;
+  niche?: string;
+  location?: string;
+  sourceNote?: string;
+  publicSignalText?: string;
+  capturedAt?: string;
+}): QuickPasteImportCandidate {
+  const normalizedUrl = normalizeUrl(input.url);
+  const linkedIn = isLinkedInUrl(normalizedUrl);
+  const domain = linkedIn ? "" : domainFromUrl(normalizedUrl);
+  const note = input.sourceNote?.trim() || "";
+  const publicSignalText = input.publicSignalText?.trim() || "";
+  const sourceText = publicSignalText || "URL supplied by admin through Quick Paste Import. No page was fetched; company, contact, and evidence fields are unknown until review.";
+
+  return {
+    pasted_url: normalizedUrl,
+    company_name: "Unknown company",
+    company_domain: domain || null,
+    company_website: linkedIn ? null : normalizedUrl,
+    company_location: input.location?.trim() || "Unknown",
+    company_industry: input.niche?.trim() || "Unknown",
+    source_type: sourceTypeFromPastedUrl(normalizedUrl),
+    source_name: "Quick Paste Import",
+    source_url: normalizedUrl,
+    source_title: linkedIn ? "Pasted LinkedIn/Sales Navigator URL" : "Pasted public URL",
+    source_text: sourceText,
+    captured_at: input.capturedAt || nowIso(),
+    evidence_status: "profile_only",
+    intent_category: publicSignalText ? "weak_research_signal" : "profile_only",
+    niche: input.niche?.trim() || QUICK_PASTE_PROFILE_NAME,
+    target_location: input.location?.trim() || null,
+    raw_payload: {
+      pasted_url: normalizedUrl,
+      source_note: note,
+      public_signal_text: publicSignalText,
+      quick_paste_import: true,
+      no_scraping: true,
+      no_linkedin_fetch: linkedIn,
+      missing_fields_marked_unknown: true,
+    },
+  };
 }
 
 function runIdempotencyKey(name: string, trigger: DiscoveryTrigger | "cron" | "admin", scope = "all") {
@@ -339,6 +519,43 @@ async function existingDedupeKeys(supabase: SupabaseClient, keys: string[]) {
   return new Set((data || []).map((row) => String(row.dedupe_key)));
 }
 
+async function ensureQuickPasteDefaultSearchProfile(supabase: SupabaseClient) {
+  const defaultRow = defaultQuickPasteProfileRow();
+  const { data: activeProfiles, error } = await supabase
+    .from("customer_search_profiles")
+    .select("*")
+    .eq("status", "active")
+    .order("created_at", { ascending: true })
+    .limit(50);
+  if (error) throw error;
+  const quickPasteProfiles = (activeProfiles || []).filter((row) => {
+    const record = row as Record<string, unknown>;
+    const metadata = record.metadata && typeof record.metadata === "object" ? record.metadata as Record<string, unknown> : {};
+    return record.customer_email === defaultRow.customer_email
+      || metadata.created_by === "quick_paste_import"
+      || record.niche === QUICK_PASTE_PROFILE_NAME;
+  });
+  const defaultProfile = quickPasteProfiles.find((row) => row.niche === QUICK_PASTE_PROFILE_NAME) || quickPasteProfiles[0];
+  if (defaultProfile?.id) {
+    const { data, error: updateError } = await supabase
+      .from("customer_search_profiles")
+      .update(defaultRow)
+      .eq("id", String(defaultProfile.id))
+      .select("*")
+      .single();
+    if (updateError || !data) throw updateError || new Error("Default Quick Paste search profile could not be updated.");
+    return profileFromRow(data as Record<string, unknown>);
+  }
+
+  const { data, error: upsertError } = await supabase
+    .from("customer_search_profiles")
+    .upsert(defaultRow, { onConflict: "customer_email,product_code,niche" })
+    .select("*")
+    .single();
+  if (upsertError || !data) throw upsertError || new Error("Default Quick Paste search profile could not be created.");
+  return profileFromRow(data as Record<string, unknown>);
+}
+
 function opportunityInsertRow(candidate: SourceCandidate, profile: CustomerSearchProfile, scores: OpportunityScores, qualification: ReturnType<typeof qualifyOpportunity>) {
   const dedupeKey = buildOpportunityDedupeKey(candidate);
   return {
@@ -387,6 +604,101 @@ function opportunityInsertRow(candidate: SourceCandidate, profile: CustomerSearc
     raw_payload: candidate.raw_payload || {},
     quality_flags: qualification.quality_flags,
     updated_at: nowIso(),
+  };
+}
+
+export async function importQuickPasteOpportunities(input: QuickPasteImportInput): Promise<QuickPasteImportResult> {
+  const supabase = supabaseOrThrow();
+  const { accepted, rejected } = parseQuickPasteUrls(input.urls || "");
+  if (accepted.length === 0) {
+    return {
+      importedRows: 0,
+      duplicateRows: 0,
+      rejectedRows: rejected.length,
+      rejected,
+      inventoryUrl: "/admin/inventory?status=DISCOVERED",
+    };
+  }
+
+  const profile = await ensureQuickPasteDefaultSearchProfile(supabase);
+  const candidates = accepted.map((item) => quickPasteCandidateFromUrl({
+    url: item.url,
+    niche: input.niche,
+    location: input.location,
+    sourceNote: input.sourceNote,
+    publicSignalText: input.publicSignalText,
+  }));
+  const existing = await existingDedupeKeys(supabase, candidates.map((candidate) => buildOpportunityDedupeKey(candidate)));
+  let importedRows = 0;
+  let duplicateRows = 0;
+
+  for (const candidate of candidates) {
+    const dedupeKey = buildOpportunityDedupeKey(candidate);
+    if (!dedupeKey || existing.has(dedupeKey)) {
+      duplicateRows += 1;
+      continue;
+    }
+
+    const calculated = calculateOpportunityScores(candidate, profile);
+    const publicSignalText = String(candidate.raw_payload?.public_signal_text || "").trim();
+    const intentCategory = publicSignalText ? "weak_research_signal" as const : "profile_only" as const;
+    const intentScore = publicSignalText ? Math.min(calculated.intent_score, 60) : 20;
+    const evidenceScore = Math.min(calculated.evidence_score, 20);
+    const overallScore = Math.round((calculated.fit_score * 0.3) + (intentScore * 0.35) + (evidenceScore * 0.2) + (calculated.freshness_score * 0.15));
+    const scores: OpportunityScores = {
+      ...calculated,
+      intent_score: intentScore,
+      evidence_score: evidenceScore,
+      overall_score: overallScore,
+      intent_category: intentCategory,
+      evidence_status: "profile_only",
+      reasons: {
+        ...calculated.reasons,
+        intent: publicSignalText
+          ? ["Admin supplied public signal text, but MarketVibe has not fetched or verified the source yet."]
+          : ["Only a pasted profile or source URL is available."],
+        evidence: ["Quick Paste stores the source URL only. No LinkedIn page, Sales Navigator page, cookie, login session, or unofficial API was used."],
+      },
+    };
+    const qualification = {
+      qualified: false,
+      inventory_status: "DISCOVERED" as const,
+      review_status: "pending" as const,
+      verification_status: "DISCOVERED" as const,
+      rejection_reason: "",
+      quality_flags: ["quick_paste_unverified", "requires_manual_review", "not_ready_for_delivery"],
+    };
+    const row = {
+      ...opportunityInsertRow(candidate, profile, scores, qualification),
+      company_industry: input.niche?.trim() || candidate.company_industry || null,
+      company_location: input.location?.trim() || candidate.company_location || null,
+      internal_notes: input.sourceNote?.trim() || null,
+      niche: input.niche?.trim() || profile.niche,
+      target_location: input.location?.trim() || null,
+      exclusivity_key: null,
+    };
+
+    const { error } = await supabase.from("opportunities").insert(row);
+    if (error?.code === "23505") {
+      duplicateRows += 1;
+      existing.add(dedupeKey);
+      continue;
+    }
+    if (error) throw error;
+    importedRows += 1;
+    existing.add(dedupeKey);
+  }
+
+  const params = new URLSearchParams({ status: "DISCOVERED" });
+  if (input.niche?.trim()) params.set("niche", input.niche.trim());
+
+  return {
+    importedRows,
+    duplicateRows,
+    rejectedRows: rejected.length,
+    rejected,
+    profileId: profile.id,
+    inventoryUrl: `/admin/inventory?${params.toString()}`,
   };
 }
 

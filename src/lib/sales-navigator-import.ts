@@ -1,6 +1,7 @@
 import { lookup } from "node:dns/promises";
 import { createHash, randomBytes } from "node:crypto";
 import { isIP } from "node:net";
+import AdmZip from "adm-zip";
 import Papa from "papaparse";
 
 export const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
@@ -48,6 +49,10 @@ export type ImportedProspectInput = Record<ImportField, string> & {
 export type ImportPreview = {
   filename: string;
   delimiter: "," | ";" | "\t";
+  sourceFormat: "csv" | "xlsx";
+  worksheetName?: string;
+  fileChecksum?: string;
+  rowFingerprints: string[];
   headers: string[];
   mapping: ColumnMapping;
   rows: Record<string, string>[];
@@ -207,7 +212,205 @@ export function parseCsvText(text: string, byteSize = Buffer.byteLength(text, "u
     throw new Error("CSV has too many rows. Maximum rows per upload is 10,000.");
   }
 
-  return { delimiter, headers, rows: result.data };
+  const rows = result.data.filter((row) => Object.values(row).some((value) => String(value || "").trim()));
+  return { delimiter, headers, rows };
+}
+
+function sha256(value: string | Buffer) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+export function fingerprintRawRow(row: Record<string, string>) {
+  const normalized = Object.keys(row)
+    .sort((a, b) => a.localeCompare(b))
+    .map((key) => [normalizeHeader(key), cleanCell(row[key])]);
+  return sha256(JSON.stringify(normalized));
+}
+
+function lastPopulatedIndex(values: string[]) {
+  for (let index = values.length - 1; index >= 0; index -= 1) {
+    if (values[index]) return index;
+  }
+  return -1;
+}
+
+function excelCellValueToText(value: unknown): string {
+  if (value == null) return "";
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return cleanCell(value);
+  if (typeof value === "object") {
+    const cellObject = value as {
+      text?: unknown;
+      result?: unknown;
+      richText?: Array<{ text?: unknown }>;
+      hyperlink?: unknown;
+    };
+    if (Array.isArray(cellObject.richText)) return cleanCell(cellObject.richText.map((item) => item.text || "").join(""));
+    if (cellObject.result != null) return excelCellValueToText(cellObject.result);
+    if (cellObject.text != null) return cleanCell(cellObject.text);
+    if (cellObject.hyperlink != null) return cleanCell(cellObject.hyperlink);
+  }
+  return cleanCell(value);
+}
+
+function xmlDecode(value: string) {
+  return value
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, "\"")
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
+function parseXmlAttributes(value: string) {
+  const attrs: Record<string, string> = {};
+  for (const match of value.matchAll(/([\w:.-]+)="([^"]*)"/g)) {
+    attrs[match[1]] = xmlDecode(match[2]);
+  }
+  return attrs;
+}
+
+function zipText(zip: AdmZip, path: string) {
+  return zip.getEntry(path)?.getData().toString("utf8") || "";
+}
+
+function normalizeWorkbookTarget(target: string) {
+  const clean = target.replace(/^\/+/, "");
+  if (clean.startsWith("xl/")) return clean;
+  return `xl/${clean}`.replace(/\/\.\//g, "/");
+}
+
+function parseWorkbookRelationships(xml: string) {
+  const relationships = new Map<string, string>();
+  for (const match of xml.matchAll(/<Relationship\b([^>]*)\/>/g)) {
+    const attrs = parseXmlAttributes(match[1]);
+    if (attrs.Id && attrs.Target && /worksheet/i.test(attrs.Type || "")) {
+      relationships.set(attrs.Id, normalizeWorkbookTarget(attrs.Target));
+    }
+  }
+  return relationships;
+}
+
+function parseWorkbookSheets(xml: string, relationships: Map<string, string>) {
+  const sheets: Array<{ name: string; path: string; visible: boolean }> = [];
+  for (const match of xml.matchAll(/<(?:[\w.-]+:)?sheet\b([^>]*)\/>/g)) {
+    const attrs = parseXmlAttributes(match[1]);
+    const relationId = attrs["r:id"];
+    const path = relationId ? relationships.get(relationId) : "";
+    if (!attrs.name || !path) continue;
+    sheets.push({
+      name: attrs.name,
+      path,
+      visible: attrs.state !== "hidden" && attrs.state !== "veryHidden",
+    });
+  }
+  return sheets;
+}
+
+function parseSharedStrings(xml: string) {
+  if (!xml) return [];
+  const strings: string[] = [];
+  for (const match of xml.matchAll(/<(?:[\w.-]+:)?si\b[^>]*>([\s\S]*?)<\/(?:[\w.-]+:)?si>/g)) {
+    const text = Array.from(match[1].matchAll(/<(?:[\w.-]+:)?t\b[^>]*>([\s\S]*?)<\/(?:[\w.-]+:)?t>/g))
+      .map((textMatch) => xmlDecode(textMatch[1]))
+      .join("");
+    strings.push(cleanCell(text));
+  }
+  return strings;
+}
+
+function columnIndexFromCellRef(ref: string) {
+  const letters = (ref.match(/[A-Z]+/i)?.[0] || "").toUpperCase();
+  if (!letters) return 0;
+  let column = 0;
+  for (const letter of letters) column = column * 26 + (letter.charCodeAt(0) - 64);
+  return Math.max(0, column - 1);
+}
+
+function parseCellText(cellAttrs: Record<string, string>, cellXml: string, sharedStrings: string[]) {
+  const inlineText = Array.from(cellXml.matchAll(/<(?:[\w.-]+:)?t\b[^>]*>([\s\S]*?)<\/(?:[\w.-]+:)?t>/g))
+    .map((match) => xmlDecode(match[1]))
+    .join("");
+  const rawValue = xmlDecode(cellXml.match(/<(?:[\w.-]+:)?v\b[^>]*>([\s\S]*?)<\/(?:[\w.-]+:)?v>/)?.[1] || "");
+  if (cellAttrs.t === "s") return cleanCell(sharedStrings[Number(rawValue)] || "");
+  if (cellAttrs.t === "inlineStr") return cleanCell(inlineText);
+  if (cellAttrs.t === "b") return rawValue === "1" ? "TRUE" : rawValue === "0" ? "FALSE" : cleanCell(rawValue);
+  return cleanCell(rawValue || inlineText);
+}
+
+function parseWorksheetRows(xml: string, sharedStrings: string[]) {
+  const rows: string[][] = [];
+  for (const rowMatch of xml.matchAll(/<(?:[\w.-]+:)?row\b([^>]*)>([\s\S]*?)<\/(?:[\w.-]+:)?row>/g)) {
+    const rowAttrs = parseXmlAttributes(rowMatch[1]);
+    const rowIndex = Math.max(0, Number(rowAttrs.r || rows.length + 1) - 1);
+    const values: string[] = rows[rowIndex] || [];
+    for (const cellMatch of rowMatch[2].matchAll(/<(?:[\w.-]+:)?c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:[\w.-]+:)?c>)/g)) {
+      const cellAttrs = parseXmlAttributes(cellMatch[1]);
+      const columnIndex = columnIndexFromCellRef(cellAttrs.r || "");
+      values[columnIndex] = parseCellText(cellAttrs, cellMatch[2] || "", sharedStrings);
+    }
+    rows[rowIndex] = values;
+  }
+  return rows;
+}
+
+export async function parseXlsxBuffer(buffer: Buffer, byteSize = buffer.byteLength) {
+  if (byteSize > MAX_IMPORT_BYTES) {
+    throw new Error("Workbook is too large. Maximum size is 10 MB.");
+  }
+
+  if (byteSize === 0) {
+    throw new Error("Workbook file is empty.");
+  }
+
+  const zip = new AdmZip(buffer);
+  const workbookXml = zipText(zip, "xl/workbook.xml");
+  const relationshipsXml = zipText(zip, "xl/_rels/workbook.xml.rels");
+  if (!workbookXml || !relationshipsXml) {
+    throw new Error("Workbook structure is not readable. Save the file as a standard .xlsx workbook and try again.");
+  }
+  const relationships = parseWorkbookRelationships(relationshipsXml);
+  const worksheets = parseWorkbookSheets(workbookXml, relationships).filter((worksheet) => worksheet.visible);
+  const sharedStrings = parseSharedStrings(zipText(zip, "xl/sharedStrings.xml"));
+
+  for (const worksheet of worksheets) {
+    const worksheetRows = parseWorksheetRows(zipText(zip, worksheet.path), sharedStrings);
+    const worksheetName = worksheet.name;
+    const columnCount = Math.max(0, ...worksheetRows.map((row) => row.length));
+    if (columnCount === 0 || worksheetRows.length === 0) continue;
+
+    for (let rowNumber = 0; rowNumber < worksheetRows.length; rowNumber += 1) {
+      const headerCandidate = Array.from({ length: columnCount }, (_, index) => excelCellValueToText(worksheetRows[rowNumber]?.[index]));
+      const headerEnd = lastPopulatedIndex(headerCandidate);
+      if (headerEnd < 0) continue;
+
+      const headers = headerCandidate.slice(0, headerEnd + 1).map(cleanCell);
+      if (headers.length === 0 || headers.every((header) => !header)) continue;
+
+      const rows: Record<string, string>[] = [];
+      for (let dataRowNumber = rowNumber + 1; dataRowNumber < worksheetRows.length; dataRowNumber += 1) {
+        const values = Array.from({ length: headers.length }, (_, index) => excelCellValueToText(worksheetRows[dataRowNumber]?.[index]));
+        if (values.every((value) => !value)) continue;
+        const raw = Object.fromEntries(headers.map((header, index) => [header, values[index] || ""]));
+        rows.push(raw);
+      }
+
+      if (rows.length > MAX_IMPORT_ROWS) {
+        throw new Error("Workbook has too many rows. Maximum rows per upload is 10,000.");
+      }
+
+      return {
+        delimiter: "," as const,
+        headers,
+        rows,
+        worksheetName,
+        fileChecksum: sha256(buffer),
+        rowFingerprints: rows.map(fingerprintRawRow),
+      };
+    }
+  }
+
+  throw new Error("Workbook has no visible worksheet with a usable header row.");
 }
 
 export function buildImportPreview({
@@ -222,7 +425,69 @@ export function buildImportPreview({
   mapping?: ColumnMapping;
 }): ImportPreview {
   const parsed = parseCsvText(text, byteSize);
-  const mapping = providedMapping || inferColumnMapping(parsed.headers);
+  return buildImportPreviewFromRows({
+    filename,
+    delimiter: parsed.delimiter,
+    sourceFormat: "csv",
+    headers: parsed.headers,
+    rows: parsed.rows,
+    mapping: providedMapping,
+    fileChecksum: sha256(text),
+    rowFingerprints: parsed.rows.map(fingerprintRawRow),
+  });
+}
+
+export async function buildImportPreviewFromWorkbookBuffer({
+  buffer,
+  filename,
+  byteSize,
+  mapping: providedMapping,
+}: {
+  buffer: Buffer;
+  filename: string;
+  byteSize?: number;
+  mapping?: ColumnMapping;
+}): Promise<ImportPreview> {
+  const parsed = await parseXlsxBuffer(buffer, byteSize);
+  return buildImportPreviewFromRows({
+    filename,
+    delimiter: parsed.delimiter,
+    sourceFormat: "xlsx",
+    worksheetName: parsed.worksheetName,
+    headers: parsed.headers,
+    rows: parsed.rows,
+    mapping: providedMapping,
+    fileChecksum: parsed.fileChecksum,
+    rowFingerprints: parsed.rowFingerprints,
+  });
+}
+
+export function buildImportPreviewFromRows({
+  filename,
+  delimiter,
+  sourceFormat = "csv",
+  worksheetName,
+  headers,
+  rows,
+  fileChecksum,
+  rowFingerprints,
+  mapping: providedMapping,
+}: {
+  filename: string;
+  delimiter: "," | ";" | "\t";
+  sourceFormat?: "csv" | "xlsx";
+  worksheetName?: string;
+  headers: string[];
+  rows: Record<string, string>[];
+  fileChecksum?: string;
+  rowFingerprints?: string[];
+  mapping?: ColumnMapping;
+}): ImportPreview {
+  if (rows.length > MAX_IMPORT_ROWS) {
+    throw new Error("CSV has too many rows. Maximum rows per upload is 10,000.");
+  }
+
+  const mapping = providedMapping || inferColumnMapping(headers);
   const seen = new Set<string>();
   const previewRows: ImportedProspectInput[] = [];
   const rejectedRows: ImportPreview["rejectedRows"] = [];
@@ -230,7 +495,7 @@ export function buildImportPreview({
   let rowsMissingCompany = 0;
   let rowsMissingAllUsableSourceReferences = 0;
 
-  parsed.rows.forEach((raw, index) => {
+  rows.forEach((raw, index) => {
     const mapped = mapRow(raw, mapping);
     if (!mapped.company_name) rowsMissingCompany += 1;
     if (!hasAnyUsableSourceReference(mapped)) rowsMissingAllUsableSourceReferences += 1;
@@ -250,15 +515,19 @@ export function buildImportPreview({
 
   return {
     filename,
-    delimiter: parsed.delimiter,
-    headers: parsed.headers,
+    delimiter,
+    sourceFormat,
+    worksheetName,
+    fileChecksum,
+    rowFingerprints: rowFingerprints || rows.map(fingerprintRawRow),
+    headers,
     mapping,
-    rows: parsed.rows,
+    rows,
     previewRows: previewRows.slice(0, 20),
     rejectedRows,
     duplicateRows,
     stats: {
-      totalRows: parsed.rows.length,
+      totalRows: rows.length,
       validRows: previewRows.length,
       rejectedRows: rejectedRows.length,
       duplicateRows: duplicateRows.length,
@@ -293,7 +562,7 @@ export function cleanCell(value: unknown) {
 
 export function validateMappedRow(row: Record<ImportField, string>) {
   if (!row.company_name) return "Company is required.";
-  if (!hasAnyUsableSourceReference(row)) return "At least one source reference is required.";
+  if (!hasAnyUsableSourceReference(row)) return "Add a company website, company domain, public signal URL, company LinkedIn URL, or LinkedIn profile URL.";
   if (!buildDedupeKey(row)) return "A dedupe key could not be generated.";
   return "";
 }
@@ -304,9 +573,7 @@ export function hasAnyUsableSourceReference(row: Record<ImportField, string>) {
     row.company_linkedin_url ||
     row.company_website ||
     row.company_domain ||
-    row.public_email ||
-    row.public_signal_url ||
-    row.public_signal_text,
+    row.public_signal_url,
   );
 }
 
@@ -339,6 +606,8 @@ export function enrichComputedFields(
 export function buildDedupeKey(row: Pick<Record<ImportField, string>, ImportField>) {
   const linkedin = normalizeLinkedInUrl(row.linkedin_profile_url);
   if (linkedin) return `linkedin:${linkedin}`;
+  const companyLinkedin = normalizeLinkedInUrl(row.company_linkedin_url);
+  if (companyLinkedin) return `company_linkedin:${companyLinkedin}`;
   const email = normalizeEmail(row.public_email);
   if (email) return `email:${email}`;
   const fullName = normalizeText(row.full_name || [row.first_name, row.last_name].filter(Boolean).join(" "));
@@ -347,6 +616,9 @@ export function buildDedupeKey(row: Pick<Record<ImportField, string>, ImportFiel
   const title = normalizeText(row.job_title);
   const domain = normalizeDomain(row.company_domain || domainFromUrl(row.company_website));
   if (title && company && domain) return `title_company_domain:${title}:${company}:${domain}`;
+  if (company && domain) return `company_domain:${company}:${domain}`;
+  const signalUrl = normalizeHttpUrl(row.public_signal_url);
+  if (company && signalUrl) return `company_signal:${company}:${signalUrl}`;
   return "";
 }
 

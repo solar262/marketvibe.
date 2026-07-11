@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Download, FileUp, Loader2, Send, ShieldCheck } from "lucide-react";
+import { ClipboardPaste, Download, FileUp, Loader2, Send, ShieldCheck } from "lucide-react";
 
 type ImportField =
   | "first_name"
@@ -28,12 +28,17 @@ type Mapping = Partial<Record<ImportField, string>>;
 
 type Preview = {
   filename: string;
+  delimiter: "," | ";" | "\t";
+  sourceFormat: "csv" | "xlsx";
+  worksheetName?: string;
+  fileChecksum?: string;
+  rowFingerprints: string[];
   headers: string[];
   mapping: Mapping;
   rows: Record<string, string>[];
   previewRows: PreviewRow[];
   duplicateRows: Array<{ index: number; reason: string; dedupe_key: string }>;
-  rejectedRows: Array<{ index: number; reason: string }>;
+  rejectedRows: Array<{ index: number; reason: string; raw_row?: Record<string, string> }>;
   stats: {
     totalRows: number;
     validRows: number;
@@ -78,7 +83,18 @@ type ImportActionResponse = {
     importedRows?: number;
     duplicateRows?: number;
     rejectedRows?: number;
+    buyerCompaniesCreated?: number;
+    duplicateCompanies?: number;
+    websiteVerificationJobsQueued?: number;
   };
+};
+
+type QuickPasteResult = {
+  importedRows: number;
+  duplicateRows: number;
+  rejectedRows: number;
+  inventoryUrl: string;
+  rejected?: Array<{ line: number; reason: string; value: string }>;
 };
 
 const fields: Array<{ value: ImportField; label: string }> = [
@@ -96,8 +112,8 @@ const fields: Array<{ value: ImportField; label: string }> = [
   ["city", "City"],
   ["industry", "Industry"],
   ["company_size", "Company size"],
-  ["public_email", "Public email"],
-  ["public_phone", "Public phone"],
+  ["public_email", "Email"],
+  ["public_phone", "Phone"],
   ["public_signal_url", "Public signal URL"],
   ["public_signal_text", "Public signal text"],
   ["source_note", "Source note"],
@@ -136,6 +152,8 @@ export function AdminImportConsole() {
   const [busy, setBusy] = useState("");
   const [filters, setFilters] = useState({ batchId: "", evidenceStatus: "", enrichmentStatus: "", company: "", country: "", city: "", industry: "", minFitScore: "" });
   const [assignment, setAssignment] = useState({ customerEmail: "", productCode: "proof_pack", count: "25", adminNotes: "", adminConfirmedCustomer: false, includeProfileOnly: false });
+  const [quickPaste, setQuickPaste] = useState({ urls: "", niche: "", location: "", sourceNote: "", publicSignalText: "" });
+  const [quickPasteResult, setQuickPasteResult] = useState<QuickPasteResult | null>(null);
 
   const selectedIds = useMemo(() => Array.from(selected), [selected]);
   const selectedProspects = useMemo(() => prospects.filter((prospect) => selected.has(String(prospect.id))), [prospects, selected]);
@@ -178,7 +196,7 @@ export function AdminImportConsole() {
       const data = await request<{ preview: Preview }>("/api/admin/import/preview", { method: "POST", body: formData });
       setPreview(data.preview);
       setMapping(data.preview.mapping || {});
-      setStatus("Preview ready. Confirm import when the counts and mapping look correct.");
+      setStatus(`Auto-mapped and validated: ${data.preview.stats.validRows} valid, ${data.preview.stats.rejectedRows} rejected, ${data.preview.stats.duplicateRows} duplicates.`);
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "Preview failed.");
     } finally {
@@ -195,13 +213,88 @@ export function AdminImportConsole() {
       const data = await request<ImportActionResponse>("/api/admin/import/confirm", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ filename: preview.filename, rows: preview.rows, mapping }),
+        body: JSON.stringify({
+          filename: preview.filename,
+          rows: preview.rows,
+          mapping,
+          sourceFormat: preview.sourceFormat,
+          worksheetName: preview.worksheetName,
+          fileChecksum: preview.fileChecksum,
+          rowFingerprints: preview.rowFingerprints,
+        }),
       });
-      setStatus(`Import saved: ${data.result?.importedRows || 0} imported, ${data.result?.duplicateRows || 0} duplicates skipped, ${data.result?.rejectedRows || 0} rejected.`);
+      setStatus(`Import saved: ${data.result?.importedRows || 0} source rows imported, ${data.result?.duplicateRows || 0} duplicates skipped, ${data.result?.rejectedRows || 0} rejected, ${data.result?.buyerCompaniesCreated || 0} companies queued.`);
       setPreview(null);
       await refresh();
     } catch (importError) {
       setError(importError instanceof Error ? importError.message : "Import failed.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function validateMapping(nextMapping?: Mapping) {
+    if (!preview) return;
+    setBusy("validate");
+    setError("");
+    setStatus("");
+    try {
+      const data = await request<{ preview: Preview }>("/api/admin/import/validate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          filename: preview.filename,
+          delimiter: preview.delimiter,
+          sourceFormat: preview.sourceFormat,
+          worksheetName: preview.worksheetName,
+          headers: preview.headers,
+          rows: preview.rows,
+          fileChecksum: preview.fileChecksum,
+          rowFingerprints: preview.rowFingerprints,
+          mapping: nextMapping,
+        }),
+      });
+      setPreview(data.preview);
+      setMapping(data.preview.mapping || nextMapping || {});
+      setStatus(`Validated: ${data.preview.stats.validRows} valid, ${data.preview.stats.rejectedRows} rejected, ${data.preview.stats.duplicateRows} duplicates.`);
+    } catch (validateError) {
+      setError(validateError instanceof Error ? validateError.message : "Validation failed.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function autoMapAndValidate() {
+    if (!preview) return;
+    await validateMapping();
+  }
+
+  async function quickPasteImport() {
+    const pastedCount = quickPaste.urls.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).length;
+    if (pastedCount === 0) {
+      setError("Paste at least one LinkedIn, Sales Navigator, profile, or company URL.");
+      return;
+    }
+
+    setBusy("quick-paste");
+    setError("");
+    setStatus("");
+    setQuickPasteResult(null);
+    try {
+      const data = await request<{ result?: QuickPasteResult }>("/api/admin/import/quick-paste", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(quickPaste),
+      });
+      const result = data.result || { importedRows: 0, duplicateRows: 0, rejectedRows: 0, inventoryUrl: "/admin/inventory?status=DISCOVERED" };
+      setQuickPasteResult(result);
+      setQuickPaste((current) => ({ ...current, urls: "" }));
+      setStatus(`Quick Paste import saved: ${result.importedRows} imported, ${result.duplicateRows} duplicates skipped, ${result.rejectedRows} rejected. Opening Inventory now.`);
+      window.setTimeout(() => {
+        window.location.href = result.inventoryUrl;
+      }, 700);
+    } catch (pasteError) {
+      setError(pasteError instanceof Error ? pasteError.message : "Quick Paste import failed.");
     } finally {
       setBusy("");
     }
@@ -267,8 +360,31 @@ export function AdminImportConsole() {
     });
   }
 
-  function fieldSource(field: ImportField, value: string) {
-    setMapping((current) => ({ ...current, [field]: value || undefined }));
+  function fieldForSource(header: string) {
+    return fields.find((field) => mapping[field.value] === header)?.value || "";
+  }
+
+  function nextMappingForHeader(current: Mapping, header: string, fieldValue: string) {
+    const next = { ...current };
+    for (const field of fields) {
+      if (next[field.value] === header) delete next[field.value];
+    }
+    if (fieldValue) next[fieldValue as ImportField] = header;
+    return next;
+  }
+
+  function fieldSourceFromHeader(header: string, fieldValue: string) {
+    const next = nextMappingForHeader(mapping, header, fieldValue);
+    setMapping(next);
+    void validateMapping(next);
+  }
+
+  function sampleForHeader(header: string) {
+    return preview?.rows.find((row) => String(row[header] || "").trim())?.[header] || "Empty in sample rows";
+  }
+
+  function labelForField(value: string) {
+    return fields.find((field) => field.value === value)?.label || "Ignored";
   }
 
   return (
@@ -277,18 +393,18 @@ export function AdminImportConsole() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-sm font-semibold text-violet-300">Protected admin workflow</p>
-            <h1 className="mt-2 font-serif text-4xl font-semibold">CSV Import Console</h1>
+            <h1 className="mt-2 font-serif text-4xl font-semibold">Lead Intake Console</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-violet-100/70">
-              CSV importer only. LinkedIn URLs are stored as source references from the file. No LinkedIn login, scraping, cookies, browser sessions, or unofficial API calls are used.
+              Quick Paste stores property, construction, real-estate, LinkedIn, Sales Navigator, profile, or company URLs as source references. No LinkedIn login, scraping, cookies, browser sessions, or unofficial API calls are used.
             </p>
           </div>
           <a href="/api/admin/import/template" className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white hover:bg-white/10">
-            <Download className="h-4 w-4" /> Download template
+            <Download className="h-4 w-4" /> CSV template
           </a>
         </div>
 
         <section className="mt-6 grid gap-3 lg:grid-cols-9">
-          {["Upload CSV", "Map columns", "Preview and validate", "Import and deduplicate", "Enrich public website data", "Score and review", "Assign to customer", "Publish to dashboard", "Download delivery CSV"].map((stage, index) => (
+          {["Paste URLs", "Store source refs", "Review inventory", "Verify evidence", "Qualify", "Assign", "Publish", "Deliver", "Replace if needed"].map((stage, index) => (
             <div key={stage} className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs font-semibold text-violet-100">
               <span className="mr-2 inline-grid h-6 w-6 place-items-center rounded-md bg-violet-500/20 text-violet-100">{index + 1}</span>
               {stage}
@@ -300,64 +416,152 @@ export function AdminImportConsole() {
         {error && <p className="mt-5 rounded-lg border border-red-300/30 bg-red-950/40 p-3 text-sm font-semibold text-red-100">{error}</p>}
 
         <section className="mt-6 rounded-lg border border-white/10 bg-white/5 p-5 shadow-2xl shadow-black/20 backdrop-blur-xl">
+          <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+            <div>
+              <div className="flex items-center gap-3">
+                <span className="inline-grid h-10 w-10 place-items-center rounded-lg bg-violet-500/20 text-violet-100">
+                  <ClipboardPaste className="h-5 w-5" />
+                </span>
+                <div>
+                  <h2 className="text-xl font-semibold">Quick Paste Import</h2>
+                  <p className="mt-1 text-sm font-semibold text-violet-100">Paste LinkedIn/Sales Navigator URLs here. No spreadsheet required.</p>
+                </div>
+              </div>
+              <textarea
+                value={quickPaste.urls}
+                onChange={(event) => setQuickPaste({ ...quickPaste, urls: event.target.value })}
+                placeholder={"https://www.linkedin.com/sales/lead/...\nhttps://www.linkedin.com/company/...\nhttps://example.com/company-page"}
+                className="mt-5 min-h-56 w-full resize-y rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none backdrop-blur-xl placeholder:text-violet-100/35 focus:border-violet-300/50"
+              />
+              <p className="mt-2 text-xs leading-5 text-violet-100/60">
+                One URL per line. LinkedIn and Sales Navigator pages are not fetched; MarketVibe stores the URL safely as an unverified source reference for review.
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-white/10 bg-black/20 p-4">
+              <h3 className="font-semibold">Optional context</h3>
+              <div className="mt-4 grid gap-3">
+                <input value={quickPaste.niche} onChange={(event) => setQuickPaste({ ...quickPaste, niche: event.target.value })} placeholder="Niche, e.g. property developers or high-end builders" className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none placeholder:text-violet-100/35" />
+                <input value={quickPaste.location} onChange={(event) => setQuickPaste({ ...quickPaste, location: event.target.value })} placeholder="Location, e.g. United Kingdom" className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none placeholder:text-violet-100/35" />
+                <input value={quickPaste.sourceNote} onChange={(event) => setQuickPaste({ ...quickPaste, sourceNote: event.target.value })} placeholder="Source note for admin review" className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none placeholder:text-violet-100/35" />
+                <textarea value={quickPaste.publicSignalText} onChange={(event) => setQuickPaste({ ...quickPaste, publicSignalText: event.target.value })} placeholder="Public signal text, e.g. looking for builder or planning permission note" className="min-h-24 resize-y rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none placeholder:text-violet-100/35" />
+              </div>
+              <button disabled={busy === "quick-paste"} onClick={() => void quickPasteImport()} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-violet-950/30 hover:brightness-110 disabled:opacity-60">
+                {busy === "quick-paste" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardPaste className="h-4 w-4" />}
+                Import pasted URLs
+              </button>
+              {quickPasteResult && (
+                <a href={quickPasteResult.inventoryUrl} className="mt-3 block rounded-lg border border-violet-300/30 bg-violet-400/10 p-3 text-sm font-semibold text-violet-50 hover:bg-violet-400/15">
+                  Open imported records in Inventory
+                </a>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-lg border border-white/10 bg-white/5 p-5 shadow-2xl shadow-black/20 backdrop-blur-xl">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h2 className="text-xl font-semibold">1. Upload CSV</h2>
-              <p className="mt-1 text-sm text-violet-100/65">UTF-8 CSV only. Comma, semicolon, and tab delimiters are detected. Maximum 10 MB and 10,000 rows.</p>
+              <h2 className="text-xl font-semibold">Advanced file import</h2>
+              <p className="mt-1 text-sm text-violet-100/65">For larger prepared CSV or XLSX files only. UTF-8 CSV delimiters are detected; XLSX uses the first visible sheet with data. Maximum 10 MB and 10,000 rows.</p>
             </div>
             <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-violet-950/30 hover:brightness-110">
               {busy === "preview" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
               Choose CSV
-              <input type="file" accept=".csv,text/csv" className="hidden" onChange={(event) => void upload(event.target.files?.[0])} />
+              <input type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(event) => void upload(event.target.files?.[0])} />
             </label>
           </div>
         </section>
 
         {preview && (
           <section className="mt-6 rounded-lg border border-white/10 bg-white/5 p-5 shadow-2xl shadow-black/20 backdrop-blur-xl">
-            <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div>
-                <h2 className="text-xl font-semibold">2. Map columns</h2>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  {fields.map((field) => (
-                    <label key={field.value} className="grid gap-1 text-xs font-semibold text-violet-100">
-                      {field.label}
-                      <select value={mapping[field.value] || ""} onChange={(event) => fieldSource(field.value, event.target.value)} className="rounded-lg border border-white/10 bg-[#13071f] px-3 py-2 text-sm text-white outline-none">
-                        <option value="">Not mapped</option>
-                        {preview.headers.map((header) => <option key={header} value={header}>{header}</option>)}
-                      </select>
-                    </label>
-                  ))}
-                </div>
+                <h2 className="text-xl font-semibold">CSV mapping and validation</h2>
+                <p className="mt-1 max-w-3xl text-sm leading-6 text-violet-100/65">
+              Matching headers are auto-mapped. Empty person fields are optional; a row is valid when it has a company name plus a website, domain, public signal URL, company LinkedIn URL, or LinkedIn profile URL.
+              {preview.sourceFormat === "xlsx" && preview.worksheetName ? ` XLSX sheet: ${preview.worksheetName}.` : ""}
+                </p>
               </div>
+              <div className="grid gap-2 sm:grid-cols-2 xl:min-w-[30rem]">
+                <button disabled={busy === "validate"} onClick={() => void autoMapAndValidate()} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-violet-950/30 hover:brightness-110 disabled:opacity-60">
+                  {busy === "validate" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                  Auto-map and validate
+                </button>
+                <button disabled={busy === "import" || preview.stats.validRows === 0} onClick={() => void confirmImport()} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-white px-5 py-3 text-sm font-bold text-[#13071f] hover:bg-violet-50 disabled:opacity-60">
+                  {busy === "import" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
+                  Import valid rows
+                </button>
+              </div>
+            </div>
 
-              <div>
-                <h2 className="text-xl font-semibold">3. Preview and validate</h2>
-                <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                  {[
-                    ["Total rows", preview.stats.totalRows],
-                    ["Valid rows", preview.stats.validRows],
-                    ["Rejected rows", preview.stats.rejectedRows],
-                    ["Duplicate rows", preview.stats.duplicateRows],
-                    ["Missing company", preview.stats.rowsMissingCompany],
-                    ["Missing references", preview.stats.rowsMissingAllUsableSourceReferences],
-                  ].map(([label, value]) => (
-                    <div key={label} className="rounded-lg border border-white/10 bg-black/20 p-3">
-                      <p className="text-xs text-violet-100/55">{label}</p>
-                      <p className="mt-1 text-2xl font-semibold">{value}</p>
-                    </div>
-                  ))}
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+              {[
+                ["Total", preview.stats.totalRows],
+                ["Valid", preview.stats.validRows],
+                ["Rejected", preview.stats.rejectedRows],
+                ["Duplicate", preview.stats.duplicateRows],
+                ["Missing company", preview.stats.rowsMissingCompany],
+                ["Missing reference", preview.stats.rowsMissingAllUsableSourceReferences],
+              ].map(([label, value]) => (
+                <div key={label} className="min-h-24 rounded-lg border border-white/10 bg-black/20 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-violet-100/55">{label}</p>
+                  <p className="mt-2 text-3xl font-semibold">{value}</p>
                 </div>
-                <div className="mt-4 max-h-[420px] overflow-auto rounded-lg border border-white/10">
+              ))}
+            </div>
+
+            <div className="mt-6 rounded-lg border border-white/10 bg-black/20 p-4">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h3 className="font-semibold">Source columns</h3>
+                  <p className="mt-1 text-sm text-violet-100/60">Each CSV column has one target field. Leave unused columns ignored.</p>
+                </div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-violet-100/50">{preview.headers.length} columns detected</p>
+              </div>
+              <div className="mt-4 grid gap-3">
+                {preview.headers.map((header) => {
+                  const selectedField = fieldForSource(header);
+                  return (
+                    <div key={header} className="grid gap-3 rounded-lg border border-white/10 bg-white/5 p-4 lg:grid-cols-[minmax(12rem,0.9fr)_minmax(11rem,0.55fr)_minmax(15rem,0.75fr)] lg:items-center">
+                      <div className="min-w-0">
+                        <p className="text-[0.7rem] font-semibold uppercase tracking-wide text-violet-100/45">Source column</p>
+                        <p className="mt-1 break-words text-sm font-semibold text-white">{header}</p>
+                        <p className="mt-1 truncate text-xs text-violet-100/45">{sampleForHeader(header)}</p>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[0.7rem] font-semibold uppercase tracking-wide text-violet-100/45">Selected target</p>
+                        <p className="mt-2 inline-flex max-w-full rounded-md bg-violet-500/15 px-2 py-1 text-xs font-semibold text-violet-100">
+                          <span className="truncate">{labelForField(selectedField)}</span>
+                        </p>
+                      </div>
+                      <label className="grid gap-1 text-xs font-semibold text-violet-100">
+                        Target field
+                        <select value={selectedField} onChange={(event) => fieldSourceFromHeader(header, event.target.value)} className="min-h-11 w-full rounded-lg border border-white/10 bg-[#13071f] px-3 py-2 text-sm text-white outline-none focus:border-violet-300/50">
+                          <option value="">Ignore this column</option>
+                          {fields.map((field) => <option key={field.value} value={field.value}>{field.label}</option>)}
+                        </select>
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,0.45fr)]">
+              <div>
+                <h3 className="font-semibold">Valid row preview</h3>
+                <div className="mt-3 max-h-[420px] overflow-auto rounded-lg border border-white/10">
                   <table className="w-full min-w-[900px] text-left text-xs">
-                    <thead className="bg-white/10 text-violet-100"><tr><th className="px-3 py-2">Name</th><th>Title</th><th>Company</th><th>Website</th><th>Fit</th><th>Intent</th><th>Evidence</th></tr></thead>
+                    <thead className="bg-white/10 text-violet-100"><tr><th className="px-3 py-2">Company</th><th>Website</th><th>Domain</th><th>Location</th><th>Source</th><th>Fit</th><th>Intent</th><th>Evidence</th></tr></thead>
                     <tbody>
                       {preview.previewRows.map((row, index) => (
                         <tr key={`${row.dedupe_key}-${index}`} className="border-t border-white/10">
-                          <td className="px-3 py-2">{row.full_name || `${row.first_name} ${row.last_name}`}</td>
-                          <td>{row.job_title}</td>
-                          <td>{row.company_name}</td>
+                          <td className="px-3 py-2">{row.company_name}</td>
                           <td>{row.company_website}</td>
+                          <td>{row.company_domain}</td>
+                          <td>{row.location || [row.city, row.country].filter(Boolean).join(", ")}</td>
+                          <td>{row.public_signal_url || row.company_linkedin_url || row.linkedin_profile_url || row.source_note}</td>
                           <td>{row.fit_score}</td>
                           <td>{row.intent_score ?? "Intent not evidenced"}</td>
                           <td>{row.evidence_status}</td>
@@ -366,11 +570,21 @@ export function AdminImportConsole() {
                     </tbody>
                   </table>
                 </div>
-                <button disabled={busy === "import"} onClick={() => void confirmImport()} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-500 px-5 py-3 text-sm font-bold text-white hover:brightness-110 disabled:opacity-60">
-                  {busy === "import" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-                  Confirm import and deduplicate
-                </button>
               </div>
+
+              {preview.rejectedRows.length > 0 && (
+                <div className="rounded-lg border border-red-300/20 bg-red-950/30 p-4">
+                  <h3 className="font-semibold text-red-100">Invalid rows</h3>
+                  <div className="mt-3 grid max-h-[420px] gap-2 overflow-auto">
+                    {preview.rejectedRows.slice(0, 25).map((row) => (
+                      <div key={`${row.index}-${row.reason}`} className="rounded-lg border border-red-200/10 bg-black/20 p-3 text-sm">
+                        <p className="font-semibold text-red-100">Row {row.index + 2}: {row.reason}</p>
+                        <p className="mt-1 truncate text-xs text-red-100/60">{Object.entries(row.raw_row || {}).slice(0, 4).map(([key, value]) => `${key}: ${value}`).join(" | ")}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </section>
         )}
