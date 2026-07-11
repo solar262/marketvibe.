@@ -1,9 +1,11 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Loader2, Pause, Play, RefreshCw, Rocket, Search, ShieldCheck } from "lucide-react";
+import { Loader2, Pause, Play, RefreshCw, Rocket, Search, ShieldCheck, Target } from "lucide-react";
 
 const actions = [
+  ["create-property-profile", "Create property profile and run discovery", Target],
   ["run-discovery", "Run discovery now", Search],
   ["run-verification", "Run verification now", ShieldCheck],
   ["refresh-stale", "Refresh stale records", RefreshCw],
@@ -13,6 +15,7 @@ const actions = [
 ] as const;
 
 export function OpportunityEngineControls() {
+  const router = useRouter();
   const [active, setActive] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -30,7 +33,9 @@ export function OpportunityEngineControls() {
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || "Action failed.");
-      setMessage(`${action} completed. Run ${result.runId || "updated"}.`);
+      const runId = result.runId || result.discovery?.runId;
+      setMessage(result.message || `${action} completed.${runId ? ` Run ${runId}.` : ""}`);
+      router.refresh();
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Action failed.");
     } finally {
@@ -57,4 +62,3 @@ export function OpportunityEngineControls() {
     </div>
   );
 }
-
