@@ -41,7 +41,7 @@ export default async function MarketVibeOperationsPage() {
     providerBlocked,
     providerDegraded,
   ] = await Promise.all([
-    countRows("marketvibe_buyer_companies", [{ kind: "in", column: "buyer_status", values: ["qualified", "active"] }]),
+    countRows("marketvibe_buyer_companies", [{ kind: "in", column: "buyer_status", values: ["qualified", "active"] }, { kind: "eq", column: "is_test_data", value: false }]),
     countRows("opportunities", [{ kind: "eq", column: "inventory_status", value: "IN_INVENTORY" }, { kind: "eq", column: "is_test_data", value: false }]),
     countRows("marketvibe_matches", [{ kind: "gte", column: "total_match_score", value: 70 }]),
     countRows("marketvibe_proof_packs", [{ kind: "eq", column: "status", value: "ready" }]),
