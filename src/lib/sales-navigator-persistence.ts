@@ -1,4 +1,4 @@
-import { getSupabaseAdmin } from "@/lib/supabase";
+import { formatSupabaseServerEnvError, getSupabaseAdmin } from "@/lib/supabase";
 import { sendTransactionalEmail } from "@/lib/brevo";
 import { getPremiumEntitlements } from "@/lib/premium-persistence";
 import type { PremiumProductCode } from "@/lib/premium-products";
@@ -53,7 +53,7 @@ export type DeliveredProspect = ProspectRow & {
 
 function supabaseOrThrow() {
   const supabase = getSupabaseAdmin();
-  if (!supabase) throw new Error("Supabase service-role access is required for imports.");
+  if (!supabase) throw new Error(formatSupabaseServerEnvError() || "Supabase privileged access is required for imports.");
   return supabase;
 }
 

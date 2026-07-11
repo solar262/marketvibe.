@@ -1,4 +1,4 @@
-import { getSupabaseAdmin } from "@/lib/supabase";
+import { formatSupabaseServerEnvError, getSupabaseAdmin, supabaseConnectionStatus } from "@/lib/supabase";
 import { sendTransactionalEmail } from "@/lib/brevo";
 import { searchLiveLeads } from "@/lib/lead-engine";
 import { csvEscape, deliveryToken, scanPublicWebsite, tokenHash } from "@/lib/sales-navigator-import";
@@ -50,7 +50,7 @@ type RunCounters = {
 
 function supabaseOrThrow() {
   const supabase = getSupabaseAdmin();
-  if (!supabase) throw new Error("Supabase service-role access is required for opportunity automation.");
+  if (!supabase) throw new Error(formatSupabaseServerEnvError() || "Supabase privileged access is not configured for opportunity automation.");
   return supabase;
 }
 
@@ -836,7 +836,32 @@ export async function refreshStaleOpportunities({ trigger = "admin", limit = 50 
 }
 
 export async function getOpportunityEngineSummary() {
-  const supabase = supabaseOrThrow();
+  const supabaseStatus = supabaseConnectionStatus();
+  const supabase = getSupabaseAdmin();
+  if (!supabase) {
+    return {
+      automationPaused: false,
+      latestRun: null,
+      nextScheduledRun: "Unavailable until Supabase server environment is complete",
+      sourcesEnabled: [],
+      supabaseStatus,
+      setupReady: false,
+      counts: {
+        activeProfiles: 0,
+        qualifiedInventory: 0,
+        reserved: 0,
+        delivered: 0,
+        expired: 0,
+        replacementsDue: 0,
+        failedDeliveries: 0,
+      },
+      sourceErrors: [{
+        source_name: "Supabase configuration",
+        error_message: formatSupabaseServerEnvError() || "Supabase privileged access is not configured.",
+        created_at: nowIso(),
+      }],
+    };
+  }
   const [
     settings,
     latestRun,
@@ -869,6 +894,8 @@ export async function getOpportunityEngineSummary() {
       "MarketVibe live lead engine",
       ...(rssFeeds().length ? ["Configured public RSS feeds"] : []),
     ],
+    supabaseStatus,
+    setupReady: true,
     counts: {
       activeProfiles: profiles.count || 0,
       qualifiedInventory: inventory.count || 0,

@@ -23,6 +23,18 @@ export default async function OpportunityEnginePage() {
       failedDeliveries: 0,
     },
     sourceErrors: [{ error_message: error instanceof Error ? error.message : "Supabase setup unavailable." }],
+    setupReady: false,
+    supabaseStatus: {
+      hasUrl: false,
+      hasAnonKey: false,
+      hasServiceRoleKey: false,
+      serverWritesEnabled: false,
+      host: "unavailable",
+      urlLooksValid: false,
+      missingRequiredServerVariables: ["NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"],
+      serviceRoleKeyEnvName: "SUPABASE_SERVICE_ROLE_KEY",
+      requiredServerVariableNames: ["NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"],
+    },
   }));
 
   const cards = [
@@ -41,6 +53,7 @@ export default async function OpportunityEnginePage() {
     summary.counts.replacementsDue > 0 ? "Replacement requests need review." : "",
     summary.counts.failedDeliveries > 0 ? "One or more delivery emails failed." : "",
     summary.automationPaused ? "Automation is paused." : "",
+    !summary.setupReady ? `Supabase server setup incomplete: ${summary.supabaseStatus.missingRequiredServerVariables.join(", ") || "unknown"}.` : "",
   ].filter(Boolean);
 
   return (
@@ -82,12 +95,15 @@ export default async function OpportunityEnginePage() {
       <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex items-center gap-2">
           {summary.automationPaused ? <PauseCircle className="h-5 w-5 text-amber-700" /> : <CheckCircle2 className="h-5 w-5 text-emerald-700" />}
-          <h2 className="font-semibold text-slate-950">{summary.automationPaused ? "Automation paused" : "Automation active"}</h2>
+          <h2 className="font-semibold text-slate-950">{summary.automationPaused ? "Automation paused" : summary.setupReady ? "Automation active" : "Setup incomplete"}</h2>
         </div>
         <div className="mt-4 grid gap-4 text-sm text-slate-600 md:grid-cols-3">
           <p><span className="font-semibold text-slate-950">Latest run:</span> {summary.latestRun?.started_at || "No run recorded"}</p>
           <p><span className="font-semibold text-slate-950">Next scheduled run:</span> {summary.nextScheduledRun}</p>
           <p><span className="font-semibold text-slate-950">Sources enabled:</span> {summary.sourcesEnabled.length ? summary.sourcesEnabled.join(", ") : "None configured"}</p>
+          <p><span className="font-semibold text-slate-950">Supabase URL:</span> {summary.supabaseStatus.hasUrl ? `Present (${summary.supabaseStatus.host})` : "Missing"}</p>
+          <p><span className="font-semibold text-slate-950">Service key env:</span> {summary.supabaseStatus.hasServiceRoleKey ? `Present (${summary.supabaseStatus.serviceRoleKeyEnvName})` : `Missing (${summary.supabaseStatus.serviceRoleKeyEnvName})`}</p>
+          <p><span className="font-semibold text-slate-950">Server writes:</span> {summary.supabaseStatus.serverWritesEnabled ? "Enabled" : "Disabled"}</p>
         </div>
       </section>
 
@@ -118,4 +134,3 @@ export default async function OpportunityEnginePage() {
     </main>
   );
 }
-

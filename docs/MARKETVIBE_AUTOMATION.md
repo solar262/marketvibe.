@@ -39,7 +39,7 @@ Required for production automation:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`: the single server-only variable MarketVibe reads for privileged Supabase writes. Use the Supabase service-role JWT or Supabase secret key value.
 - `CRON_SECRET`
 - `CUSTOMER_ACCESS_SECRET` recommended, otherwise existing webhook/admin secrets are used for customer access tokens.
 
@@ -196,4 +196,3 @@ Add an adapter in `src/lib/opportunity-engine.ts` that returns `SourceCandidate[
 - set clear `source_type` and `source_name`;
 - continue safely on per-source errors;
 - rely on `calculateOpportunityScores()` and `qualifyOpportunity()` before inventory.
-

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { isCronAuthorized } from "../src/lib/cron-auth";
 import { buildOpportunityDeliveryCsv } from "../src/lib/opportunity-engine";
 import { opportunityConfigForProduct } from "../src/lib/opportunity-products";
+import { formatSupabaseServerEnvError, SUPABASE_SERVICE_ROLE_KEY_ENV, supabaseConnectionStatus } from "../src/lib/supabase";
 import {
   buildExclusivityKey,
   buildOpportunityDedupeKey,
@@ -146,6 +147,20 @@ assert.equal(selection.shortage, 1);
 assert.equal(replacementAutoApprovalReason("website_dead"), true);
 assert.equal(replacementAutoApprovalReason("outside_criteria"), false);
 
+const originalSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const originalSupabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+process.env.NEXT_PUBLIC_SUPABASE_URL = "";
+process.env.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_test_value";
+const supabaseStatus = supabaseConnectionStatus();
+assert.equal(SUPABASE_SERVICE_ROLE_KEY_ENV, "SUPABASE_SERVICE_ROLE_KEY");
+assert.equal(supabaseStatus.hasServiceRoleKey, true);
+assert.deepEqual(supabaseStatus.missingRequiredServerVariables, ["NEXT_PUBLIC_SUPABASE_URL"]);
+assert.match(formatSupabaseServerEnvError(), /NEXT_PUBLIC_SUPABASE_URL/);
+if (originalSupabaseUrl === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+else process.env.NEXT_PUBLIC_SUPABASE_URL = originalSupabaseUrl;
+if (originalSupabaseServiceRoleKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+else process.env.SUPABASE_SERVICE_ROLE_KEY = originalSupabaseServiceRoleKey;
+
 process.env.CRON_SECRET = "cron-test-secret";
 assert.equal(isCronAuthorized(new Request("https://marketvibe1.com/api/cron/opportunity-health", { headers: { authorization: "Bearer cron-test-secret" } })), true);
 assert.equal(isCronAuthorized(new Request("https://marketvibe1.com/api/cron/opportunity-health", { headers: { authorization: "Bearer wrong" } })), false);
@@ -172,4 +187,3 @@ assert.match(csv, /Bright Works Studio/);
 assert.doesNotMatch(csv, /internal_notes|do not expose/);
 
 console.log("Opportunity lifecycle tests passed.");
-

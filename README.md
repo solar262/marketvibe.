@@ -49,7 +49,7 @@ The webhook handler listens for `checkout.session.completed`, verifies the Strip
 1. Create a Supabase project.
 2. Run `supabase/migrations/0001_marketvibe_schema.sql` in the SQL editor or through the Supabase CLI.
 3. Run `scripts/seed-demo.sql` for starter settings and categories.
-4. Add `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` to `.env.local`.
+4. Add `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` to `.env.local`. `SUPABASE_SERVICE_ROLE_KEY` is the single server-only variable name MarketVibe reads for privileged Supabase writes; paste the Supabase service-role JWT or Supabase secret key value there.
 
 ## CSV import
 
