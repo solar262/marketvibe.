@@ -101,10 +101,10 @@ async function createPropertyOpportunityProfile() {
   try {
     discovery = await runPropertyDiscoveryWithIntegrity({ trigger: "admin", profileId: String(data.id) });
   } catch (error) {
-    discoveryError = error instanceof Error ? error.message : "Initial discovery could not run.";
+    discoveryError = error instanceof Error ? error.message : "Property inventory cleanup could not run.";
   }
 
-  const removed = (discovery?.integrity.before.rejected || 0) + (discovery?.integrity.after.rejected || 0);
+  const removed = discovery?.integrity.before.rejected || 0;
 
   return {
     ok: true,
@@ -113,8 +113,8 @@ async function createPropertyOpportunityProfile() {
     discovery,
     discoveryError,
     message: discoveryError
-      ? `Property opportunity profile is active. Discovery needs attention: ${discoveryError}`
-      : `Property opportunity profile is active. ${removed} non-opportunity records were removed and discovery completed.`,
+      ? `Property opportunity profile is active. Cleanup needs attention: ${discoveryError}`
+      : `Property opportunity profile is active. ${removed} legacy local-business records were removed. Property discovery is isolated from the legacy lead engine.`,
   };
 }
 
