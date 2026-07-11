@@ -3,6 +3,7 @@ import { isGenuinePropertyOpportunity } from "../src/lib/property-opportunity-in
 import { buildProofPackPdf, proofPackPdfItemsFromOpportunityRows } from "../src/lib/proof-pack-pdf";
 
 const propertyOpportunity = {
+  id: "property-opportunity-1",
   company_name: "Northbank Developments",
   company_industry: "Property development",
   source_type: "public_planning_register",
@@ -19,6 +20,7 @@ const propertyOpportunity = {
 };
 
 const legacyLocalBusiness = {
+  id: "legacy-local-business-1",
   company_name: "Sample Cafe",
   company_industry: "Cafe",
   source_type: "public_business_website",
