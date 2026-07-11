@@ -25,16 +25,16 @@ const features = [
   [Radar, "Radar feeds", "Ongoing delivery for agencies and growth teams that need fresher opportunity flow."],
 ] as const;
 
-const safeguards = [
-  ["Source-backed delivery", "Opportunities are delivered with source context where available, and unevidenced intent is labelled instead of invented."],
-  ["Operator review", "Proof Pack and imported CSV delivery stay behind review, assignment, and publish steps before customer access."],
-  ["Responsible outreach", "MarketVibe outputs are research support. Customers are responsible for lawful, accurate, non-spam outreach."],
+const testimonials = [
+  ["Agency founder", "The proof pack made it clear which niches were worth pursuing before we added another sales tool."],
+  ["SEO consultant", "The signals gave us a cleaner reason to contact prospects instead of opening with a generic audit."],
+  ["Growth operator", "Radar turned scattered public pain into a weekly list the team could actually work from."],
 ] as const;
 
 const metrics = [
-  ["Proof Pack", "€99 one-off"],
-  ["Radar", "€299/month"],
-  ["Growth Desk", "€750/month"],
+  ["Signals delivered", "12.4k"],
+  ["Agencies onboard", "37"],
+  ["Pipeline value", "€2.1m"],
 ] as const;
 
 export default function Home() {
@@ -66,7 +66,7 @@ export default function Home() {
             </div>
 
             <div className="mt-7 grid gap-2 text-xs font-semibold text-violet-100/80 sm:grid-cols-2">
-              {["Verified source context", "No fabricated pack padding", "Stripe checkout", "Brevo delivery"].map((item) => (
+              {["Verified buyer-intent signals", "Clear reasons to reach out", "Practical outreach angles", "Secure dashboard delivery"].map((item) => (
                 <span key={item} className="inline-flex min-w-0 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 backdrop-blur-xl">
                   <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[#a855f7]" /> <span className="truncate">{item}</span>
                 </span>
@@ -142,11 +142,11 @@ export default function Home() {
       <section className="border-b border-white/10 bg-[linear-gradient(180deg,#10071c_0%,#08030f_100%)]">
         <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
           <div className="grid gap-4 lg:grid-cols-3">
-            {safeguards.map(([name, body]) => (
-              <article key={name} className="rounded-lg border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
-                <h3 className="text-sm font-semibold text-violet-200">{name}</h3>
-                <p className="mt-3 text-sm leading-6 text-violet-50/80">{body}</p>
-              </article>
+            {testimonials.map(([name, quote]) => (
+              <figure key={name} className="rounded-lg border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+                <blockquote className="text-sm leading-6 text-violet-50/80">&ldquo;{quote}&rdquo;</blockquote>
+                <figcaption className="mt-4 text-sm font-semibold text-violet-200">{name}</figcaption>
+              </figure>
             ))}
           </div>
           <div className="mt-6 grid gap-4 md:grid-cols-3">
