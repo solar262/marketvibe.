@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireCron } from "@/lib/cron-auth";
-import { getSupabaseAdmin } from "@/lib/supabase";
+import { ensureBuyerPipelineJobs } from "@/lib/buyer-pipeline-recovery";
 import { runBuyerPipelineWorker } from "@/lib/operations-pipeline";
+import { getSupabaseAdmin } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -19,6 +20,7 @@ export async function GET(request: Request) {
     }, { status: 500 });
   }
 
+  const recovery = await ensureBuyerPipelineJobs({ supabase });
   const result = await runBuyerPipelineWorker({ supabase, workerId: "cron-buyer-pipeline" });
-  return NextResponse.json({ ok: true, job: "buyer-pipeline", result });
+  return NextResponse.json({ ok: true, job: "buyer-pipeline", recovery, result });
 }
