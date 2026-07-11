@@ -1,6 +1,6 @@
 import type { BusinessLead, LeadSearchInput } from "./types";
 import { normalizeCustomSearchTerm, type SearchMode } from "./custom-search";
-import { getSupabaseAdmin, supabaseConnectionStatus } from "./supabase";
+import { formatSupabaseServerEnvError, getSupabaseAdmin, supabaseConnectionStatus } from "./supabase";
 
 export type PersistedLeadSearch = {
   searchRunId?: string;
@@ -110,7 +110,7 @@ export async function persistLeadSearch({
 }): Promise<PersistedLeadSearch> {
   const supabase = getSupabaseAdmin();
   if (!supabase) {
-    return { saved: false, error: "Supabase server writes are not configured. Add NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY." };
+    return { saved: false, error: formatSupabaseServerEnvError() || "Supabase server writes are not configured." };
   }
 
   const fields = discoveryFields(input);

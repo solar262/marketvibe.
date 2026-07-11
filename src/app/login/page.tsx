@@ -14,30 +14,19 @@ async function login(formData: FormData) {
     redirect("/login?error=config");
   }
 
-  const emailMatches = email === credentials.email;
-  const passwordMatches = password === credentials.password;
-
-  if (emailMatches && passwordMatches) {
+  if (email === credentials.email && password === credentials.password) {
     const cookieStore = await cookies();
     cookieStore.set(ADMIN_COOKIE, adminSessionValue(), {
       httpOnly: true,
       sameSite: "lax",
-      secure: true,
+      secure: process.env.NODE_ENV === "production",
       path: "/",
       maxAge: 60 * 60 * 8,
     });
     redirect("/admin");
   }
 
-  const debugParams = new URLSearchParams({
-    error: "1",
-    emailLength: String(email.length),
-    passwordLength: String(password.length),
-    emailMatches: String(emailMatches),
-    passwordMatches: String(passwordMatches),
-  });
-
-  redirect(`/login?${debugParams.toString()}`);
+  redirect("/login?error=1");
 }
 
 export default async function LoginPage({
@@ -45,10 +34,6 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{
     error?: string;
-    emailLength?: string;
-    passwordLength?: string;
-    emailMatches?: string;
-    passwordMatches?: string;
   }>;
 }) {
   const params = await searchParams;
@@ -69,12 +54,6 @@ export default async function LoginPage({
           <label className="grid gap-1 text-sm font-medium">Password<input name="password" type="password" className={inputClass} required /></label>
         </div>
         {params.error === "1" && <p className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-700">Invalid admin credentials.</p>}
-        {params.error === "1" && (
-          <p className="mt-4 rounded-md bg-slate-50 p-3 text-xs text-slate-700">
-            Debug: email length {params.emailLength ?? "0"}, password length {params.passwordLength ?? "0"}, email match{" "}
-            {params.emailMatches ?? "false"}, password match {params.passwordMatches ?? "false"}.
-          </p>
-        )}
         {params.error === "config" && <p className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-700">Admin credentials are not configured.</p>}
         <button disabled={!configured} className="mt-5 w-full rounded-md bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400">Login</button>
         <div className="mt-4 flex justify-between text-sm font-medium">

@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
+import { requireAdminJson } from "@/lib/admin-api";
 import { adminCredentials } from "@/lib/auth";
 import { sendTransactionalEmail } from "@/lib/brevo";
 
 export async function POST() {
+  const unauthorized = await requireAdminJson();
+  if (unauthorized) return unauthorized;
+
   const adminEmail = adminCredentials().email;
   if (!adminEmail) {
     return NextResponse.json({ ok: false, error: "Admin email is not configured." }, { status: 500 });

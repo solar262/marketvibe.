@@ -24,7 +24,6 @@ const nextConfig: NextConfig = {
       "/shipping",
       "/refund",
       "/admin/products",
-      "/admin/import",
       "/admin/orders",
       "/admin/fulfillment",
     ].map((source) => ({

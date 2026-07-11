@@ -14,6 +14,7 @@ import {
   recordCompletedPremiumOrder,
   upsertPremiumEntitlement,
 } from "./premium-persistence";
+import { appendCustomerAccessParams, createCustomerAccessToken } from "./customer-access";
 
 export type MarketVibeProduct = CheckoutProductCode;
 
@@ -30,8 +31,10 @@ const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.marketvibe1.com"
 function accessUrl(product: PremiumProductCode, requestedProduct?: CheckoutProductCode, leadSlug?: string, sessionId?: string, email?: string) {
   if (requestedProduct === "audit" && leadSlug) return `${baseUrl}/audit/${leadSlug}?unlocked=1`;
   if (product === "proof_pack") return `${baseUrl}${onboardingPathForProduct("proof_pack", sessionId, email)}`;
+  if (product === "radar") return `${baseUrl}${onboardingPathForProduct("radar", sessionId, email)}`;
   if (product === "growth_desk") return `${baseUrl}${onboardingPathForProduct("growth_desk", sessionId, email)}`;
-  return `${baseUrl}/dashboard?email=${encodeURIComponent(email || "")}`;
+  const accessToken = createCustomerAccessToken(email || "");
+  return `${baseUrl}${appendCustomerAccessParams("/dashboard", email || "", accessToken)}`;
 }
 
 export function classifyStripeSession(session: Stripe.Checkout.Session): PremiumProductCode {
@@ -59,7 +62,8 @@ export async function sendBuyerDeliveryEmail({ email, product, requestedProduct,
   const access = accessUrl(product, requestedProduct, leadSlug, sessionId, normalizedEmail);
   const pricingUrl = `${baseUrl}/pricing`;
   const supportUrl = `${baseUrl}/contact`;
-  const dashboardUrl = `${baseUrl}/dashboard?email=${encodeURIComponent(normalizedEmail)}`;
+  const accessToken = createCustomerAccessToken(normalizedEmail);
+  const dashboardUrl = `${baseUrl}${appendCustomerAccessParams("/dashboard", normalizedEmail, accessToken)}`;
 
   await addOrUpdateContact(normalizedEmail, {
     SOURCE: "stripe_buyer",

@@ -50,10 +50,7 @@ export default async function PaymentSuccessPage({
 }) {
   const { session_id: sessionId, product } = await searchParams;
   const delivery = await verifyAndDeliver(sessionId, product);
-  const continueHref =
-    delivery.product === "radar"
-      ? `/dashboard${delivery.email ? `?email=${encodeURIComponent(delivery.email)}` : ""}`
-      : onboardingPathForProduct(delivery.product, sessionId, delivery.email);
+  const continueHref = onboardingPathForProduct(delivery.product, sessionId, delivery.email);
 
   return (
     <main className="min-h-screen bg-[#08030f] px-4 py-16 text-white sm:px-6 lg:px-8">

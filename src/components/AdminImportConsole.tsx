@@ -1,0 +1,688 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ClipboardPaste, Download, FileUp, Loader2, Send, ShieldCheck } from "lucide-react";
+
+type ImportField =
+  | "first_name"
+  | "last_name"
+  | "full_name"
+  | "job_title"
+  | "company_name"
+  | "company_website"
+  | "company_domain"
+  | "linkedin_profile_url"
+  | "company_linkedin_url"
+  | "location"
+  | "country"
+  | "city"
+  | "industry"
+  | "company_size"
+  | "public_email"
+  | "public_phone"
+  | "public_signal_url"
+  | "public_signal_text"
+  | "source_note";
+
+type Mapping = Partial<Record<ImportField, string>>;
+
+type Preview = {
+  filename: string;
+  delimiter: "," | ";" | "\t";
+  sourceFormat: "csv" | "xlsx";
+  worksheetName?: string;
+  fileChecksum?: string;
+  rowFingerprints: string[];
+  headers: string[];
+  mapping: Mapping;
+  rows: Record<string, string>[];
+  previewRows: PreviewRow[];
+  duplicateRows: Array<{ index: number; reason: string; dedupe_key: string }>;
+  rejectedRows: Array<{ index: number; reason: string; raw_row?: Record<string, string> }>;
+  stats: {
+    totalRows: number;
+    validRows: number;
+    rejectedRows: number;
+    duplicateRows: number;
+    rowsMissingCompany: number;
+    rowsMissingAllUsableSourceReferences: number;
+  };
+};
+
+type PreviewRow = Record<ImportField, string> & {
+  dedupe_key: string;
+  fit_score: number;
+  intent_score: number | null;
+  evidence_status: string;
+};
+
+type ImportBatch = {
+  id: string;
+  original_filename: string;
+  created_at: string;
+};
+
+type ProspectAssignment = {
+  customer_email?: string | null;
+  assignment_status?: string | null;
+};
+
+type Prospect = Partial<Record<ImportField, string>> & {
+  id: string;
+  fit_score?: number | null;
+  intent_score?: number | null;
+  evidence_status?: string | null;
+  enrichment_status?: string | null;
+  review_status?: string | null;
+  premium_prospect_assignments?: ProspectAssignment[] | null;
+};
+
+type ImportActionResponse = {
+  result?: {
+    csvUrl?: string;
+    importedRows?: number;
+    duplicateRows?: number;
+    rejectedRows?: number;
+    buyerCompaniesCreated?: number;
+    duplicateCompanies?: number;
+    websiteVerificationJobsQueued?: number;
+  };
+};
+
+type QuickPasteResult = {
+  importedRows: number;
+  duplicateRows: number;
+  rejectedRows: number;
+  inventoryUrl: string;
+  rejected?: Array<{ line: number; reason: string; value: string }>;
+};
+
+const fields: Array<{ value: ImportField; label: string }> = [
+  ["first_name", "First name"],
+  ["last_name", "Last name"],
+  ["full_name", "Full name"],
+  ["job_title", "Job title"],
+  ["company_name", "Company name"],
+  ["company_website", "Company website"],
+  ["company_domain", "Company domain"],
+  ["linkedin_profile_url", "LinkedIn source URL"],
+  ["company_linkedin_url", "Company LinkedIn source URL"],
+  ["location", "Location"],
+  ["country", "Country"],
+  ["city", "City"],
+  ["industry", "Industry"],
+  ["company_size", "Company size"],
+  ["public_email", "Email"],
+  ["public_phone", "Phone"],
+  ["public_signal_url", "Public signal URL"],
+  ["public_signal_text", "Public signal text"],
+  ["source_note", "Source note"],
+].map(([value, label]) => ({ value: value as ImportField, label }));
+
+const productOptions = [
+  ["proof_pack", "Proof Pack"],
+  ["radar", "Radar"],
+  ["growth_desk", "Growth Desk"],
+] as const;
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(path, init);
+  const contentType = response.headers.get("content-type") || "";
+  const data: unknown = contentType.includes("application/json") ? await response.json() : await response.text();
+  if (!response.ok) {
+    const errorMessage =
+      typeof data === "string"
+        ? data
+        : data && typeof data === "object" && "error" in data
+          ? String((data as { error?: unknown }).error || "Request failed.")
+          : "Request failed.";
+    throw new Error(errorMessage);
+  }
+  return data as T;
+}
+
+export function AdminImportConsole() {
+  const [preview, setPreview] = useState<Preview | null>(null);
+  const [mapping, setMapping] = useState<Mapping>({});
+  const [batches, setBatches] = useState<ImportBatch[]>([]);
+  const [prospects, setProspects] = useState<Prospect[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [status, setStatus] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState("");
+  const [filters, setFilters] = useState({ batchId: "", evidenceStatus: "", enrichmentStatus: "", company: "", country: "", city: "", industry: "", minFitScore: "" });
+  const [assignment, setAssignment] = useState({ customerEmail: "", productCode: "proof_pack", count: "25", adminNotes: "", adminConfirmedCustomer: false, includeProfileOnly: false });
+  const [quickPaste, setQuickPaste] = useState({ urls: "", niche: "", location: "", sourceNote: "", publicSignalText: "" });
+  const [quickPasteResult, setQuickPasteResult] = useState<QuickPasteResult | null>(null);
+
+  const selectedIds = useMemo(() => Array.from(selected), [selected]);
+  const selectedProspects = useMemo(() => prospects.filter((prospect) => selected.has(String(prospect.id))), [prospects, selected]);
+  const evidenceCounts = useMemo(() => ({
+    profileOnly: selectedProspects.filter((prospect) => prospect.evidence_status === "profile_only").length,
+    website: selectedProspects.filter((prospect) => prospect.evidence_status === "website_verified").length,
+    publicSignal: selectedProspects.filter((prospect) => prospect.evidence_status === "public_signal_verified").length,
+    noIntent: selectedProspects.filter((prospect) => prospect.intent_score == null).length,
+  }), [selectedProspects]);
+
+  const refresh = useCallback(async () => {
+    try {
+      const params = new URLSearchParams(Object.entries(filters).filter(([, value]) => value));
+      const [batchData, prospectData] = await Promise.all([
+        request<{ batches?: ImportBatch[] }>("/api/admin/import/batches"),
+        request<{ prospects?: Prospect[] }>(`/api/admin/import/prospects?${params.toString()}`),
+      ]);
+      setBatches(batchData.batches || []);
+      setProspects(prospectData.prospects || []);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Admin data could not be loaded.");
+    }
+  }, [filters]);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      void refresh();
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, [refresh]);
+
+  async function upload(file?: File) {
+    if (!file) return;
+    setBusy("preview");
+    setError("");
+    setStatus("");
+    try {
+      const formData = new FormData();
+      formData.set("file", file);
+      const data = await request<{ preview: Preview }>("/api/admin/import/preview", { method: "POST", body: formData });
+      setPreview(data.preview);
+      setMapping(data.preview.mapping || {});
+      setStatus(`Auto-mapped and validated: ${data.preview.stats.validRows} valid, ${data.preview.stats.rejectedRows} rejected, ${data.preview.stats.duplicateRows} duplicates.`);
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : "Preview failed.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function confirmImport() {
+    if (!preview) return;
+    setBusy("import");
+    setError("");
+    setStatus("");
+    try {
+      const data = await request<ImportActionResponse>("/api/admin/import/confirm", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          filename: preview.filename,
+          rows: preview.rows,
+          mapping,
+          sourceFormat: preview.sourceFormat,
+          worksheetName: preview.worksheetName,
+          fileChecksum: preview.fileChecksum,
+          rowFingerprints: preview.rowFingerprints,
+        }),
+      });
+      setStatus(`Import saved: ${data.result?.importedRows || 0} source rows imported, ${data.result?.duplicateRows || 0} duplicates skipped, ${data.result?.rejectedRows || 0} rejected, ${data.result?.buyerCompaniesCreated || 0} companies queued.`);
+      setPreview(null);
+      await refresh();
+    } catch (importError) {
+      setError(importError instanceof Error ? importError.message : "Import failed.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function validateMapping(nextMapping?: Mapping) {
+    if (!preview) return;
+    setBusy("validate");
+    setError("");
+    setStatus("");
+    try {
+      const data = await request<{ preview: Preview }>("/api/admin/import/validate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          filename: preview.filename,
+          delimiter: preview.delimiter,
+          sourceFormat: preview.sourceFormat,
+          worksheetName: preview.worksheetName,
+          headers: preview.headers,
+          rows: preview.rows,
+          fileChecksum: preview.fileChecksum,
+          rowFingerprints: preview.rowFingerprints,
+          mapping: nextMapping,
+        }),
+      });
+      setPreview(data.preview);
+      setMapping(data.preview.mapping || nextMapping || {});
+      setStatus(`Validated: ${data.preview.stats.validRows} valid, ${data.preview.stats.rejectedRows} rejected, ${data.preview.stats.duplicateRows} duplicates.`);
+    } catch (validateError) {
+      setError(validateError instanceof Error ? validateError.message : "Validation failed.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function autoMapAndValidate() {
+    if (!preview) return;
+    await validateMapping();
+  }
+
+  async function quickPasteImport() {
+    const pastedCount = quickPaste.urls.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).length;
+    if (pastedCount === 0) {
+      setError("Paste at least one LinkedIn, Sales Navigator, profile, or company URL.");
+      return;
+    }
+
+    setBusy("quick-paste");
+    setError("");
+    setStatus("");
+    setQuickPasteResult(null);
+    try {
+      const data = await request<{ result?: QuickPasteResult }>("/api/admin/import/quick-paste", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(quickPaste),
+      });
+      const result = data.result || { importedRows: 0, duplicateRows: 0, rejectedRows: 0, inventoryUrl: "/admin/inventory?status=DISCOVERED" };
+      setQuickPasteResult(result);
+      setQuickPaste((current) => ({ ...current, urls: "" }));
+      setStatus(`Quick Paste import saved: ${result.importedRows} imported, ${result.duplicateRows} duplicates skipped, ${result.rejectedRows} rejected. Opening Inventory now.`);
+      window.setTimeout(() => {
+        window.location.href = result.inventoryUrl;
+      }, 700);
+    } catch (pasteError) {
+      setError(pasteError instanceof Error ? pasteError.message : "Quick Paste import failed.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function action(path: string, body: Record<string, unknown>, success: string) {
+    setBusy(path);
+    setError("");
+    setStatus("");
+    try {
+      const data = await request<ImportActionResponse>(path, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      setStatus(data.result?.csvUrl ? `${success} CSV: ${data.result.csvUrl}` : success);
+      await refresh();
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : "Action failed.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function exportSelected() {
+    if (selectedIds.length === 0) {
+      setError("Select at least one row to export.");
+      return;
+    }
+    setBusy("export");
+    setError("");
+    try {
+      const response = await fetch("/api/admin/import/export", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ids: selectedIds }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Export failed.");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "marketvibe-selected-prospects.csv";
+      link.click();
+      URL.revokeObjectURL(url);
+      setStatus("Selected CSV downloaded.");
+    } catch (exportError) {
+      setError(exportError instanceof Error ? exportError.message : "Export failed.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  function toggle(id: string) {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function fieldForSource(header: string) {
+    return fields.find((field) => mapping[field.value] === header)?.value || "";
+  }
+
+  function nextMappingForHeader(current: Mapping, header: string, fieldValue: string) {
+    const next = { ...current };
+    for (const field of fields) {
+      if (next[field.value] === header) delete next[field.value];
+    }
+    if (fieldValue) next[fieldValue as ImportField] = header;
+    return next;
+  }
+
+  function fieldSourceFromHeader(header: string, fieldValue: string) {
+    const next = nextMappingForHeader(mapping, header, fieldValue);
+    setMapping(next);
+    void validateMapping(next);
+  }
+
+  function sampleForHeader(header: string) {
+    return preview?.rows.find((row) => String(row[header] || "").trim())?.[header] || "Empty in sample rows";
+  }
+
+  function labelForField(value: string) {
+    return fields.find((field) => field.value === value)?.label || "Ignored";
+  }
+
+  return (
+    <main className="min-h-screen bg-[#08030f] p-4 text-white sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-7xl">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-violet-300">Protected admin workflow</p>
+            <h1 className="mt-2 font-serif text-4xl font-semibold">Lead Intake Console</h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-violet-100/70">
+              Quick Paste stores property, construction, real-estate, LinkedIn, Sales Navigator, profile, or company URLs as source references. No LinkedIn login, scraping, cookies, browser sessions, or unofficial API calls are used.
+            </p>
+          </div>
+          <a href="/api/admin/import/template" className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white hover:bg-white/10">
+            <Download className="h-4 w-4" /> CSV template
+          </a>
+        </div>
+
+        <section className="mt-6 grid gap-3 lg:grid-cols-9">
+          {["Paste URLs", "Store source refs", "Review inventory", "Verify evidence", "Qualify", "Assign", "Publish", "Deliver", "Replace if needed"].map((stage, index) => (
+            <div key={stage} className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs font-semibold text-violet-100">
+              <span className="mr-2 inline-grid h-6 w-6 place-items-center rounded-md bg-violet-500/20 text-violet-100">{index + 1}</span>
+              {stage}
+            </div>
+          ))}
+        </section>
+
+        {status && <p className="mt-5 rounded-lg border border-violet-300/30 bg-violet-400/10 p-3 text-sm font-semibold text-violet-50">{status}</p>}
+        {error && <p className="mt-5 rounded-lg border border-red-300/30 bg-red-950/40 p-3 text-sm font-semibold text-red-100">{error}</p>}
+
+        <section className="mt-6 rounded-lg border border-white/10 bg-white/5 p-5 shadow-2xl shadow-black/20 backdrop-blur-xl">
+          <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+            <div>
+              <div className="flex items-center gap-3">
+                <span className="inline-grid h-10 w-10 place-items-center rounded-lg bg-violet-500/20 text-violet-100">
+                  <ClipboardPaste className="h-5 w-5" />
+                </span>
+                <div>
+                  <h2 className="text-xl font-semibold">Quick Paste Import</h2>
+                  <p className="mt-1 text-sm font-semibold text-violet-100">Paste LinkedIn/Sales Navigator URLs here. No spreadsheet required.</p>
+                </div>
+              </div>
+              <textarea
+                value={quickPaste.urls}
+                onChange={(event) => setQuickPaste({ ...quickPaste, urls: event.target.value })}
+                placeholder={"https://www.linkedin.com/sales/lead/...\nhttps://www.linkedin.com/company/...\nhttps://example.com/company-page"}
+                className="mt-5 min-h-56 w-full resize-y rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none backdrop-blur-xl placeholder:text-violet-100/35 focus:border-violet-300/50"
+              />
+              <p className="mt-2 text-xs leading-5 text-violet-100/60">
+                One URL per line. LinkedIn and Sales Navigator pages are not fetched; MarketVibe stores the URL safely as an unverified source reference for review.
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-white/10 bg-black/20 p-4">
+              <h3 className="font-semibold">Optional context</h3>
+              <div className="mt-4 grid gap-3">
+                <input value={quickPaste.niche} onChange={(event) => setQuickPaste({ ...quickPaste, niche: event.target.value })} placeholder="Niche, e.g. property developers or high-end builders" className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none placeholder:text-violet-100/35" />
+                <input value={quickPaste.location} onChange={(event) => setQuickPaste({ ...quickPaste, location: event.target.value })} placeholder="Location, e.g. United Kingdom" className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none placeholder:text-violet-100/35" />
+                <input value={quickPaste.sourceNote} onChange={(event) => setQuickPaste({ ...quickPaste, sourceNote: event.target.value })} placeholder="Source note for admin review" className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none placeholder:text-violet-100/35" />
+                <textarea value={quickPaste.publicSignalText} onChange={(event) => setQuickPaste({ ...quickPaste, publicSignalText: event.target.value })} placeholder="Public signal text, e.g. looking for builder or planning permission note" className="min-h-24 resize-y rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none placeholder:text-violet-100/35" />
+              </div>
+              <button disabled={busy === "quick-paste"} onClick={() => void quickPasteImport()} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-violet-950/30 hover:brightness-110 disabled:opacity-60">
+                {busy === "quick-paste" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardPaste className="h-4 w-4" />}
+                Import pasted URLs
+              </button>
+              {quickPasteResult && (
+                <a href={quickPasteResult.inventoryUrl} className="mt-3 block rounded-lg border border-violet-300/30 bg-violet-400/10 p-3 text-sm font-semibold text-violet-50 hover:bg-violet-400/15">
+                  Open imported records in Inventory
+                </a>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-lg border border-white/10 bg-white/5 p-5 shadow-2xl shadow-black/20 backdrop-blur-xl">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">Advanced file import</h2>
+              <p className="mt-1 text-sm text-violet-100/65">For larger prepared CSV or XLSX files only. UTF-8 CSV delimiters are detected; XLSX uses the first visible sheet with data. Maximum 10 MB and 10,000 rows.</p>
+            </div>
+            <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-violet-950/30 hover:brightness-110">
+              {busy === "preview" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
+              Choose CSV
+              <input type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(event) => void upload(event.target.files?.[0])} />
+            </label>
+          </div>
+        </section>
+
+        {preview && (
+          <section className="mt-6 rounded-lg border border-white/10 bg-white/5 p-5 shadow-2xl shadow-black/20 backdrop-blur-xl">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+              <div>
+                <h2 className="text-xl font-semibold">CSV mapping and validation</h2>
+                <p className="mt-1 max-w-3xl text-sm leading-6 text-violet-100/65">
+              Matching headers are auto-mapped. Empty person fields are optional; a row is valid when it has a company name plus a website, domain, public signal URL, company LinkedIn URL, or LinkedIn profile URL.
+              {preview.sourceFormat === "xlsx" && preview.worksheetName ? ` XLSX sheet: ${preview.worksheetName}.` : ""}
+                </p>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2 xl:min-w-[30rem]">
+                <button disabled={busy === "validate"} onClick={() => void autoMapAndValidate()} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-violet-950/30 hover:brightness-110 disabled:opacity-60">
+                  {busy === "validate" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                  Auto-map and validate
+                </button>
+                <button disabled={busy === "import" || preview.stats.validRows === 0} onClick={() => void confirmImport()} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-white px-5 py-3 text-sm font-bold text-[#13071f] hover:bg-violet-50 disabled:opacity-60">
+                  {busy === "import" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
+                  Import valid rows
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+              {[
+                ["Total", preview.stats.totalRows],
+                ["Valid", preview.stats.validRows],
+                ["Rejected", preview.stats.rejectedRows],
+                ["Duplicate", preview.stats.duplicateRows],
+                ["Missing company", preview.stats.rowsMissingCompany],
+                ["Missing reference", preview.stats.rowsMissingAllUsableSourceReferences],
+              ].map(([label, value]) => (
+                <div key={label} className="min-h-24 rounded-lg border border-white/10 bg-black/20 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-violet-100/55">{label}</p>
+                  <p className="mt-2 text-3xl font-semibold">{value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 rounded-lg border border-white/10 bg-black/20 p-4">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h3 className="font-semibold">Source columns</h3>
+                  <p className="mt-1 text-sm text-violet-100/60">Each CSV column has one target field. Leave unused columns ignored.</p>
+                </div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-violet-100/50">{preview.headers.length} columns detected</p>
+              </div>
+              <div className="mt-4 grid gap-3">
+                {preview.headers.map((header) => {
+                  const selectedField = fieldForSource(header);
+                  return (
+                    <div key={header} className="grid gap-3 rounded-lg border border-white/10 bg-white/5 p-4 lg:grid-cols-[minmax(12rem,0.9fr)_minmax(11rem,0.55fr)_minmax(15rem,0.75fr)] lg:items-center">
+                      <div className="min-w-0">
+                        <p className="text-[0.7rem] font-semibold uppercase tracking-wide text-violet-100/45">Source column</p>
+                        <p className="mt-1 break-words text-sm font-semibold text-white">{header}</p>
+                        <p className="mt-1 truncate text-xs text-violet-100/45">{sampleForHeader(header)}</p>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[0.7rem] font-semibold uppercase tracking-wide text-violet-100/45">Selected target</p>
+                        <p className="mt-2 inline-flex max-w-full rounded-md bg-violet-500/15 px-2 py-1 text-xs font-semibold text-violet-100">
+                          <span className="truncate">{labelForField(selectedField)}</span>
+                        </p>
+                      </div>
+                      <label className="grid gap-1 text-xs font-semibold text-violet-100">
+                        Target field
+                        <select value={selectedField} onChange={(event) => fieldSourceFromHeader(header, event.target.value)} className="min-h-11 w-full rounded-lg border border-white/10 bg-[#13071f] px-3 py-2 text-sm text-white outline-none focus:border-violet-300/50">
+                          <option value="">Ignore this column</option>
+                          {fields.map((field) => <option key={field.value} value={field.value}>{field.label}</option>)}
+                        </select>
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,0.45fr)]">
+              <div>
+                <h3 className="font-semibold">Valid row preview</h3>
+                <div className="mt-3 max-h-[420px] overflow-auto rounded-lg border border-white/10">
+                  <table className="w-full min-w-[900px] text-left text-xs">
+                    <thead className="bg-white/10 text-violet-100"><tr><th className="px-3 py-2">Company</th><th>Website</th><th>Domain</th><th>Location</th><th>Source</th><th>Fit</th><th>Intent</th><th>Evidence</th></tr></thead>
+                    <tbody>
+                      {preview.previewRows.map((row, index) => (
+                        <tr key={`${row.dedupe_key}-${index}`} className="border-t border-white/10">
+                          <td className="px-3 py-2">{row.company_name}</td>
+                          <td>{row.company_website}</td>
+                          <td>{row.company_domain}</td>
+                          <td>{row.location || [row.city, row.country].filter(Boolean).join(", ")}</td>
+                          <td>{row.public_signal_url || row.company_linkedin_url || row.linkedin_profile_url || row.source_note}</td>
+                          <td>{row.fit_score}</td>
+                          <td>{row.intent_score ?? "Intent not evidenced"}</td>
+                          <td>{row.evidence_status}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {preview.rejectedRows.length > 0 && (
+                <div className="rounded-lg border border-red-300/20 bg-red-950/30 p-4">
+                  <h3 className="font-semibold text-red-100">Invalid rows</h3>
+                  <div className="mt-3 grid max-h-[420px] gap-2 overflow-auto">
+                    {preview.rejectedRows.slice(0, 25).map((row) => (
+                      <div key={`${row.index}-${row.reason}`} className="rounded-lg border border-red-200/10 bg-black/20 p-3 text-sm">
+                        <p className="font-semibold text-red-100">Row {row.index + 2}: {row.reason}</p>
+                        <p className="mt-1 truncate text-xs text-red-100/60">{Object.entries(row.raw_row || {}).slice(0, 4).map(([key, value]) => `${key}: ${value}`).join(" | ")}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        <section className="mt-6 rounded-lg border border-white/10 bg-white/5 p-5 shadow-2xl shadow-black/20 backdrop-blur-xl">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">Batch history and review</h2>
+              <p className="mt-1 text-sm text-violet-100/65">Imported prospects do not publish automatically. Select records, review evidence, assign, then publish.</p>
+            </div>
+            <button onClick={() => void refresh()} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10">Refresh</button>
+          </div>
+
+          <div className="mt-4 grid gap-3 lg:grid-cols-4">
+            <select value={filters.batchId} onChange={(event) => setFilters({ ...filters, batchId: event.target.value })} className="rounded-lg border border-white/10 bg-[#13071f] px-3 py-2 text-sm">
+              <option value="">All batches</option>
+              {batches.map((batch) => <option key={batch.id} value={batch.id}>{batch.original_filename} · {new Date(batch.created_at).toLocaleString()}</option>)}
+            </select>
+            <select value={filters.evidenceStatus} onChange={(event) => setFilters({ ...filters, evidenceStatus: event.target.value })} className="rounded-lg border border-white/10 bg-[#13071f] px-3 py-2 text-sm">
+              <option value="">Any evidence</option>
+              <option value="profile_only">Profile-only</option>
+              <option value="website_verified">Website verified</option>
+              <option value="public_signal_verified">Public signal verified</option>
+            </select>
+            <input value={filters.company} onChange={(event) => setFilters({ ...filters, company: event.target.value })} placeholder="Company filter" className="rounded-lg border border-white/10 bg-[#13071f] px-3 py-2 text-sm outline-none" />
+            <button onClick={() => void refresh()} className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[#13071f]">Apply filters</button>
+          </div>
+
+          <div className="mt-5 overflow-auto rounded-lg border border-white/10">
+            <table className="w-full min-w-[1400px] text-left text-xs">
+              <thead className="bg-white/10 text-violet-100">
+                <tr>
+                  <th className="px-3 py-2">Select</th><th>Name</th><th>Title</th><th>Company</th><th>Location</th><th>Industry</th><th>Website</th><th>LinkedIn source</th><th>Fit</th><th>Intent</th><th>Evidence</th><th>Enrichment</th><th>Review</th><th>Assigned</th><th>Delivery</th>
+                </tr>
+              </thead>
+              <tbody>
+                {prospects.map((prospect) => {
+                  const assignments = Array.isArray(prospect.premium_prospect_assignments) ? prospect.premium_prospect_assignments : [];
+                  return (
+                    <tr key={prospect.id} className="border-t border-white/10 align-top">
+                      <td className="px-3 py-2"><input type="checkbox" checked={selected.has(String(prospect.id))} onChange={() => toggle(String(prospect.id))} /></td>
+                      <td>{prospect.full_name || `${prospect.first_name || ""} ${prospect.last_name || ""}`}</td>
+                      <td>{prospect.job_title}</td>
+                      <td>{prospect.company_name}</td>
+                      <td>{prospect.location || [prospect.city, prospect.country].filter(Boolean).join(", ")}</td>
+                      <td>{prospect.industry}</td>
+                      <td>{prospect.company_website ? <a className="text-violet-200 underline" href={prospect.company_website} target="_blank" rel="noreferrer">Website</a> : ""}</td>
+                      <td>{prospect.linkedin_profile_url ? <a className="text-violet-200 underline" href={prospect.linkedin_profile_url} target="_blank" rel="noreferrer">Source</a> : ""}</td>
+                      <td>{prospect.fit_score}</td>
+                      <td>{prospect.intent_score ?? "Not evidenced"}</td>
+                      <td>{prospect.evidence_status}</td>
+                      <td>{prospect.enrichment_status}</td>
+                      <td>{prospect.review_status}</td>
+          <td>{assignments.map((item) => item.customer_email).filter(Boolean).join(", ")}</td>
+          <td>{assignments.map((item) => item.assignment_status).filter(Boolean).join(", ")}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-5 grid gap-4 xl:grid-cols-[1fr_1.2fr]">
+            <div className="rounded-lg border border-white/10 bg-black/20 p-4">
+              <h3 className="font-semibold">Selected actions</h3>
+              <p className="mt-1 text-sm text-violet-100/65">{selectedIds.length} selected · {evidenceCounts.profileOnly} profile-only · {evidenceCounts.website} website-verified · {evidenceCounts.publicSignal} public-signal-verified · {evidenceCounts.noIntent} without intent evidence</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button onClick={() => void action("/api/admin/import/enrich", { ids: selectedIds }, "Enrichment finished. Review statuses updated.")} className="rounded-lg border border-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/10">Enrich selected</button>
+                <button onClick={() => void action("/api/admin/import/review", { ids: selectedIds, reviewStatus: "approved" }, "Selected records approved.")} className="rounded-lg border border-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/10">Approve selected</button>
+                <button onClick={() => void action("/api/admin/import/review", { ids: selectedIds, reviewStatus: "rejected" }, "Selected records rejected.")} className="rounded-lg border border-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/10">Reject selected</button>
+                <button onClick={() => void exportSelected()} className="rounded-lg border border-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/10">Export selected</button>
+                <button onClick={() => void action("/api/admin/import/assign", { ids: selectedIds, action: "remove" }, "Assignments removed.")} className="rounded-lg border border-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/10">Remove assignment</button>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-white/10 bg-black/20 p-4">
+              <h3 className="font-semibold">Assign and publish</h3>
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <input value={assignment.customerEmail} onChange={(event) => setAssignment({ ...assignment, customerEmail: event.target.value })} placeholder="Customer billing email" className="rounded-lg border border-white/10 bg-[#13071f] px-3 py-2 text-sm outline-none" />
+                <select value={assignment.productCode} onChange={(event) => setAssignment({ ...assignment, productCode: event.target.value })} className="rounded-lg border border-white/10 bg-[#13071f] px-3 py-2 text-sm">
+                  {productOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+                <input value={assignment.count} onChange={(event) => setAssignment({ ...assignment, count: event.target.value })} placeholder="Number of opportunities" className="rounded-lg border border-white/10 bg-[#13071f] px-3 py-2 text-sm outline-none" />
+                <input value={assignment.adminNotes} onChange={(event) => setAssignment({ ...assignment, adminNotes: event.target.value })} placeholder="Internal delivery note" className="rounded-lg border border-white/10 bg-[#13071f] px-3 py-2 text-sm outline-none" />
+              </div>
+              <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={assignment.adminConfirmedCustomer} onChange={(event) => setAssignment({ ...assignment, adminConfirmedCustomer: event.target.checked })} /> Administrator-confirmed customer record</label>
+              <label className="mt-2 flex items-center gap-2 text-sm"><input type="checkbox" checked={assignment.includeProfileOnly} onChange={(event) => setAssignment({ ...assignment, includeProfileOnly: event.target.checked })} /> Include profile-only records in delivery</label>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button onClick={() => void action("/api/admin/import/assign", { ids: selectedIds.slice(0, Number(assignment.count) || selectedIds.length), ...assignment }, "Selected records assigned.")} className="rounded-lg border border-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/10">Assign selected</button>
+                <button onClick={() => void action("/api/admin/import/publish", { ids: selectedIds.slice(0, Number(assignment.count) || selectedIds.length), ...assignment }, "Publish attempted. Delivery recorded only if the server completed every step.")} className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-500 px-3 py-2 text-sm font-bold text-white hover:brightness-110">
+                  {busy === "/api/admin/import/publish" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  Publish to customer
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}

@@ -1,14 +1,21 @@
 import Link from "next/link";
-import { BarChart3, Bot, Database, Mail, Search, Settings, ShieldCheck } from "lucide-react";
+import { BarChart3, Bot, Database, FileUp, Mail, Radar, Search, Settings, ShieldCheck, Workflow } from "lucide-react";
+import { AdminLogoutButton } from "@/components/AdminLogoutButton";
 
 const links = [
   ["Dashboard", "/admin", BarChart3],
+  ["Operations", "/admin/operations", Workflow],
+  ["Exceptions", "/admin/exceptions", ShieldCheck],
+  ["Opportunity Engine", "/admin/opportunity-engine", Radar],
+  ["Inventory", "/admin/inventory", Database],
+  ["CSV Import", "/admin/import", FileUp],
   ["Lead Search", "/lead-search", Search],
   ["Autopilot", "/admin/autopilot", Bot],
   ["Email", "/admin/email", Mail],
   ["Outreach", "/admin/outreach", Mail],
   ["Compliance", "/compliance", ShieldCheck],
   ["Persistence", "/admin/persistence", Database],
+  ["Setup", "/admin/setup", Settings],
   ["Settings", "/admin/settings", Settings],
 ];
 
@@ -26,6 +33,7 @@ export function AdminNav() {
             <span className="break-words">{label as string}</span>
           </Link>
         ))}
+        <AdminLogoutButton />
       </nav>
     </aside>
   );

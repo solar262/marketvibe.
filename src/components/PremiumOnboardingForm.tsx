@@ -41,6 +41,24 @@ export function PremiumOnboardingForm({
     }
   }
 
+  const productSpecific =
+    productCode === "proof_pack"
+      ? [
+          ["exclusions", "Exclusions", "Competitors, regions, company types, or leads you do not want included."],
+        ]
+      : productCode === "radar"
+        ? [
+            ["opportunityPreferences", "Opportunity preferences", "Signals, company types, and opportunity patterns you want prioritized."],
+            ["dashboardChecklist", "Dashboard checklist", "What your first recurring dashboard should help you review."],
+            ["exportPreferences", "Export preferences", "CSV fields, delivery frequency, or workflow preferences."],
+          ]
+        : [
+            ["dealValue", "Typical deal value", "Approximate deal value or account size you want MarketVibe to prioritize."],
+            ["exclusions", "Exclusions", "Competitors, regions, company types, or leads you do not want included."],
+            ["deliveryRecipients", "Delivery recipients", "Who should receive delivery emails or reports."],
+            ["reportingPreference", "Reporting preference", "Weekly summary, CSV-first delivery, dashboard review, or other preference."],
+          ];
+
   return (
     <form onSubmit={submit} className="mt-8 grid gap-4">
       <input type="hidden" name="productCode" value={productCode} />
@@ -92,6 +110,20 @@ export function PremiumOnboardingForm({
       <label className="grid gap-1 text-sm font-semibold text-violet-100">
         Optional notes
         <textarea name="notes" rows={3} className={glassInputClass} />
+      </label>
+      <div className="grid gap-4">
+        {productSpecific.map(([name, label, placeholder]) => (
+          <label key={name} className="grid gap-1 text-sm font-semibold text-violet-100">
+            {label}
+            <textarea name={name} rows={3} placeholder={placeholder} className={glassInputClass} />
+          </label>
+        ))}
+      </div>
+      <label className="flex items-start gap-3 rounded-lg border border-white/10 bg-white/5 p-3 text-sm leading-6 text-violet-100">
+        <input required name="acknowledgement" value="yes" type="checkbox" className="mt-1" />
+        <span>
+          I understand MarketVibe uses verified public/source-backed information where available, does not guarantee replies, clients, sales, or revenue, and will not fabricate missing opportunities.
+        </span>
       </label>
       <button disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-500 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-violet-950/30 transition hover:brightness-110 disabled:opacity-70">
         {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}

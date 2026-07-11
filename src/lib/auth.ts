@@ -51,3 +51,7 @@ export async function requireAdmin() {
     redirect("/login");
   }
 }
+
+export async function requireAdminApi() {
+  return isAdminAuthenticated();
+}

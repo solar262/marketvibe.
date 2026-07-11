@@ -216,28 +216,28 @@ const offers = [
 const testimonials = [
   {
     quote:
-      'The proof pack gave our agency ten better conversations than a month of cold list building.',
-    name: 'Maya R.',
-    role: 'Founder, RevOps studio',
+      'Proof Pack delivery must use source-backed opportunities where available and label unevidenced intent clearly.',
+    name: 'Source-backed delivery',
+    role: 'Operating rule',
   },
   {
     quote:
-      'MarketVibe does the hard part: it tells us why a prospect might care before we write the first message.',
-    name: 'Leon K.',
-    role: 'Growth consultant',
+      'Imported CSV records are reviewed, assigned, and published by an administrator before customer delivery.',
+    name: 'Operator review',
+    role: 'Operating rule',
   },
   {
     quote:
-      'The signal scoring made our weekly outreach review faster, calmer, and much less guessy.',
-    name: 'Sofia M.',
-    role: 'Agency partner',
+      'Customers are responsible for lawful, accurate outreach and should not treat scores as guaranteed sales outcomes.',
+    name: 'Responsible outreach',
+    role: 'Operating rule',
   },
 ];
 
 const proofMetrics = [
-  { label: 'Signals delivered', value: '18,400+', detail: 'Public business pain signals packaged for action.', icon: Radar },
-  { label: 'Agencies onboard', value: '126', detail: 'Early teams using proof packs and niche reports.', icon: UsersRound },
-  { label: 'Pipeline value', value: 'EUR 42M', detail: 'Estimated opportunity value represented across reports.', icon: LineChart },
+  { label: 'Proof Pack', value: 'EUR 99', detail: 'One-off source-backed sample delivery.', icon: Radar },
+  { label: 'Radar', value: 'EUR 299/mo', detail: 'Recurring dashboard access after onboarding.', icon: UsersRound },
+  { label: 'Growth Desk', value: 'EUR 750/mo', detail: 'Managed delivery for focused niches and territories.', icon: LineChart },
 ];
 
 const navItems = [
@@ -913,7 +913,7 @@ function ProofMetrics() {
 
 function Testimonials() {
   return (
-    <section className="testimonial-strip" aria-label="Customer proof">
+    <section className="testimonial-strip" aria-label="Operating safeguards">
       {testimonials.map((testimonial) => (
         <article className="testimonial-card" key={testimonial.name}>
           <Quote size={20} />
