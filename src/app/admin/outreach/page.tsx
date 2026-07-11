@@ -5,6 +5,9 @@ import { getOutreachStats } from "@/lib/outreach";
 export default async function AdminOutreachPage() {
   const stats = await getOutreachStats();
   const config = stats.config;
+  const brevoConfigured = Boolean(process.env.BREVO_API_KEY && process.env.BREVO_SENDER_EMAIL);
+  const brevoSender = process.env.BREVO_SENDER_EMAIL || "Not configured";
+  const replyTo = config.replyTo || process.env.ADMIN_EMAIL || brevoSender;
 
   return (
     <main className="p-4 sm:p-6 lg:p-8">
@@ -12,18 +15,26 @@ export default async function AdminOutreachPage() {
         <div>
           <p className="text-sm font-semibold text-emerald-700">Admin</p>
           <h1 className="mt-2 text-3xl font-semibold text-slate-950">Outreach Queue</h1>
-          <p className="mt-2 max-w-2xl text-slate-600">Queue compliant outreach from saved public business contacts. Sending stays disabled until a provider, sender domain, and daily limits are configured.</p>
+          <p className="mt-2 max-w-2xl text-slate-600">
+            Brevo handles MarketVibe email delivery. This page controls only optional automated prospect outreach, which remains paused unless it is deliberately enabled with a daily limit.
+          </p>
         </div>
-        <Link href="/api/admin/outreach/queue-from-leads?limit=10" className="inline-flex items-center justify-center rounded-md bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">
-          Queue saved leads
-        </Link>
+        {config.enabled ? (
+          <Link href="/api/admin/outreach/queue-from-leads?limit=10" className="inline-flex items-center justify-center rounded-md bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">
+            Queue saved leads
+          </Link>
+        ) : (
+          <span className="inline-flex cursor-not-allowed items-center justify-center rounded-md bg-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-500">
+            Outreach paused
+          </span>
+        )}
       </div>
 
       <section className="mt-6 grid gap-4 md:grid-cols-4">
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <Mail className="h-5 w-5 text-emerald-700" />
-          <p className="mt-4 text-sm text-slate-500">Sending</p>
-          <p className="mt-1 text-2xl font-semibold text-slate-950">{config.enabled ? "Enabled" : "Disabled"}</p>
+          <p className="mt-4 text-sm text-slate-500">Automated outreach</p>
+          <p className="mt-1 text-2xl font-semibold text-slate-950">{config.enabled ? "Enabled" : "Paused"}</p>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <Inbox className="h-5 w-5 text-emerald-700" />
@@ -47,8 +58,10 @@ export default async function AdminOutreachPage() {
           <div className="flex items-start gap-3">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
             <div>
-              <p className="font-semibold">Email sending is disabled by default.</p>
-              <p className="mt-1">Configure `OUTREACH_EMAIL_PROVIDER`, provider API key, `OUTREACH_FROM_EMAIL`, `OUTREACH_DAILY_SEND_LIMIT`, and set `OUTREACH_EMAIL_ENABLED=true` only after the sender domain is ready.</p>
+              <p className="font-semibold">Automated prospect outreach is paused.</p>
+              <p className="mt-1">
+                This does not block Brevo transactional email, paid Proof Pack delivery, or Radar delivery. MarketVibe does not require Resend or SendGrid.
+              </p>
             </div>
           </div>
         </section>
@@ -63,17 +76,23 @@ export default async function AdminOutreachPage() {
 
       <section className="mt-6 grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-semibold text-slate-950">Provider readiness</h2>
+          <h2 className="text-xl font-semibold text-slate-950">Email readiness</h2>
           <div className="mt-4 grid gap-2 text-sm text-slate-700">
-            <p>Provider: {config.provider || "Not set"}</p>
-            <p>Provider key: {config.providerReady ? "Configured" : "Missing"}</p>
-            <p>Sender email: {config.fromEmail || "Missing"}</p>
-            <p>Reply-to: {config.replyTo || "Missing"}</p>
-            <p>Daily send limit: {config.dailyLimit}</p>
+            <p>Provider: Brevo</p>
+            <p>Brevo API: {brevoConfigured ? "Configured" : "Missing"}</p>
+            <p>Sender email: {brevoSender}</p>
+            <p>Reply-to: {replyTo}</p>
+            <p>Automated outreach daily limit: {config.dailyLimit}</p>
           </div>
-          <Link href="/api/admin/outreach/send-queued?limit=5" className="mt-5 inline-flex items-center justify-center rounded-md border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-950 hover:bg-slate-50">
-            Test send queued
-          </Link>
+          {config.enabled ? (
+            <Link href="/api/admin/outreach/send-queued?limit=5" className="mt-5 inline-flex items-center justify-center rounded-md border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-950 hover:bg-slate-50">
+              Test send queued
+            </Link>
+          ) : (
+            <span className="mt-5 inline-flex cursor-not-allowed items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-400">
+              Test send unavailable while paused
+            </span>
+          )}
         </div>
 
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -108,4 +127,3 @@ export default async function AdminOutreachPage() {
     </main>
   );
 }
-
