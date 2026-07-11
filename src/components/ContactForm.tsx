@@ -4,31 +4,34 @@ import { useState } from "react";
 import { inputClass } from "@/lib/ui";
 
 export function ContactForm({ offer }: { offer: string }) {
-  const [sent, setSent] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [errorMessage, setErrorMessage] = useState("");
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (loading) return;
-    setLoading(true);
-    setError("");
-    setSent(false);
-    const form = new FormData(event.currentTarget);
+    setStatus("sending");
+    setErrorMessage("");
+
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+
     try {
       const response = await fetch("/api/contact", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(Object.fromEntries(form.entries())),
       });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || "Message could not be sent.");
-      setSent(true);
-      event.currentTarget.reset();
-    } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Message could not be sent.");
-    } finally {
-      setLoading(false);
+
+      const result = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(result?.error || "Your message could not be sent. Please try again.");
+      }
+
+      formElement.reset();
+      setStatus("sent");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Your message could not be sent. Please try again.");
+      setStatus("error");
     }
   }
 
@@ -56,11 +59,18 @@ export function ContactForm({ offer }: { offer: string }) {
         Message
         <textarea required name="message" rows={5} className={inputClass} />
       </label>
-      <button disabled={loading} className="rounded-md bg-stone-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">
-        {loading ? "Sending..." : "Send message"}
+      <button
+        disabled={status === "sending"}
+        className="rounded-md bg-stone-950 px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {status === "sending" ? "Sending…" : "Send message"}
       </button>
-      {sent && <p className="rounded-md bg-violet-50 p-3 text-sm text-violet-900">Message received. We will reply by email when operator review is needed.</p>}
-      {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+      {status === "sent" && (
+        <p className="rounded-md bg-violet-50 p-3 text-sm text-violet-900">Message sent.</p>
+      )}
+      {status === "error" && (
+        <p className="rounded-md bg-red-50 p-3 text-sm text-red-800">{errorMessage}</p>
+      )}
     </form>
   );
 }
