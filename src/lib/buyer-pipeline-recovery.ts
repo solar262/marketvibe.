@@ -5,7 +5,6 @@ type SupabaseClient = NonNullable<ReturnType<typeof getSupabaseAdmin>>;
 type RecoverableBuyerCompany = {
   id: string;
   buyer_status: string;
-  website_status: string;
 };
 
 type ExistingPipelineJob = {
@@ -38,7 +37,8 @@ export async function ensureBuyerPipelineJobs({
 }) {
   const { data: companies, error: companiesError } = await supabase
     .from("marketvibe_buyer_companies")
-    .select("id,buyer_status,website_status")
+    .select("id,buyer_status")
+    .eq("is_test_data", false)
     .in("buyer_status", [...RECOVERABLE_BUYER_STATES])
     .order("created_at", { ascending: true })
     .limit(limit);
