@@ -6,7 +6,7 @@ export function Footer() {
       <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 text-sm text-slate-600 sm:px-6 md:grid-cols-4 lg:px-8">
         <div className="md:col-span-2">
           <p className="font-semibold text-white">MarketVibe</p>
-          <p className="mt-3 max-w-md leading-6 text-slate-300">Buyer-intent intelligence for agencies, consultants, and growth teams that need clearer opportunities before outreach.</p>
+          <p className="mt-3 max-w-md leading-6 text-slate-300">Buyer-intent intelligence for agencies, consultants, and growth teams that need clearer opportunities before committing time to a market.</p>
         </div>
         <div>
           <p className="font-semibold text-white">App</p>

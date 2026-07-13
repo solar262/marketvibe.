@@ -13,28 +13,28 @@ import {
 } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "MarketVibe | Opportunity Intelligence for Modern Prospecting",
+  title: "MarketVibe | Buyer-Intent Market Intelligence",
   description:
-    "Uncover high-intent opportunities faster with buyer-intent scoring, source context, outreach angles, and proof-pack delivery.",
+    "Review buyer-intent market signals with source context, fit notes, and a simple Proof Pack starting point.",
 };
 
 const features = [
-  [Gauge, "Opportunity scoring", "Rank public buyer-intent signals before your team spends time on outreach."],
-  [MessageSquareText, "Outreach angles", "See the pain point, timing, and first-message angle connected to each signal."],
-  [ClipboardCheck, "Proof packs", "Try one niche first with a focused shortlist, source context, and outreach angles."],
-  [Radar, "Radar feeds", "Ongoing delivery for agencies and growth teams that need fresher opportunity flow."],
+  [Gauge, "Market fit signals", "Review public buyer-intent signals before your team spends time on a market."],
+  [MessageSquareText, "Clear context", "See what changed, why it may matter, and how the opportunity was assessed."],
+  [ClipboardCheck, "Proof Pack", "Test one niche first with a focused sample and source context where available."],
+  [Radar, "Radar delivery", "Move to recurring market review when you want a steadier opportunity feed."],
 ] as const;
 
-const testimonials = [
-  ["Agency founder", "The proof pack made it clear which niches were worth pursuing before we added another sales tool."],
-  ["SEO consultant", "The signals gave us a cleaner reason to contact prospects instead of opening with a generic audit."],
-  ["Growth operator", "Radar turned scattered public pain into a weekly list the team could actually work from."],
+const proofNotes = [
+  ["Sample first", "Use a Proof Pack to judge whether one market is worth reviewing before choosing a monthly plan."],
+  ["Context included", "Each item is presented with source context and plain-language notes so your team can assess fit."],
+  ["No guarantees", "MarketVibe supports better review decisions. It does not promise replies, clients, or revenue."],
 ] as const;
 
 const metrics = [
-  ["Signals delivered", "12.4k"],
-  ["Agencies onboard", "37"],
-  ["Opportunity value", "€2.1m"],
+  ["Proof Pack", "€99"],
+  ["Radar", "Monthly"],
+  ["Growth Desk", "Managed"],
 ] as const;
 
 export default function Home() {
@@ -50,10 +50,10 @@ export default function Home() {
               <Sparkles className="h-4 w-4 text-[#a855f7]" /> MarketVibe buyer-intent intelligence
             </p>
             <h1 className="mt-5 max-w-2xl font-serif text-4xl font-semibold tracking-tight text-white sm:text-5xl lg:text-[3.7rem] lg:leading-[1.02]">
-              Stop Chasing Cold Leads
+              Find buyers with a reason to act.
             </h1>
             <p className="mt-5 max-w-xl text-base leading-7 text-violet-100/75 sm:text-lg">
-              MarketVibe turns public business pain signals into scored opportunities, source context, and practical outreach angles for agencies, consultants, and growth teams.
+              MarketVibe turns public business signals into focused market opportunities with source context and plain-language fit notes for agencies, consultants, and growth teams.
             </p>
 
             <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -66,7 +66,7 @@ export default function Home() {
             </div>
 
             <div className="mt-7 grid gap-2 text-xs font-semibold text-violet-100/80 sm:grid-cols-2">
-              {["Verified buyer-intent signals", "Clear reasons to reach out", "Practical outreach angles", "Secure dashboard delivery"].map((item) => (
+              {["Public buyer-intent signals", "Source context included", "Plain-language fit notes", "Secure delivery"].map((item) => (
                 <span key={item} className="inline-flex min-w-0 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 backdrop-blur-xl">
                   <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[#a855f7]" /> <span className="truncate">{item}</span>
                 </span>
@@ -93,9 +93,9 @@ export default function Home() {
 
                   <div className="mt-4 grid gap-3">
                     {[
-                      ["Signal", "Founder asks how to improve qualified sales meetings this quarter."],
-                      ["Pain", "Opportunity quality is low and the team is burning time on manual research."],
-                      ["Angle", "Lead with a short buyer-intent brief, then offer a focused prospecting sprint."],
+                      ["Signal", "A founder is asking how to improve qualified meetings this quarter."],
+                      ["Context", "The issue appears to be opportunity quality, not just list size."],
+                      ["Next step", "Review the source, check fit, then decide whether the market is worth testing."],
                     ].map(([label, body]) => (
                       <div key={label} className="rounded-lg border border-white/10 bg-white/5 p-4 backdrop-blur-xl">
                         <p className="text-xs font-semibold uppercase tracking-wide text-violet-300">{label}</p>
@@ -105,7 +105,7 @@ export default function Home() {
                   </div>
 
                   <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                    {["Source saved", "Fit checked", "CSV ready"].map((item) => (
+                    {["Source reviewed", "Fit checked", "Next step clear"].map((item) => (
                       <div key={item} className="rounded-lg border border-white/10 bg-black/20 p-3 text-sm font-semibold text-white">
                         <ShieldCheck className="mb-2 h-4 w-4 text-[#a855f7]" />
                         {item}
@@ -124,7 +124,7 @@ export default function Home() {
           <div className="max-w-3xl">
             <p className="text-sm font-semibold text-[#a855f7]">How it works</p>
             <h2 className="mt-2 font-serif text-3xl font-semibold tracking-tight text-white">
-              Opportunity intelligence without the old prospect-list clutter.
+              Market signals without generic list clutter.
             </h2>
           </div>
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -142,11 +142,11 @@ export default function Home() {
       <section className="border-b border-white/10 bg-[linear-gradient(180deg,#10071c_0%,#08030f_100%)]">
         <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
           <div className="grid gap-4 lg:grid-cols-3">
-            {testimonials.map(([name, quote]) => (
-              <figure key={name} className="rounded-lg border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
-                <blockquote className="text-sm leading-6 text-violet-50/80">&ldquo;{quote}&rdquo;</blockquote>
-                <figcaption className="mt-4 text-sm font-semibold text-violet-200">{name}</figcaption>
-              </figure>
+            {proofNotes.map(([title, body]) => (
+              <article key={title} className="rounded-lg border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+                <h3 className="text-sm font-semibold text-violet-200">{title}</h3>
+                <p className="mt-3 text-sm leading-6 text-violet-50/80">{body}</p>
+              </article>
             ))}
           </div>
           <div className="mt-6 grid gap-4 md:grid-cols-3">
@@ -167,7 +167,7 @@ export default function Home() {
               <Target className="mb-4 h-7 w-7 text-[#a855f7]" />
               <h2 className="font-serif text-2xl font-semibold text-white">Try one market before subscribing.</h2>
               <p className="mt-2 max-w-2xl leading-7 text-violet-100/70">
-                Start with a €99 Proof Pack when you want useful prospects and outreach angles for one niche, without paying monthly first.
+                Start with a €99 Proof Pack when you want to review one niche before paying monthly.
               </p>
             </div>
             <Link href="/sample" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-500 px-6 py-3 text-sm font-semibold text-white shadow-xl shadow-violet-950/20 transition hover:brightness-110">

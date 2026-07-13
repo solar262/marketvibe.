@@ -17,9 +17,9 @@ const playfair = Playfair_Display({
 });
 
 const siteUrl = "https://www.marketvibe1.com";
-const siteTitle = "MarketVibe | Opportunity Intelligence for Modern Prospecting";
+const siteTitle = "MarketVibe | Buyer-Intent Market Intelligence";
 const siteDescription =
-  "Find better prospects faster with opportunity scoring, outreach angles, audit summaries, and faster prospecting for freelancers, agencies, consultants, and service providers.";
+  "Review buyer-intent market signals with source context, fit notes, and a simple Proof Pack starting point for agencies, consultants, and growth teams.";
 const previewImage = "/marketvibe-email-preview.png";
 
 export const metadata: Metadata = {

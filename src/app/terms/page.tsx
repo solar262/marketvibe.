@@ -10,23 +10,23 @@ export const metadata: Metadata = {
 const sections = [
   {
     title: "Service overview",
-    body: "MarketVibe provides buyer-intent research, proof-pack delivery, opportunity dashboards, source context, and related digital access for agencies, consultants, growth teams, and service sellers.",
+    body: "MarketVibe provides buyer-intent research, Proof Pack delivery, opportunity workspaces, source context, and related digital access for agencies, consultants, growth teams, and service sellers.",
   },
   {
     title: "What the Proof Pack includes",
-    body: "A Proof Pack is a one-off buyer-intent sample. It may include verified saved opportunities, source context where available, pain summaries, intent scores, and outreach angles. MarketVibe does not pad proof packs with fabricated companies or source links.",
+    body: "A Proof Pack is a one-off buyer-intent sample. It may include relevant opportunities, source context where available, pain summaries, intent indicators, and fit notes.",
   },
   {
     title: "How MarketVibe outputs may be used",
-    body: "You may use MarketVibe outputs to support your own research, outreach planning, proposals, service offers, or internal prioritization. You are responsible for how you present, edit, share, or act on the information.",
+    body: "You may use MarketVibe outputs to support your own research, market review, proposals, service offers, or internal prioritization. You are responsible for how you present, edit, share, or act on the information.",
   },
   {
     title: "No guaranteed results",
-    body: "MarketVibe does not guarantee sales, clients, rankings, replies, deliverability, revenue, profit, or business outcomes. Lead scores and audit notes are practical indicators, not promises that a business will buy services or respond to outreach.",
+    body: "MarketVibe does not guarantee sales, clients, rankings, replies, deliverability, revenue, profit, or business outcomes. Scores and audit notes are practical indicators, not promises that a business will buy services or respond.",
   },
   {
     title: "User responsibility",
-    body: "You are responsible for how you use MarketVibe results, reports, business contact details, outreach messages, and exported content. You must use the service lawfully and avoid deceptive, abusive, misleading, or spam-like activity.",
+    body: "You are responsible for how you use MarketVibe results, reports, business contact details, message drafts, and exported content. You must use the service lawfully and avoid deceptive, abusive, misleading, or spam-like activity.",
   },
   {
     title: "Public business information",
@@ -54,7 +54,7 @@ const sections = [
   },
   {
     title: "Limitation of liability",
-    body: "MarketVibe is provided as a business prospecting and audit-support tool. To the maximum extent allowed by law, we are not liable for lost revenue, lost opportunities, account restrictions, third-party platform decisions, or actions you take based on MarketVibe outputs.",
+    body: "MarketVibe is provided as a business research and decision-support tool. To the maximum extent allowed by law, we are not liable for lost revenue, lost opportunities, account restrictions, third-party platform decisions, or actions you take based on MarketVibe outputs.",
   },
   {
     title: "Contact",
@@ -67,7 +67,7 @@ export default function TermsPage() {
     <main className="bg-[radial-gradient(circle_at_top,#d1fae5_0,transparent_30rem),linear-gradient(180deg,#f8fafc_0%,#ffffff_45%,#f8fafc_100%)] px-4 py-12 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-3xl rounded-[2rem] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-950/5 sm:p-8">
         <p className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-900">
-          <ShieldCheck className="h-4 w-4" /> MarketVibe Lead Engine
+          <ShieldCheck className="h-4 w-4" /> MarketVibe
         </p>
         <h1 className="mt-5 text-3xl font-semibold tracking-tight text-slate-950">Terms of Service</h1>
         <p className="mt-3 text-sm text-slate-500">Last updated: July 2026</p>

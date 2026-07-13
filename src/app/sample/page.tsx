@@ -5,7 +5,7 @@ import { SampleCheckoutForm } from "./SampleCheckoutForm";
 
 export const metadata: Metadata = {
   title: "MarketVibe Proof Pack | €99 Buyer-Intent Sample",
-  description: "Buy a one-off MarketVibe Proof Pack for a niche-specific shortlist with buyer context, source links where available, and outreach angles.",
+  description: "Buy a one-off MarketVibe Proof Pack for a focused market sample with context and source links where available.",
 };
 
 export default function SamplePage() {
@@ -19,17 +19,19 @@ export default function SamplePage() {
               Proof Pack
             </p>
             <h1 className="mt-6 font-serif text-4xl font-semibold tracking-tight sm:text-6xl">
-              Try one focused prospect pack before you subscribe.
+              Test one market before you subscribe.
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-violet-100/70">
-              The €99 Proof Pack gives you a niche-specific shortlist with context, source links where available, and outreach angles. Use it to test one market without committing to a monthly plan.
+              The €99 Proof Pack gives you a focused market sample with context
+              and source links where available. Use it to decide whether
+              MarketVibe is useful before choosing a monthly plan.
             </p>
 
             <div className="mt-8 grid gap-3 sm:grid-cols-2">
               {[
                 "No subscription required",
-                "Built around your exact niche",
-                "Shows why each opportunity may matter",
+                "Built around one niche",
+                "Context for each opportunity",
                 "Delivered by secure workspace and email",
               ].map((item) => (
                 <div key={item} className="rounded-lg border border-white/10 bg-white/5 p-4 text-sm font-semibold text-violet-50 backdrop-blur-xl">
@@ -41,9 +43,9 @@ export default function SamplePage() {
 
             <section className="mt-8 grid gap-3">
               {[
-                ["Not a random prospect list", "You get a focused pack shaped around your niche, territory, offer, and ideal buyer."],
-                ["Saves the research slog", "Instead of opening dozens of tabs, you receive a shortlist with context already organized."],
-                ["Useful immediately", "Each opportunity is meant to help you decide who to review, what to say, and whether Radar is worth it."],
+                ["Focused, not generic", "You get a sample shaped around your niche, territory, offer, and ideal buyer."],
+                ["Less manual review", "Instead of opening dozens of tabs, you receive a focused set of opportunities with context already organized."],
+                ["Built for decision-making", "Each opportunity is meant to help you decide what to review and whether Radar is worth it."],
               ].map(([title, body]) => (
                 <div key={title} className="rounded-lg border border-white/10 bg-black/20 p-4 backdrop-blur-xl">
                   <h2 className="text-sm font-semibold text-white">{title}</h2>
@@ -55,7 +57,9 @@ export default function SamplePage() {
             <div className="mt-8 rounded-lg border border-violet-300/20 bg-white/5 p-5 backdrop-blur-xl">
               <ShieldCheck className="h-6 w-6 text-[#a855f7]" />
               <p className="mt-3 text-sm leading-6 text-violet-100/70">
-                MarketVibe does not claim guaranteed replies, clients, or revenue. The pack is decision support for prospect research and outreach planning, so you can judge the signal before paying monthly.
+                MarketVibe does not claim guaranteed replies, clients, or
+                revenue. The pack is decision support for market review, so you
+                can judge the signal before paying monthly.
               </p>
               <Link href="/terms" className="mt-4 inline-flex text-sm font-semibold text-violet-200 hover:text-white">
                 Read terms

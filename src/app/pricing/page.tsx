@@ -13,7 +13,7 @@ import { CheckoutButton } from "@/components/CheckoutButton";
 export const metadata: Metadata = {
   title: "MarketVibe Pricing | Buyer-Intent Intelligence",
   description:
-    "Choose a MarketVibe buyer-intent intelligence plan for qualified opportunities, signal context, outreach angles, and delivery.",
+    "Choose a MarketVibe buyer-intent intelligence plan for focused market review, source context, and recurring delivery.",
 };
 
 const buyButton =
@@ -39,7 +39,7 @@ export default function PricingPage() {
 
             <p className="mx-auto mt-6 max-w-3xl text-lg leading-8 text-violet-100/75">
               MarketVibe converts public business pain signals into scored,
-              organized opportunities with source context and practical outreach angles.
+              organized opportunities with source context and plain-language fit notes.
             </p>
           </div>
 
@@ -55,16 +55,16 @@ export default function PricingPage() {
               <h2 className="mt-2 text-4xl font-bold">€99</h2>
               <p className="mt-1 text-sm text-violet-100/60">One-off niche test · no subscription</p>
               <p className="mt-5 min-h-20 leading-7 text-violet-100/75">
-                Get a focused shortlist for one market so you can see useful prospects,
-                why they matter, and how to approach them before subscribing.
+                Get a focused review for one market so you can judge whether the
+                MarketVibe format is useful before subscribing.
               </p>
               <div className="mt-6 space-y-3 text-sm text-violet-50">
                 {[
-                  "Niche-specific opportunity shortlist",
-                  "Why each company is worth a look",
+                  "One focused niche",
+                  "Context for each opportunity",
                   "Source links where available",
-                  "Ready-to-use outreach angles",
-                  "Secure dashboard and CSV delivery",
+                  "Plain-language fit notes",
+                  "Secure workspace and email delivery",
                 ].map((item) => (
                   <p key={item} className="flex gap-2">
                     <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-fuchsia-300" />
@@ -88,16 +88,16 @@ export default function PricingPage() {
               <h2 className="mt-2 text-4xl font-bold">€299</h2>
               <p className="mt-1 text-sm text-violet-100/60">Per month</p>
               <p className="mt-5 min-h-20 leading-7 text-violet-100/75">
-                Continuous access to scored buyer-intent opportunities for a focused,
-                repeatable prospecting workflow.
+                Recurring access to scored buyer-intent opportunities for an
+                ongoing market review workflow.
               </p>
               <div className="mt-6 space-y-3 text-sm text-violet-50">
                 {[
-                  "Ongoing buyer-intent radar",
-                  "Intent scoring and pain summaries",
+                  "Recurring signal review",
+                  "Context and priority notes",
                   "Opportunity filtering",
-                  "Outreach-angle recommendations",
-                  "Dashboard and export access",
+                  "Plain-language recommendations",
+                  "Workspace access",
                 ].map((item) => (
                   <p key={item} className="flex gap-2">
                     <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-fuchsia-300" />
@@ -120,15 +120,15 @@ export default function PricingPage() {
                 Per month · onboarding applies
               </p>
               <p className="mt-5 min-h-20 leading-7 text-violet-100/75">
-                Managed buyer-intent delivery for businesses that need a more focused
-                niche, territory, and reporting workflow.
+                Managed market review for businesses that need help narrowing
+                niche, territory, and reporting focus.
               </p>
               <div className="mt-6 space-y-3 text-sm text-violet-50">
                 {[
-                  "Custom niche and territory tracking",
-                  "Weekly opportunity delivery",
+                  "Custom niche and territory focus",
+                  "Weekly opportunity review",
                   "Priority filtering and reporting",
-                  "CSV and report exports",
+                  "Report exports",
                   "Priority support",
                 ].map((item) => (
                   <p key={item} className="flex gap-2">

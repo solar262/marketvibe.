@@ -45,9 +45,10 @@ export function SampleCheckoutForm() {
     <form onSubmit={submit} className="rounded-lg border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
       <div>
         <p className="text-sm font-semibold text-violet-200">Proof Pack</p>
-        <h2 className="mt-1 text-2xl font-semibold text-white">Start checkout</h2>
+        <h2 className="mt-1 text-2xl font-semibold text-white">Start Proof Pack</h2>
         <p className="mt-2 text-sm leading-6 text-violet-100/65">
-          Pay by card, then complete onboarding so your pack can be built from verified saved signals.
+          Pay by card, then tell us the niche you want to review. We use that
+          to prepare your Proof Pack.
         </p>
       </div>
       <div className="mt-6 grid gap-4">
@@ -60,13 +61,13 @@ export function SampleCheckoutForm() {
           <input name="name" className={glassInputClass} />
         </label>
         <label className="grid gap-2 text-sm font-semibold text-violet-100">
-          Niche you want to validate
+          Niche to review
           <input name="niche" className={glassInputClass} placeholder="Example: B2B SaaS agencies in Germany" />
         </label>
       </div>
       <button disabled={loading} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-500 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-violet-950/30 transition hover:brightness-110 disabled:opacity-70">
         {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-        Get proof pack
+        Get Proof Pack
       </button>
       {error && <p className="mt-4 rounded-lg border border-red-300/30 bg-red-950/40 p-3 text-sm font-semibold text-red-100">{error}</p>}
     </form>

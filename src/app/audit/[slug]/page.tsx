@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { Download, HelpCircle, LockKeyhole } from "lucide-react";
 import { CheckoutButton } from "@/components/CheckoutButton";
 import { findLeadBySlug } from "@/lib/lead-engine";
@@ -6,6 +7,12 @@ import { getAuditBySlugFromSupabase } from "@/lib/lead-persistence";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 function titleCase(value: string) {
   return value.replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -53,7 +60,7 @@ function contactPageDisplay(value?: string) {
 
 function reportSummary(name: string, score: number, issue: string) {
   const opportunityLevel = score >= 70 ? "strong" : score >= 40 ? "clear" : "basic";
-  return `${name} is a verified public business lead with a ${opportunityLevel} website-improvement angle. The scan found ${issue}, giving a service provider a practical reason to start a local visibility, contact-flow, or trust-signal conversation.`;
+  return `${name} is a verified public business record with a ${opportunityLevel} website-improvement signal. The scan found ${issue}, giving a service provider a practical reason to review local visibility, contact flow, or trust signals.`;
 }
 
 function polishedOutreachMessage(input: { name: string; businessCategory: string; city: string; issue: string }) {
@@ -153,10 +160,10 @@ export default async function AuditPage({
             <LockKeyhole className="h-7 w-7 text-emerald-300" />
             <h2 className="mt-4 text-2xl font-semibold">Validate this market with a Proof Pack</h2>
             <p className="mt-2 max-w-2xl text-slate-300">
-              MarketVibe now sells Proof Pack, Radar, and Growth Desk. The Proof Pack is a one-off €99 buyer-intent sample built from verified saved signals where available.
+              MarketVibe now sells Proof Pack, Radar, and Growth Desk. The Proof Pack is a one-off €99 buyer-intent sample built from source-backed signals where available.
             </p>
             <div className="mt-5 rounded-md border border-white/10 bg-white/5 p-4 text-sm leading-6 text-slate-200">
-              <strong className="text-white">How buyers can use it:</strong> review source-backed opportunities, pain summaries, and outreach angles before committing to recurring Radar delivery. MarketVibe does not guarantee replies, clients, income, or sales.
+              <strong className="text-white">How buyers can use it:</strong> review source-backed opportunities, context notes, and fit guidance before committing to recurring Radar delivery. MarketVibe does not guarantee replies, clients, income, or sales.
             </div>
             <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
               <CheckoutButton product="proof_pack" leadSlug={lead.slug} className="inline-flex items-center justify-center gap-2 rounded-md bg-white px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-slate-100">
@@ -174,7 +181,7 @@ export default async function AuditPage({
         ) : (
           <section className="mt-8 grid gap-6">
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-5">
-              <h2 className="font-semibold text-slate-950">Full Lead Details</h2>
+              <h2 className="font-semibold text-slate-950">Full Business Details</h2>
               <div className="mt-4 grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
                 <span>Website: {lead.website}</span>
                 <span>Contact page: {contactPageDisplay(lead.contactPageUrl)}</span>
@@ -199,7 +206,7 @@ export default async function AuditPage({
               </div>
             </div>
             <div className="rounded-lg border border-slate-200 bg-white p-5">
-              <h2 className="font-semibold text-slate-950">Outreach Message</h2>
+              <h2 className="font-semibold text-slate-950">Draft Message</h2>
               <p className="mt-3 whitespace-pre-line rounded-md bg-slate-50 p-4 text-sm leading-6 text-slate-700">{outreachMessage}</p>
               <p className="mt-3 text-xs leading-5 text-slate-500">Replace [Your name / agency name] before sending this message.</p>
               <p className="mt-4 text-sm text-slate-700"><strong>Subject:</strong> Quick website visibility note for {lead.businessName}</p>
@@ -223,7 +230,7 @@ export default async function AuditPage({
         )}
       </div>
 
-      <Link href="/engine" className="mt-6 inline-flex text-sm font-semibold text-slate-950 hover:underline">Back to engine</Link>
+      <Link href="/pricing" className="mt-6 inline-flex text-sm font-semibold text-slate-950 hover:underline">Back to pricing</Link>
     </main>
   );
 }
