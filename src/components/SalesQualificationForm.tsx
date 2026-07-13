@@ -120,18 +120,18 @@ export function SalesQualificationForm() {
         <div className="flex items-start gap-3">
           <Target className="mt-1 h-5 w-5 shrink-0 text-fuchsia-300" />
           <div>
-            <h2 className="text-2xl font-semibold text-white">Check the right MarketVibe path</h2>
+            <h2 className="text-2xl font-semibold text-white">Find the right starting point</h2>
             <p className="mt-2 text-sm leading-6 text-violet-100/70">
-              Proof Pack is the one-off market test. Radar is the recurring buyer-intent feed. This check helps match your offer to the right starting point.
+              Proof Pack is the one-off market test. Radar is for ongoing buyer-intent delivery. This check helps you choose the better first step.
             </p>
           </div>
         </div>
 
         <div className="mt-6 grid gap-3 text-sm text-violet-50">
           {[
-            "Review fit from your service, target market, value, company size, and outreach capacity.",
-            "Recommend a one-off Proof Pack or a recurring Radar plan based on your answers.",
-            "Move straight to the right checkout once the fit check is complete.",
+            "Match MarketVibe to your offer, target market, and average customer value.",
+            "Choose a one-off Proof Pack when you want to test one market first.",
+            "Choose Radar when you want recurring buyer-intent opportunities.",
           ].map((item) => (
             <p key={item} className="flex gap-2 rounded-lg border border-white/10 bg-black/20 p-3">
               <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-fuchsia-300" />
@@ -167,7 +167,7 @@ export function SalesQualificationForm() {
           </div>
 
           <fieldset className="grid gap-2">
-            <legend className="text-sm font-semibold text-violet-50">Preferred starting point</legend>
+            <legend className="text-sm font-semibold text-violet-50">How would you like to start?</legend>
             <div className="grid gap-2 sm:grid-cols-2">
               {[
                 ["proof_pack", "EUR 99 Proof Pack", "One-off market validation before subscribing."],
@@ -202,7 +202,7 @@ export function SalesQualificationForm() {
               {errors.averageClientValue && <span className="text-xs text-red-200">{errors.averageClientValue}</span>}
             </label>
             <label className={labelClass}>
-              Weekly outreach capacity
+              Prospects you can review each week
               <input required inputMode="numeric" className={inputClass} value={form.weeklyOutreachCapacity} onChange={(event) => update("weeklyOutreachCapacity", event.target.value)} placeholder="50" />
               {errors.weeklyOutreachCapacity && <span className="text-xs text-red-200">{errors.weeklyOutreachCapacity}</span>}
             </label>
@@ -229,8 +229,8 @@ export function SalesQualificationForm() {
               </select>
             </label>
             <label className={labelClass}>
-              Current lead-generation method
-              <input required className={inputClass} value={form.currentLeadGenerationMethod} onChange={(event) => update("currentLeadGenerationMethod", event.target.value)} placeholder="Manual Google, LinkedIn, referrals" />
+              How do you find prospects today?
+              <input required className={inputClass} value={form.currentLeadGenerationMethod} onChange={(event) => update("currentLeadGenerationMethod", event.target.value)} placeholder="Google, LinkedIn, referrals, ads" />
               {errors.currentLeadGenerationMethod && <span className="text-xs text-red-200">{errors.currentLeadGenerationMethod}</span>}
             </label>
           </div>
@@ -275,8 +275,8 @@ export function SalesQualificationForm() {
             </div>
             <p className="mt-4 text-sm leading-6 text-violet-50/80">
               {recommendedProduct === "proof_pack"
-                ? "Best next step: use Proof Pack as the paid reality check for one market before committing to recurring delivery."
-                : "Best next step: start Radar for recurring buyer-intent opportunities and a repeatable prospecting workflow."}
+                ? "Recommended next step: start with a Proof Pack to test one market before paying monthly."
+                : "Recommended next step: start Radar for recurring buyer-intent opportunities."}
             </p>
             <div className="mt-4 flex flex-col gap-3 sm:flex-row">
               <button type="button" onClick={() => startCheckout(recommendedProduct)} disabled={Boolean(checkoutLoading)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-3 text-sm font-bold text-slate-950 hover:bg-violet-50 disabled:opacity-60">
