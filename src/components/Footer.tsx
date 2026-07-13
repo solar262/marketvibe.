@@ -11,9 +11,9 @@ export function Footer() {
         <div>
           <p className="font-semibold text-white">App</p>
           <div className="mt-3 grid gap-2 text-slate-300">
-            <Link href="/engine">Engine</Link>
             <Link href="/pricing">Pricing</Link>
             <Link href="/sample">Proof Pack</Link>
+            <Link href="/qualify">Get Started</Link>
             <Link href="/faq">Buyer Q&amp;A</Link>
           </div>
         </div>

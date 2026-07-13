@@ -6,9 +6,9 @@ import { useState } from "react";
 
 const links = [
   ["Home", "/"],
-  ["Engine", "/engine"],
   ["Pricing", "/pricing"],
   ["Proof Pack", "/sample"],
+  ["Get Started", "/qualify"],
 ];
 
 export function Header() {
@@ -29,8 +29,8 @@ export function Header() {
           ))}
         </nav>
         <div className="hidden items-center gap-2 lg:flex">
-          <Link href="/sample" className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-violet-950/30 transition hover:brightness-110">
-            <PackageCheck className="h-4 w-4" /> Get proof pack
+          <Link href="/qualify" className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-violet-950/30 transition hover:brightness-110">
+            <PackageCheck className="h-4 w-4" /> Check fit
           </Link>
         </div>
         <button aria-label="Menu" className="rounded-md border border-white/15 p-2 text-white lg:hidden" onClick={() => setOpen((value) => !value)}>
@@ -45,8 +45,8 @@ export function Header() {
                 {label}
               </Link>
             ))}
-            <Link href="/sample" className="rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-500 px-3 py-2 text-center font-semibold text-white" onClick={() => setOpen(false)}>
-              Get proof pack
+            <Link href="/qualify" className="rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-500 px-3 py-2 text-center font-semibold text-white" onClick={() => setOpen(false)}>
+              Check fit
             </Link>
           </div>
         </div>

@@ -13,7 +13,7 @@ import { CheckoutButton } from "@/components/CheckoutButton";
 export const metadata: Metadata = {
   title: "MarketVibe Pricing | Buyer-Intent Intelligence",
   description:
-    "Choose a MarketVibe buyer-intent intelligence plan for qualified opportunities, signal context, outreach angles, and pipeline delivery.",
+    "Choose a MarketVibe buyer-intent intelligence plan for qualified opportunities, signal context, outreach angles, and delivery.",
 };
 
 const buyButton =
@@ -44,24 +44,27 @@ export default function PricingPage() {
           </div>
 
           <section className="mt-14 grid gap-6 lg:grid-cols-3">
-            <article className="rounded-3xl border border-white/10 bg-white/[0.06] p-7 shadow-2xl shadow-black/30 backdrop-blur">
+            <article className="relative rounded-3xl border border-white/10 bg-white/[0.06] p-7 shadow-2xl shadow-black/30 backdrop-blur">
+              <span className="absolute right-5 top-5 rounded-full border border-fuchsia-300/30 bg-fuchsia-300/10 px-3 py-1 text-xs font-black text-fuchsia-100">
+                TRY FIRST
+              </span>
               <BriefcaseBusiness className="h-8 w-8 text-fuchsia-300" />
               <p className="mt-5 text-sm font-bold uppercase tracking-wider text-fuchsia-300">
                 Proof Pack
               </p>
               <h2 className="mt-2 text-4xl font-bold">€99</h2>
-              <p className="mt-1 text-sm text-violet-100/60">One-off purchase</p>
+              <p className="mt-1 text-sm text-violet-100/60">One-off niche test · no subscription</p>
               <p className="mt-5 min-h-20 leading-7 text-violet-100/75">
-                Test MarketVibe with a focused buyer-intent opportunity pack before
-                committing to ongoing delivery.
+                Get a focused shortlist for one market so you can see useful prospects,
+                why they matter, and how to approach them before subscribing.
               </p>
               <div className="mt-6 space-y-3 text-sm text-violet-50">
                 {[
-                  "Qualified buyer-intent opportunities",
-                  "Pain point and intent context",
+                  "Niche-specific opportunity shortlist",
+                  "Why each company is worth a look",
                   "Source links where available",
-                  "Suggested outreach angles",
-                  "Downloadable delivery",
+                  "Ready-to-use outreach angles",
+                  "Secure dashboard and CSV delivery",
                 ].map((item) => (
                   <p key={item} className="flex gap-2">
                     <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-fuchsia-300" />
@@ -70,7 +73,7 @@ export default function PricingPage() {
                 ))}
               </div>
               <CheckoutButton product="proof_pack" className={buyButton}>
-                Buy Proof Pack
+                Get my Proof Pack
               </CheckoutButton>
             </article>
 

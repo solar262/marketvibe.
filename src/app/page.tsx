@@ -21,7 +21,7 @@ export const metadata: Metadata = {
 const features = [
   [Gauge, "Opportunity scoring", "Rank public buyer-intent signals before your team spends time on outreach."],
   [MessageSquareText, "Outreach angles", "See the pain point, timing, and first-message angle connected to each signal."],
-  [ClipboardCheck, "Proof packs", "Buy a one-off pack to validate fit before moving into recurring Radar delivery."],
+  [ClipboardCheck, "Proof packs", "Try one niche first with a focused shortlist, source context, and outreach angles."],
   [Radar, "Radar feeds", "Ongoing delivery for agencies and growth teams that need fresher opportunity flow."],
 ] as const;
 
@@ -34,7 +34,7 @@ const testimonials = [
 const metrics = [
   ["Signals delivered", "12.4k"],
   ["Agencies onboard", "37"],
-  ["Pipeline value", "€2.1m"],
+  ["Opportunity value", "€2.1m"],
 ] as const;
 
 export default function Home() {
@@ -60,8 +60,8 @@ export default function Home() {
               <Link href="/sample" className="inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-500 px-5 py-3 text-sm font-semibold text-white shadow-xl shadow-violet-950/30 transition hover:brightness-110">
                 Get proof pack <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link href="/engine" className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-black/15 backdrop-blur-xl transition hover:bg-white/10">
-                See engine
+              <Link href="/pricing" className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-black/15 backdrop-blur-xl transition hover:bg-white/10">
+                Compare plans
               </Link>
             </div>
 
@@ -82,7 +82,7 @@ export default function Home() {
                   <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
                     <div className="min-w-0">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-violet-200">Live signal board</p>
-                      <h2 className="mt-2 text-lg font-semibold">Growth Services Pipeline</h2>
+                      <h2 className="mt-2 text-lg font-semibold">Growth Services Signals</h2>
                       <p className="mt-1 text-xs text-violet-100/55">Buyer-intent preview</p>
                     </div>
                     <div className="rounded-lg border border-violet-300/30 bg-violet-300/10 p-3 text-center shadow-lg shadow-violet-950/20">
@@ -94,7 +94,7 @@ export default function Home() {
                   <div className="mt-4 grid gap-3">
                     {[
                       ["Signal", "Founder asks how to improve qualified sales meetings this quarter."],
-                      ["Pain", "Pipeline quality is low and internal team is burning time on manual research."],
+                      ["Pain", "Opportunity quality is low and the team is burning time on manual research."],
                       ["Angle", "Lead with a short buyer-intent brief, then offer a focused prospecting sprint."],
                     ].map(([label, body]) => (
                       <div key={label} className="rounded-lg border border-white/10 bg-white/5 p-4 backdrop-blur-xl">
@@ -122,9 +122,9 @@ export default function Home() {
       <section className="border-b border-white/10 bg-[#08030f]">
         <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
           <div className="max-w-3xl">
-            <p className="text-sm font-semibold text-[#a855f7]">Engine</p>
+            <p className="text-sm font-semibold text-[#a855f7]">How it works</p>
             <h2 className="mt-2 font-serif text-3xl font-semibold tracking-tight text-white">
-              Opportunity intelligence without the old lead-pack clutter.
+              Opportunity intelligence without the old prospect-list clutter.
             </h2>
           </div>
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -165,9 +165,9 @@ export default function Home() {
           <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
             <div className="min-w-0">
               <Target className="mb-4 h-7 w-7 text-[#a855f7]" />
-              <h2 className="font-serif text-2xl font-semibold text-white">Validate the market before subscribing.</h2>
+              <h2 className="font-serif text-2xl font-semibold text-white">Try one market before subscribing.</h2>
               <p className="mt-2 max-w-2xl leading-7 text-violet-100/70">
-                Start with a Proof Pack, then move into Radar or Growth Desk when the signal quality is right.
+                Start with a €99 Proof Pack when you want useful prospects and outreach angles for one niche, without paying monthly first.
               </p>
             </div>
             <Link href="/sample" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-500 px-6 py-3 text-sm font-semibold text-white shadow-xl shadow-violet-950/20 transition hover:brightness-110">

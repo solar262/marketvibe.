@@ -44,11 +44,11 @@ const signals = [
     urgency: 'Hot',
     value: 'EUR 4k-12k project',
     pain: 'Publicly asked how other small studios are filling the next 60 days after referrals slowed down.',
-    reason: 'The post names a short-term pipeline gap, a clear service category, and an immediate revenue problem.',
+    reason: 'The post names a short-term opportunity gap, a clear service category, and an immediate revenue problem.',
     angle:
-      'Open with a short pipeline teardown: 3 nearby B2B niches, 12 companies showing website refresh signals, and a founder-led outreach script.',
+      'Open with a short opportunity brief: 3 nearby B2B niches, 12 companies showing website refresh signals, and a founder-led outreach script.',
     nextMove: 'Offer a 7-day opportunity sample focused on local B2B service companies.',
-    tags: ['web design', 'founder-led', 'pipeline'],
+    tags: ['web design', 'founder-led', 'opportunity'],
   },
   {
     id: 'MV-1042',
@@ -154,7 +154,7 @@ const signals = [
     pain: 'Asked which industries have urgent demand for AI workflow automation this quarter.',
     reason: 'The agency is ready to sell but needs market timing, niche focus, and live buyer pain signals.',
     angle:
-      'Deliver a signal brief around admin-heavy firms hiring operations support or complaining about manual follow-ups.',
+      'Deliver a signal brief around operations-heavy firms hiring support staff or complaining about manual follow-ups.',
     nextMove: 'Pitch Growth Desk with custom niche tracking and weekly reports.',
     tags: ['AI automation', 'workflow', 'agency'],
   },
@@ -218,19 +218,19 @@ const testimonials = [
     quote:
       'Proof Pack delivery must use source-backed opportunities where available and label unevidenced intent clearly.',
     name: 'Source-backed delivery',
-    role: 'Operating rule',
+    role: 'Delivery standard',
   },
   {
     quote:
-      'Imported CSV records are reviewed, assigned, and published by an administrator before customer delivery.',
-    name: 'Operator review',
-    role: 'Operating rule',
+      'Every delivery is reviewed before customer handoff so the output stays relevant, explainable, and ready to use.',
+    name: 'Quality review',
+    role: 'Delivery standard',
   },
   {
     quote:
       'Customers are responsible for lawful, accurate outreach and should not treat scores as guaranteed sales outcomes.',
     name: 'Responsible outreach',
-    role: 'Operating rule',
+    role: 'Responsible use',
   },
 ];
 
@@ -242,7 +242,6 @@ const proofMetrics = [
 
 const navItems = [
   { label: 'Home', path: '/' },
-  { label: 'Engine', path: '/engine' },
   { label: 'Pricing', path: '/pricing' },
   { label: 'Proof Pack', path: '/sample' },
 ];
@@ -449,7 +448,6 @@ function App() {
       <Header route={route} navigate={navigate} />
       <main>
         {route === '/' && <HomePage {...sharedProps} />}
-        {route === '/engine' && <EnginePage {...sharedProps} />}
         {route === '/pricing' && <PricingPage revenueTotal={revenueTotal} navigate={navigate} />}
         {route === '/sample' && <SamplePage {...sharedProps} />}
         {route === '/signup' && <SignupPage navigate={navigate} />}
@@ -505,7 +503,7 @@ function HomePage({ navigate, filteredSignals, selectedSignal, hotSignals }) {
             </p>
             <h1>Know who needs your service before competitors do.</h1>
             <p>
-              MarketVibe turns public business pain into organized, scored, actionable pipeline
+              MarketVibe turns public business pain into organized, scored, actionable opportunities
               for agencies, consultants, SaaS teams, and local growth providers.
             </p>
             <div className="hero-actions">
@@ -513,8 +511,8 @@ function HomePage({ navigate, filteredSignals, selectedSignal, hotSignals }) {
                 Get proof pack
                 <ArrowRight size={17} />
               </a>
-              <a className="secondary-action" href="/engine" onClick={(event) => navigate('/engine', event)}>
-                Explore engine
+              <a className="secondary-action" href="/pricing" onClick={(event) => navigate('/pricing', event)}>
+                Compare plans
                 <Radar size={17} />
               </a>
             </div>
@@ -769,7 +767,7 @@ function PricingPage({ revenueTotal, navigate }) {
               <Building2 size={15} />
               Pricing
             </p>
-            <h2>Offer ladder built for serious pipeline buyers.</h2>
+            <h2>Offer ladder built for serious opportunity buyers.</h2>
           </div>
           <a className="primary-action" href="/sample" onClick={(event) => navigate('/sample', event)}>
             Get proof pack
@@ -1052,8 +1050,7 @@ function ThankYouPage({ navigate }) {
         </p>
         <h2>Your MarketVibe order is in motion.</h2>
         <p>
-          We have your Stripe session and the delivery jobs will process paid proof packs from the
-          webhook queue.
+          We have your payment confirmation and will prepare your paid Proof Pack delivery.
         </p>
         {sessionId && <p className="session-line">Session: {sessionId}</p>}
         <a className="primary-action" href="/sample" onClick={(event) => navigate('/sample', event)}>

@@ -20,6 +20,7 @@ const siteUrl = "https://www.marketvibe1.com";
 const siteTitle = "MarketVibe | Opportunity Intelligence for Modern Prospecting";
 const siteDescription =
   "Find better prospects faster with opportunity scoring, outreach angles, audit summaries, and faster prospecting for freelancers, agencies, consultants, and service providers.";
+const previewImage = "/marketvibe-email-preview.png";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -42,6 +43,20 @@ export const metadata: Metadata = {
     siteName: "MarketVibe",
     type: "website",
     locale: "en_US",
+    images: [
+      {
+        url: previewImage,
+        width: 1200,
+        height: 630,
+        alt: "MarketVibe Proof Pack preview",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: siteTitle,
+    description: siteDescription,
+    images: [previewImage],
   },
 };
 
