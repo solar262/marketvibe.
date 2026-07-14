@@ -6,6 +6,20 @@ import {
   updateEntitlementForSubscription,
   updateEntitlementStatusBySubscriptionId,
 } from "@/lib/premium-persistence";
+import { getSupabaseAdmin } from "@/lib/supabase";
+
+async function releaseFailedStripeEvent(eventId: string) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { released: false, skipped: true };
+
+  const { error } = await supabase
+    .from("processed_stripe_events")
+    .delete()
+    .eq("id", eventId);
+
+  if (error) throw error;
+  return { released: true, skipped: false };
+}
 
 export async function handleVerifiedStripeEvent(event: Stripe.Event) {
   const idempotency = await markStripeEventProcessing(event);
@@ -13,37 +27,50 @@ export async function handleVerifiedStripeEvent(event: Stripe.Event) {
     return { received: true, duplicate: true };
   }
 
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object as Stripe.Checkout.Session;
-    if (session.payment_status === "paid" || session.mode === "subscription") {
-      const delivery = await deliverStripeSession(session);
-      if (delivery.ok) {
-        await track("premium_delivery_sent", {
-          product: delivery.product,
-          requestedProduct: delivery.requestedProduct,
-          leadSlug: delivery.leadSlug,
-        }).catch(() => undefined);
+  try {
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object as Stripe.Checkout.Session;
+      if (session.payment_status === "paid" || session.mode === "subscription") {
+        const delivery = await deliverStripeSession(session);
+        if (delivery.ok) {
+          await track("premium_delivery_sent", {
+            product: delivery.product,
+            requestedProduct: delivery.requestedProduct,
+            leadSlug: delivery.leadSlug,
+          }).catch(() => undefined);
+        }
       }
     }
-  }
 
-  if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
-    const subscription = event.data.object as Stripe.Subscription;
-    await updateEntitlementForSubscription(
-      subscription,
-      event.type === "customer.subscription.deleted" ? "cancelled" : undefined,
-    );
-  }
-
-  if (event.type === "invoice.payment_failed") {
-    const invoice = event.data.object as Stripe.Invoice & { subscription?: string | Stripe.Subscription | null };
-    const subscriptionId = typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id;
-    if (subscriptionId) {
-      await updateEntitlementStatusBySubscriptionId(subscriptionId, "past_due");
+    if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
+      const subscription = event.data.object as Stripe.Subscription;
+      await updateEntitlementForSubscription(
+        subscription,
+        event.type === "customer.subscription.deleted" ? "cancelled" : undefined,
+      );
     }
-  }
 
-  return { received: true, duplicate: false };
+    if (event.type === "invoice.payment_failed") {
+      const invoice = event.data.object as Stripe.Invoice & { subscription?: string | Stripe.Subscription | null };
+      const subscriptionId = typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id;
+      if (subscriptionId) {
+        await updateEntitlementStatusBySubscriptionId(subscriptionId, "past_due");
+      }
+    }
+
+    return { received: true, duplicate: false };
+  } catch (error) {
+    // The event was reserved before fulfillment began. Release that reservation
+    // when processing fails so Stripe's next retry can complete the order instead
+    // of being incorrectly discarded as a duplicate.
+    await releaseFailedStripeEvent(event.id).catch((releaseError) => {
+      console.error("[stripe-webhook] failed to release event for retry", {
+        eventId: event.id,
+        releaseError,
+      });
+    });
+    throw error;
+  }
 }
 
 export async function stripeWebhookResponse(request: Request) {
