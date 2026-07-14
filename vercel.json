@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/autopilot",
-      "schedule": "0 7 * * *"
+      "schedule": "30 9 * * *"
     },
     {
       "path": "/api/cron/opportunity-matching",
