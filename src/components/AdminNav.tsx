@@ -4,7 +4,6 @@ import { AdminLogoutButton } from "@/components/AdminLogoutButton";
 
 const links = [
   ["Dashboard", "/admin", BarChart3],
-  ["AllRounder", "/admin/allrounder", Bot],
   ["Operations", "/admin/operations", Workflow],
   ["Exceptions", "/admin/exceptions", ShieldCheck],
   ["Opportunity Engine", "/admin/opportunity-engine", Radar],
