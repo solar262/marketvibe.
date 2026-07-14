@@ -40,7 +40,7 @@ function firstText(row: OpportunityRow, keys: string[]) {
   return "";
 }
 
-function normalizeInventoryRow(row: any): any {
+function normalizeInventoryRow(row: unknown) {
   if (!row || typeof row !== "object" || Array.isArray(row)) return row;
 
   const item = row as OpportunityRow;
@@ -58,6 +58,8 @@ function normalizeInventoryRow(row: any): any {
     "public_signal_text",
     "signal_text",
     "signal_summary",
+    "source_text",
+    "source_title",
     "source_evidence",
     "evidence_summary",
     "opportunity_summary",
@@ -67,6 +69,7 @@ function normalizeInventoryRow(row: any): any {
     "match_reason",
     "source_note",
     "internal_notes",
+    "recommended_action",
     "summary",
     "description",
     "title",
@@ -87,7 +90,7 @@ function normalizeInventoryRow(row: any): any {
   };
 }
 
-export async function listInventory(filters: Record<string, string> = {}): Promise<any[]> {
+export async function listInventory(filters: Record<string, string> = {}) {
   const rows = await listInventoryBase(filters);
-  return rows.map(normalizeInventoryRow);
+  return rows.map(normalizeInventoryRow) as Array<Record<string, unknown>>;
 }
