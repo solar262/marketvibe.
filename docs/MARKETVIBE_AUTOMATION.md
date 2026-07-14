@@ -62,6 +62,7 @@ Optional:
 All new cron routes require `Authorization: Bearer $CRON_SECRET`, `x-cron-secret`, or `?secret=`. Vercel Cron supports the bearer pattern when `CRON_SECRET` is set.
 
 - `/api/cron/opportunity-matching`
+- `/api/cron/opportunity-pipeline`
 - `/api/cron/opportunity-discovery`
 - `/api/cron/opportunity-verification`
 - `/api/cron/opportunity-refresh`
@@ -116,6 +117,8 @@ Product defaults live in `src/lib/opportunity-products.ts`:
 
 Matching reads qualified inventory, applies profile filters and score thresholds, checks freshness, excludes previously delivered records, and records match reasons.
 
+Matching and delivery fail closed on commercial access. A customer profile is only eligible for automatic matching when the email/product has an active `premium_entitlements` row or a completed `premium_orders` row. Internal `@marketvibe.local` source profiles can help discovery, but they are skipped for customer matching and cannot be delivered by cron.
+
 ## Exclusivity
 
 Supported modes:
@@ -168,8 +171,9 @@ Objective system failures such as dead websites or missing evidence can be auto-
 3. Confirm Supabase service-role, Stripe, and Brevo variables remain server-side only.
 4. Deploy `sales-navigator-import-v1`.
 5. Open `/admin/opportunity-engine`.
-6. Run discovery, verification, fill shortages, and delivery in order.
-7. Use `OPPORTUNITY_EMAIL_TEST_MODE=1` for safe delivery-email tests.
+6. Use `Run full automation pipeline` to run discovery, verification, and matching in one action.
+7. Publish delivery only after a real paid/onboarded customer profile exists.
+8. Use `OPPORTUNITY_EMAIL_TEST_MODE=1` for safe delivery-email tests.
 
 ## Production Verification
 

@@ -12,7 +12,7 @@ export function SupportAssistant() {
     <section className="rounded-lg border border-violet-300/20 bg-violet-400/10 p-5 text-violet-50">
       <h2 className="text-xl font-semibold">Automated support assistant</h2>
       <p className="mt-2 text-sm leading-6 text-violet-100/70">
-        I am an automated MarketVibe support assistant. I answer only from approved FAQ and policy content. I cannot negotiate pricing, authorize refunds, give legal advice, or promise results.
+        I can help with product questions, billing, access, exports, privacy, and troubleshooting. For pricing changes, refund requests, legal questions, or outcome guarantees, I will route you to support.
       </p>
       <label className="mt-4 grid gap-2 text-sm font-semibold">
         Ask about product, billing, access, exports, privacy, or troubleshooting
@@ -32,8 +32,8 @@ export function SupportAssistant() {
           </>
         ) : (
           <>
-            <p className="font-semibold text-white">I do not have an approved answer for that.</p>
-            <p className="mt-2 text-violet-100/75">Please send the support form so the operator can review it. Include your billing email, product, and any Stripe receipt or delivery context.</p>
+            <p className="font-semibold text-white">This needs a support review.</p>
+            <p className="mt-2 text-violet-100/75">Send the support form with your billing email, product, and any receipt or delivery details so it can be reviewed properly.</p>
             <Link href="/contact?offer=support" className="mt-3 inline-flex font-semibold text-violet-200 hover:text-white">Open support form</Link>
           </>
         )}

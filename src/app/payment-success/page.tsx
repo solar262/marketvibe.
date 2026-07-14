@@ -18,7 +18,7 @@ async function verifyAndDeliver(sessionId?: string, fallbackProduct?: string): P
     return {
       status: "unknown",
       product: fallback,
-      message: "Payment has returned to MarketVibe. Stripe webhook delivery will also run when configured.",
+      message: "Payment has returned to MarketVibe. Your access email will be sent when payment confirmation is available.",
     };
   }
 

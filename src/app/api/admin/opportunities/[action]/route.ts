@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdminJson, safeApiError } from "@/lib/admin-api";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { runOpportunityAutomationPipeline } from "@/lib/opportunity-automation";
 import {
   approveReplacementRequest,
   fillCustomerShortages,
@@ -127,6 +128,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ act
 
   try {
     if (action === "create-property-profile") return NextResponse.json(await createPropertyOpportunityProfile());
+    if (action === "run-pipeline") return NextResponse.json(await runOpportunityAutomationPipeline({
+      trigger: "admin",
+      profileId: body.profileId,
+      publishDeliveries: body.publishDeliveries === true,
+      sendEmail: body.sendEmail === true,
+    }));
     if (action === "run-discovery") return NextResponse.json(await runPropertyDiscoveryWithIntegrity({ trigger: "admin", profileId: body.profileId }));
     if (action === "run-verification") return NextResponse.json(await runOpportunityVerification({ trigger: "admin" }));
     if (action === "refresh-stale") return NextResponse.json(await refreshStaleOpportunities({ trigger: "admin" }));

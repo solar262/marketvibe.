@@ -7,13 +7,13 @@ function cleanEnv(value: string | undefined) {
   return value?.trim() || undefined;
 }
 
-const supabaseUrl = cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_URL);
-const supabaseAnonKey = cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+const supabaseUrl = cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL);
+const supabaseAnonKey = cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY);
 
 function supabaseServerConfig() {
   return {
-    url: cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_URL),
-    anonKey: cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+    url: cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL),
+    anonKey: cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY),
     serviceRoleKey: cleanEnv(process.env[SUPABASE_SERVICE_ROLE_KEY_ENV]),
   };
 }
@@ -35,7 +35,7 @@ export const supabase =
 
 export function requireSupabase() {
   if (!supabase) {
-    throw new Error("Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.");
+    throw new Error("Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL/NEXT_PUBLIC_SUPABASE_ANON_KEY or VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY.");
   }
   return supabase;
 }
@@ -65,6 +65,7 @@ export function supabaseConnectionStatus() {
     missingRequiredServerVariables,
     hasUrl: Boolean(url),
     hasAnonKey: Boolean(anonKey),
+    usingViteSupabaseFallback: Boolean(!process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.VITE_SUPABASE_URL),
     hasServiceRoleKey: Boolean(serviceRoleKey),
     serverWritesEnabled: Boolean(url && serviceRoleKey),
     host: safeSupabaseHost(),

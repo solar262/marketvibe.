@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart3, Bot, Database, FileUp, Mail, Radar, Settings, ShieldCheck, Workflow } from "lucide-react";
+import { BarChart3, Bot, Database, FileUp, Mail, MailPlus, Radar, Settings, ShieldCheck, UserRoundCheck, Workflow } from "lucide-react";
 import { AdminLogoutButton } from "@/components/AdminLogoutButton";
 
 const links = [
@@ -7,6 +7,8 @@ const links = [
   ["Operations", "/admin/operations", Workflow],
   ["Exceptions", "/admin/exceptions", ShieldCheck],
   ["Opportunity Engine", "/admin/opportunity-engine", Radar],
+  ["Sales Pipeline", "/admin/sales-pipeline", UserRoundCheck],
+  ["Outbound Sales", "/admin/outbound", MailPlus],
   ["Inventory", "/admin/inventory", Database],
   ["CSV Import", "/admin/import", FileUp],
   ["Autopilot", "/admin/autopilot", Bot],

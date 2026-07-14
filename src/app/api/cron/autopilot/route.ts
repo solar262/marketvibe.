@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireCron } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,10 @@ async function runScheduledBackendJob(startedAt: string): Promise<AutopilotJobRe
   };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const unauthorized = requireCron(request);
+  if (unauthorized) return unauthorized;
+
   const startedAt = new Date().toISOString();
   console.log(`[autopilot] started at ${startedAt}`);
 

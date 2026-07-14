@@ -25,11 +25,11 @@ const sections = [
   },
   {
     title: "Analytics and cookies",
-    body: "We use analytics tools, including Vercel Analytics, to understand visits, page views, button clicks, checkout referrals, and general performance. Your browser may also use cookies or similar technology for login, checkout, security, and site functionality.",
+    body: "We use analytics tools to understand visits, page views, button clicks, checkout referrals, and general performance. Your browser may also use cookies or similar technology for login, checkout, security, and site functionality.",
   },
   {
     title: "Service providers",
-    body: "We may use trusted providers such as Vercel for hosting and analytics, Stripe for payments, Brevo for email delivery and contact management, Supabase or similar database providers for storage, and other tools needed to operate the service.",
+    body: "We may use trusted providers for hosting, analytics, payments, email delivery, contact management, storage, and other tools needed to operate the service. Stripe handles card payments.",
   },
   {
     title: "Data retention",

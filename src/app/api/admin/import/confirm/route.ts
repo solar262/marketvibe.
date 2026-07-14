@@ -22,6 +22,7 @@ export async function POST(request: Request) {
       worksheetName: payload.worksheetName ? String(payload.worksheetName) : undefined,
       fileChecksum: payload.fileChecksum ? String(payload.fileChecksum) : undefined,
       rowFingerprints: Array.isArray(payload.rowFingerprints) ? payload.rowFingerprints.map(String) : undefined,
+      approveValidRows: Boolean(payload.approveValidRows),
     });
     return NextResponse.json({ ok: true, result });
   } catch (error) {

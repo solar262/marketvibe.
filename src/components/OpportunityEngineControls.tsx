@@ -2,10 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Loader2, Pause, Play, RefreshCw, Rocket, ShieldCheck, Target } from "lucide-react";
+import { Loader2, Pause, Play, RefreshCw, Rocket, Search, ShieldCheck, Target, Zap } from "lucide-react";
 
 const actions = [
+  ["run-pipeline", "Run full automation pipeline", Zap],
   ["create-property-profile", "Activate property profile and clean inventory", Target],
+  ["run-discovery", "Run discovery now", Search],
   ["run-verification", "Run verification now", ShieldCheck],
   ["refresh-stale", "Refresh stale records", RefreshCw],
   ["fill-shortages", "Fill customer shortages", Rocket],

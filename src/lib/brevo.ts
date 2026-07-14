@@ -16,15 +16,16 @@ type SequenceEmail = {
 };
 
 export const marketVibeUrl = "https://www.marketvibe1.com";
-export const engineUrl = `${marketVibeUrl}/engine`;
 export const proofPackUrl = `${marketVibeUrl}/sample`;
 export const dashboardUrl = `${marketVibeUrl}/dashboard`;
-export const leadSearchUrl = engineUrl;
 export const pricingUrl = `${marketVibeUrl}/pricing`;
+export const engineUrl = pricingUrl;
+export const leadSearchUrl = pricingUrl;
 
 function brevoConfig() {
   return {
     apiKey: process.env.BREVO_API_KEY || "",
+    resendApiKey: process.env.RESEND_API_KEY || process.env.VITE_RESEND_API_KEY || "",
     senderEmail: process.env.BREVO_SENDER_EMAIL || process.env.OUTREACH_FROM_EMAIL || "hello@marketvibe1.com",
     senderName: process.env.BREVO_SENDER_NAME || process.env.OUTREACH_FROM_NAME || "MarketVibe",
     listId: process.env.BREVO_MARKETVIBE_LIST_ID || "",
@@ -60,8 +61,9 @@ async function brevoFetch(path: string, init: RequestInit) {
 export function getBrevoStatus() {
   const config = brevoConfig();
   return {
-    configured: Boolean(config.apiKey && config.senderEmail),
+    configured: Boolean((config.apiKey || config.resendApiKey) && config.senderEmail),
     hasApiKey: Boolean(config.apiKey),
+    hasResendApiKey: Boolean(config.resendApiKey),
     hasSenderEmail: Boolean(config.senderEmail),
     hasSenderName: Boolean(config.senderName),
     hasListId: Boolean(config.listId),
@@ -104,6 +106,26 @@ export async function addContactToMarketVibeList(email: string, attributes: Brev
 export async function sendTransactionalEmail({ to, subject, htmlContent, textContent, scheduledAt }: TransactionalEmailInput) {
   const config = brevoConfig();
   if (!config.senderEmail) throw new Error("Brevo sender email is not configured.");
+  if (!config.apiKey && config.resendApiKey) {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${config.resendApiKey}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        from: `${config.senderName} <${config.senderEmail}>`,
+        to: [to.trim().toLowerCase()],
+        subject,
+        html: htmlContent,
+        text: textContent,
+        ...(scheduledAt ? { scheduled_at: scheduledAt } : {}),
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data?.message || `Resend API error ${response.status}`);
+    return { messageId: String(data?.id || "") };
+  }
 
   return brevoFetch("/smtp/email", {
     method: "POST",
@@ -154,14 +176,14 @@ export async function scheduleFreeLeadSequence(to: string, firstName = "") {
     {
       delayDays: 1,
       subject: "Validate buyer-intent quality with a Proof Pack",
-      htmlContent: `<p>${greeting}</p><p>A focused Proof Pack helps you review real buyer-intent context before committing to recurring Radar delivery.</p><p><a href="${proofPackUrl}">Get a Proof Pack</a></p><p><a href="${engineUrl}">See the MarketVibe engine</a></p>`,
-      textContent: `${greeting}\n\nA focused Proof Pack helps you review real buyer-intent context before committing to recurring Radar delivery.\n\nGet a Proof Pack:\n${proofPackUrl}\n\nSee the MarketVibe engine:\n${engineUrl}`,
+      htmlContent: `<p>${greeting}</p><p>A focused Proof Pack helps you review real buyer-intent context before committing to recurring Radar delivery.</p><p><a href="${proofPackUrl}">Get a Proof Pack</a></p><p><a href="${pricingUrl}">Compare plans</a></p>`,
+      textContent: `${greeting}\n\nA focused Proof Pack helps you review real buyer-intent context before committing to recurring Radar delivery.\n\nGet a Proof Pack:\n${proofPackUrl}\n\nCompare plans:\n${pricingUrl}`,
     },
     {
       delayDays: 3,
       subject: "How MarketVibe turns public pain into opportunity",
-      htmlContent: `<p>${greeting}</p><p>MarketVibe scores urgency, relevance, source quality, and pain clarity so outreach starts from context rather than guesswork.</p><p><a href="${engineUrl}">Review the engine</a></p><p><a href="${pricingUrl}">Compare premium plans</a></p>`,
-      textContent: `${greeting}\n\nMarketVibe scores urgency, relevance, source quality, and pain clarity so outreach starts from context rather than guesswork.\n\nReview the engine:\n${engineUrl}\n\nCompare premium plans:\n${pricingUrl}`,
+      htmlContent: `<p>${greeting}</p><p>MarketVibe scores urgency, relevance, source quality, and pain clarity so outreach starts from context rather than guesswork.</p><p><a href="${pricingUrl}">Compare premium plans</a></p>`,
+      textContent: `${greeting}\n\nMarketVibe scores urgency, relevance, source quality, and pain clarity so outreach starts from context rather than guesswork.\n\nCompare premium plans:\n${pricingUrl}`,
     },
     {
       delayDays: 5,

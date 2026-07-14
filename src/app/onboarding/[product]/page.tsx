@@ -25,7 +25,7 @@ export default async function PremiumOnboardingPage({
         <div className="rounded-3xl border border-amber-200 bg-amber-50 p-8 text-amber-950">
           <h1 className="text-3xl font-semibold">Access verification needed</h1>
           <p className="mt-3 leading-7">
-            We could not verify a paid {premiumProductLabel(productCode)} session or active entitlement.
+            We could not verify paid {premiumProductLabel(productCode)} access for this link.
           </p>
           <Link href="/pricing" className="mt-6 inline-flex rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white">
             Return to pricing
@@ -44,8 +44,7 @@ export default async function PremiumOnboardingPage({
         </p>
         <h1 className="mt-5 text-4xl font-bold">{premiumProductLabel(productCode)} onboarding</h1>
         <p className="mt-4 max-w-2xl leading-7 text-violet-100/75">
-          Tell us the niche, territory, offer, and buyer profile. MarketVibe will use verified saved
-          signals where available and will not pad packs with fabricated companies.
+          Tell us the niche, territory, offer, and buyer profile so MarketVibe can prepare a focused delivery for your market.
         </p>
 
         <PremiumOnboardingForm productCode={productCode} sessionId={sessionId} email={access.email || email} />

@@ -83,6 +83,7 @@ type ImportActionResponse = {
     importedRows?: number;
     duplicateRows?: number;
     rejectedRows?: number;
+    approvedRows?: number;
     buyerCompaniesCreated?: number;
     duplicateCompanies?: number;
     websiteVerificationJobsQueued?: number;
@@ -154,6 +155,7 @@ export function AdminImportConsole() {
   const [assignment, setAssignment] = useState({ customerEmail: "", productCode: "proof_pack", count: "25", adminNotes: "", adminConfirmedCustomer: false, includeProfileOnly: false });
   const [quickPaste, setQuickPaste] = useState({ urls: "", niche: "", location: "", sourceNote: "", publicSignalText: "" });
   const [quickPasteResult, setQuickPasteResult] = useState<QuickPasteResult | null>(null);
+  const [approveValidRows, setApproveValidRows] = useState(true);
 
   const selectedIds = useMemo(() => Array.from(selected), [selected]);
   const selectedProspects = useMemo(() => prospects.filter((prospect) => selected.has(String(prospect.id))), [prospects, selected]);
@@ -221,9 +223,10 @@ export function AdminImportConsole() {
           worksheetName: preview.worksheetName,
           fileChecksum: preview.fileChecksum,
           rowFingerprints: preview.rowFingerprints,
+          approveValidRows,
         }),
       });
-      setStatus(`Import saved: ${data.result?.importedRows || 0} source rows imported, ${data.result?.duplicateRows || 0} duplicates skipped, ${data.result?.rejectedRows || 0} rejected, ${data.result?.buyerCompaniesCreated || 0} companies queued.`);
+      setStatus(`Import saved: ${data.result?.importedRows || 0} new rows, ${data.result?.duplicateRows || 0} duplicates skipped, ${data.result?.rejectedRows || 0} rejected, ${data.result?.approvedRows || 0} approved, ${data.result?.buyerCompaniesCreated || 0} companies queued.`);
       setPreview(null);
       await refresh();
     } catch (importError) {
@@ -404,7 +407,7 @@ export function AdminImportConsole() {
         </div>
 
         <section className="mt-6 grid gap-3 lg:grid-cols-9">
-          {["Paste URLs", "Store source refs", "Review inventory", "Verify evidence", "Qualify", "Assign", "Publish", "Deliver", "Replace if needed"].map((stage, index) => (
+          {["Create CSV", "Upload file", "Validate rows", "Import clean rows", "Approve supply", "Assign", "Publish", "Deliver", "Replace if needed"].map((stage, index) => (
             <div key={stage} className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs font-semibold text-violet-100">
               <span className="mr-2 inline-grid h-6 w-6 place-items-center rounded-md bg-violet-500/20 text-violet-100">{index + 1}</span>
               {stage}
@@ -462,14 +465,33 @@ export function AdminImportConsole() {
         <section className="mt-6 rounded-lg border border-white/10 bg-white/5 p-5 shadow-2xl shadow-black/20 backdrop-blur-xl">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h2 className="text-xl font-semibold">Advanced file import</h2>
-              <p className="mt-1 text-sm text-violet-100/65">For larger prepared CSV or XLSX files only. UTF-8 CSV delimiters are detected; XLSX uses the first visible sheet with data. Maximum 10 MB and 10,000 rows.</p>
+              <h2 className="text-xl font-semibold">Navigator CSV/XLSX intake</h2>
+              <p className="mt-1 text-sm text-violet-100/65">Use an approved CRM export or the MarketVibe template. Required minimum: company name plus website, domain, public signal URL, company LinkedIn URL, or LinkedIn profile URL.</p>
             </div>
-            <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-violet-950/30 hover:brightness-110">
-              {busy === "preview" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
-              Choose CSV
-              <input type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(event) => void upload(event.target.files?.[0])} />
-            </label>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <a href="/api/admin/import/template" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-5 py-3 text-sm font-bold text-white hover:bg-white/10">
+                <Download className="h-4 w-4" /> Template
+              </a>
+              <label className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-violet-950/30 hover:brightness-110">
+                {busy === "preview" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
+                Upload CSV/XLSX
+                <input type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(event) => void upload(event.target.files?.[0])} />
+              </label>
+            </div>
+          </div>
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
+            <div className="rounded-lg border border-white/10 bg-black/20 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-violet-100/55">Source</p>
+              <p className="mt-2 text-sm font-semibold text-violet-50">CRM Sync, permitted export, or template</p>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-black/20 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-violet-100/55">Validation</p>
+              <p className="mt-2 text-sm font-semibold text-violet-50">Duplicates and bad rows are skipped</p>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-black/20 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-violet-100/55">Approval</p>
+              <p className="mt-2 text-sm font-semibold text-violet-50">Source-backed rows can auto-approve</p>
+            </div>
           </div>
         </section>
 
@@ -494,6 +516,13 @@ export function AdminImportConsole() {
                 </button>
               </div>
             </div>
+            <label className="mt-4 flex items-start gap-3 rounded-lg border border-emerald-300/20 bg-emerald-400/10 p-4 text-sm text-emerald-50">
+              <input type="checkbox" checked={approveValidRows} onChange={(event) => setApproveValidRows(event.target.checked)} className="mt-1" />
+              <span>
+                <span className="block font-semibold">Approve valid source-backed rows after import</span>
+                <span className="mt-1 block text-emerald-50/75">Rows with public-signal or website evidence become delivery-ready. Profile-only rows stay pending.</span>
+              </span>
+            </label>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
               {[

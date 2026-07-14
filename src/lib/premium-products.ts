@@ -22,7 +22,7 @@ export const premiumProducts: Record<PremiumProductCode, PremiumProduct> = {
     amount: 9900,
     currency: "eur",
     mode: "payment",
-    description: "One-off buyer-intent proof pack with verified opportunities, signal context, and outreach angles.",
+    description: "One-off niche test with a focused opportunity shortlist, buyer context, source links where available, and outreach angles.",
     entitlement: "proof_pack",
     successDestination: "/onboarding/proof-pack",
   },

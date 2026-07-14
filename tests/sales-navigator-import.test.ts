@@ -311,12 +311,48 @@ const adminImportMarkup = renderToStaticMarkup(React.createElement(AdminImportCo
 assert.match(adminImportMarkup, /Lead Intake Console/, "The importer route must render the lead intake console.");
 assert.match(adminImportMarkup, /Paste LinkedIn\/Sales Navigator URLs here\. No spreadsheet required\./, "The importer route must expose the Quick Paste workflow.");
 assert.match(adminImportMarkup, /property developers or high-end builders/, "Quick Paste must point admins toward property/construction opportunity intake.");
-assert.match(adminImportMarkup, /Advanced file import/, "The importer route must keep CSV/XLSX import available for advanced users.");
+assert.match(adminImportMarkup, /Navigator CSV\/XLSX intake/, "The importer route must expose the simplified Navigator file intake workflow.");
 assert.doesNotMatch(adminImportMarkup, /Daily Operations/, "The importer route must not render the admin dashboard.");
 const adminImportConsoleSource = readFileSync(join(process.cwd(), "src", "components", "AdminImportConsole.tsx"), "utf8");
 assert.match(adminImportConsoleSource, /Auto-map and validate/, "CSV mapping must expose a primary auto-map and validate button.");
 assert.match(adminImportConsoleSource, /Import valid rows/, "CSV mapping must expose a clear import-valid-rows button.");
+assert.match(adminImportConsoleSource, /Approve valid source-backed rows after import/, "The importer route must expose operator-safe auto-approval.");
+assert.match(adminImportConsoleSource, /approveValidRows/, "CSV import must send the operator auto-approval setting to the server.");
 assert.match(adminImportConsoleSource, /Ignore this column/, "Every source-column mapping dropdown must include an ignore option.");
+const importConfirmRouteSource = readFileSync(join(process.cwd(), "src", "app", "api", "admin", "import", "confirm", "route.ts"), "utf8");
+assert.match(importConfirmRouteSource, /approveValidRows/, "Confirm import API must accept the operator auto-approval setting.");
+
+const salesNavigatorCompanionManifest = JSON.parse(readFileSync(join(process.cwd(), "browser-extension", "sales-navigator-companion", "manifest.json"), "utf8"));
+assert.equal(salesNavigatorCompanionManifest.name, "MarketVibe Sales Navigator Companion");
+assert.ok(salesNavigatorCompanionManifest.host_permissions.includes("https://www.linkedin.com/*"), "Navigator companion must run on LinkedIn/Sales Navigator.");
+assert.ok(salesNavigatorCompanionManifest.host_permissions.includes("https://www.marketvibe1.com/*"), "Navigator companion must connect captured CSV to the MarketVibe portal.");
+const salesNavigatorCompanionSource = readFileSync(join(process.cwd(), "browser-extension", "sales-navigator-companion", "content.js"), "utf8");
+assert.match(salesNavigatorCompanionSource, /buildSearchUrl/, "Navigator companion must include targeted finder searches.");
+assert.match(salesNavigatorCompanionSource, /captureVisibleLeadCards/, "Navigator companion must capture visible result cards.");
+assert.match(salesNavigatorCompanionSource, /importCapturedCsvIntoMarketVibe/, "Navigator companion must import captured CSV through MarketVibe admin.");
+assert.match(salesNavigatorCompanionSource, /Send to MarketVibe/, "Navigator companion must expose one-click import from Sales Navigator.");
+assert.match(salesNavigatorCompanionSource, /navigatorAutoImport=1/, "Navigator companion must open MarketVibe with an auto-import signal.");
+assert.match(salesNavigatorCompanionSource, /approveValidRows:\s*true/, "Navigator companion import must use the existing source-backed auto-approval path.");
+assert.match(salesNavigatorCompanionSource, /clearAfterSuccess/, "Navigator companion must clear the local captured batch after successful auto-import.");
+assert.match(salesNavigatorCompanionSource, /owner custom home builder luxury homes/, "Navigator companion finder must target builder/property supply leads.");
+assert.match(salesNavigatorCompanionSource, /CUSTOMER_SIDE_EXCLUSION_PATTERN/, "Navigator companion must reject customer-side agency/consultant records.");
+assert.match(salesNavigatorCompanionSource, /MarketVibe supply lead/, "Navigator companion source notes must identify captured rows as supply leads.");
+assert.match(salesNavigatorCompanionSource, /MAX_PAGES_PER_SEARCH/, "Navigator companion must keep paging through Sales Navigator results.");
+assert.match(salesNavigatorCompanionSource, /findNextPageControl/, "Navigator companion must be able to continue beyond the first result page.");
+assert.match(salesNavigatorCompanionSource, /% FINDER_SEARCHES\.length/, "Navigator companion must rotate searches instead of stopping before the target row count.");
+assert.match(salesNavigatorCompanionSource, /waitForVisibleResults/, "Navigator companion must wait for LinkedIn results before capturing.");
+assert.match(salesNavigatorCompanionSource, /RATE_LIMIT_COOLDOWN_MS/, "Navigator companion must stop and cool down when Sales Navigator rate-limits the session.");
+assert.match(salesNavigatorCompanionSource, /SAFE_BATCH_SIZE/, "Navigator companion must collect in safer batches instead of forcing large runs.");
+assert.match(salesNavigatorCompanionSource, /PAGE_NAVIGATION_DELAY_MS/, "Navigator companion must slow page navigation to reduce request pressure.");
+assert.match(salesNavigatorCompanionSource, /rateLimitMessageVisible/, "Navigator companion must detect Too Many Requests pages.");
+assert.match(salesNavigatorCompanionSource, /for \(let index = 0; index < 4;/, "Navigator companion must use conservative scrolling before capture.");
+assert.match(salesNavigatorCompanionSource, /const query = `\$\{base\} \$\{signal\}`/, "Navigator companion must keep geography strings out of Sales Navigator keyword searches while adding signal terms.");
+assert.match(salesNavigatorCompanionSource, /Use Sales Navigator geography filters manually/, "Navigator companion should avoid putting geography strings into keyword searches.");
+assert.match(salesNavigatorCompanionSource, /australia\|ireland\|new zealand\|uae\|dubai/, "Navigator companion should recognize broader high-value property geographies.");
+assert.match(salesNavigatorCompanionSource, /owner construction company residential commercial/, "Navigator companion should broaden property/construction search variants.");
+assert.match(salesNavigatorCompanionSource, /commercial property|real estate investment|property management|architecture firm/, "Navigator companion should cover adjacent high-value property markets.");
+assert.doesNotMatch(salesNavigatorCompanionSource, /founder marketing agency construction builders|lead generation agency construction companies|growth consultant builders contractors/, "Navigator companion must not search for customer-side agencies as supply records.");
+assert.doesNotMatch(salesNavigatorCompanionSource, /document\.cookie|chrome\.cookies|password/i, "Navigator companion must not collect cookies, credentials, or passwords.");
 
 const opportunityEngineSource = readFileSync(join(process.cwd(), "src", "lib", "opportunity-engine.ts"), "utf8");
 assert.match(opportunityEngineSource, /Property Pipeline Buyers/, "Quick Paste default profile must be the property pipeline profile.");
@@ -324,6 +360,8 @@ assert.match(opportunityEngineSource, /High-ticket property, construction, and r
 assert.doesNotMatch(opportunityEngineSource, /B2B Pipeline Buyers|SEO agency|web design agency/, "Quick Paste defaults must not target SEO or web-design agencies.");
 
 const persistenceSource = readFileSync(join(process.cwd(), "src", "lib", "sales-navigator-persistence.ts"), "utf8");
+assert.match(persistenceSource, /approveValidRows/, "Import persistence must support operator-safe auto-approval.");
+assert.match(persistenceSource, /evidence_status === "profile_only"/, "Auto-approval must leave profile-only rows pending.");
 assert.match(persistenceSource, /status:\s*"email_failed"/, "Delivery failures must be recorded.");
 assert.match(persistenceSource, /throw new Error\(emailError instanceof Error/, "Delivery email failures must throw instead of returning false success.");
 const cronBuyerPipelineSource = readFileSync(join(process.cwd(), "src", "app", "api", "cron", "buyer-pipeline", "route.ts"), "utf8");

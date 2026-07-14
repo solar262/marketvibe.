@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { sendTransactionalEmail } from "@/lib/brevo";
 import { recordPremiumEnquiry } from "@/lib/premium-persistence";
+import { sendAdminRevenueAlert, sendCustomerSupportAutoReply } from "@/lib/revenue-automation";
 
 const visits = new Map<string, number>();
 
@@ -36,15 +36,9 @@ export async function POST(request: Request) {
     });
   }
 
-  const adminEmail = process.env.ADMIN_EMAIL;
-  if (!adminEmail) {
-    return NextResponse.json({ error: "Admin email is not configured." }, { status: 500 });
-  }
-
   try {
     const premium = offer === "agency-partner" || offer === "data-licence";
-    await sendTransactionalEmail({
-      to: adminEmail,
+    const adminAlert = await sendAdminRevenueAlert({
       subject: premium
         ? `MarketVibe premium enquiry: ${offer}`
         : "New MarketVibe contact message",
@@ -58,10 +52,17 @@ export async function POST(request: Request) {
       `,
       textContent: `${premium ? "New MarketVibe premium enquiry" : "New MarketVibe contact message"}\n\nOffer: ${offer}\nName: ${name}\nEmail: ${email}\nCompany: ${company}\n\n${message}`,
     });
+    if (adminAlert.skipped) {
+      return NextResponse.json({ error: "Admin email is not configured." }, { status: 500 });
+    }
   } catch (error) {
     console.warn("contact_admin_email_failed", error);
     return NextResponse.json({ error: "Message saved, but email delivery failed." }, { status: 502 });
   }
+
+  await sendCustomerSupportAutoReply({ email, name, offer }).catch((error) => {
+    console.warn("contact_auto_reply_failed", error);
+  });
 
   console.log("contact_message", { ...payload, offer });
   return NextResponse.json({ ok: true });

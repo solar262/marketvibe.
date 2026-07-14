@@ -6,6 +6,7 @@ import { isPremiumProductCode, premiumProductLabel } from "@/lib/premium-product
 import { verifyPremiumAccess } from "@/lib/premium-access";
 import { appendCustomerAccessParams, createCustomerAccessToken } from "@/lib/customer-access";
 import { createOrUpdateSearchProfileFromOnboarding } from "@/lib/opportunity-engine";
+import { autoFulfillImportedProspectsForOnboarding } from "@/lib/sales-navigator-persistence";
 
 export const runtime = "nodejs";
 
@@ -100,20 +101,55 @@ export async function POST(request: Request) {
     savedPackItems = result.count;
   }
 
+  let autoFulfillment: Awaited<ReturnType<typeof autoFulfillImportedProspectsForOnboarding>> | null = null;
+  if (onboarding.onboardingId) {
+    try {
+      autoFulfillment = await autoFulfillImportedProspectsForOnboarding({
+        onboardingId: onboarding.onboardingId,
+        customerEmail: access.email || email,
+        productCode,
+        niche: String(payload.niche || ""),
+        country: String(payload.country || ""),
+        city: String(payload.city || ""),
+        territory: String(payload.territory || ""),
+        serviceOffer: String(payload.serviceOffer || ""),
+        idealBuyer: String(payload.idealBuyer || ""),
+      });
+    } catch (error) {
+      autoFulfillment = {
+        ok: false,
+        status: "failed",
+        customerEmail: access.email || email,
+        productCode,
+        matchedProspects: 0,
+        targetQuantity: 0,
+        minimumQuantity: 0,
+        error: error instanceof Error ? error.message : "Automatic fulfillment failed.",
+      };
+    }
+  }
+
   try {
     const accessToken = createCustomerAccessToken(access.email || email);
     const dashboardUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://www.marketvibe1.com"}${appendCustomerAccessParams("/dashboard", access.email || email, accessToken)}`;
+    const fulfillmentMessage = autoFulfillment?.status === "delivered"
+      ? `Your matched delivery is ready with ${autoFulfillment.matchedProspects} opportunities. A secure dashboard and CSV link has been sent separately.`
+      : autoFulfillment?.status === "awaiting_supply"
+        ? "Your profile is saved. MarketVibe is preparing enough relevant opportunities for your target market and will continue checking automatically."
+        : autoFulfillment?.status === "failed"
+          ? "Your profile is saved. Delivery hit a temporary issue and will be retried automatically."
+          : "";
     await sendTransactionalEmail({
       to: access.email || email,
       subject: `${premiumProductLabel(productCode)} onboarding received`,
       htmlContent: `
         <p>Your ${premiumProductLabel(productCode)} onboarding has been received.</p>
-        <p>${productCode === "proof_pack"
+        <p>${fulfillmentMessage || (productCode === "proof_pack"
           ? savedPackItems > 0
             ? `We found ${savedPackItems} verified saved opportunities for your pack. Your dashboard and CSV are ready.`
-            : "We are processing verified opportunities. We will not pad your pack with fabricated companies or source links."
+            : "We are preparing relevant opportunities for your pack and will deliver them when the delivery is ready."
           : "Your access is being prepared from your niche and territory details."
-        }</p>
+        )}</p>
         <p><a href="${dashboardUrl}">Open your dashboard</a></p>
       `,
       textContent: `Your ${premiumProductLabel(productCode)} onboarding has been received.\n\nOpen your dashboard:\n${dashboardUrl}`,
@@ -127,6 +163,7 @@ export async function POST(request: Request) {
     onboardingId: onboarding.onboardingId,
     searchProfileId,
     savedPackItems,
+    autoFulfillment,
     dashboardUrl: appendCustomerAccessParams("/dashboard", access.email || email, createCustomerAccessToken(access.email || email)),
   });
 }

@@ -9,11 +9,13 @@ import {
   buildOpportunityDedupeKey,
   calculateOpportunityScores,
   domainFromUrl,
+  hasLowValueOpportunityEvidence,
   normalizeDomain,
   normalizeEmail,
   normalizePhone,
   normalizeText,
   normalizeUrl,
+  opportunityDeliveryQualityFlags,
   profileFromOnboarding,
   qualifyOpportunity,
   recommendedAction,
@@ -26,7 +28,7 @@ import {
   type OpportunityInput,
   type OpportunityScores,
 } from "@/lib/opportunity-quality";
-import type { PremiumProductCode } from "@/lib/premium-products";
+import { isPremiumProductCode, type PremiumProductCode } from "@/lib/premium-products";
 import type { BusinessLead, LeadSearchInput } from "@/lib/types";
 
 type SupabaseClient = NonNullable<ReturnType<typeof getSupabaseAdmin>>;
@@ -35,6 +37,41 @@ type DiscoveryTrigger = "admin" | "cron" | "test";
 
 type SourceCandidate = OpportunityInput & {
   raw_payload?: Record<string, unknown>;
+};
+
+type NavigatorProspectOpportunityRow = {
+  id: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  full_name?: string | null;
+  job_title?: string | null;
+  company_name?: string | null;
+  company_domain?: string | null;
+  company_website?: string | null;
+  linkedin_profile_url?: string | null;
+  company_linkedin_url?: string | null;
+  location?: string | null;
+  country?: string | null;
+  city?: string | null;
+  industry?: string | null;
+  company_size?: string | null;
+  public_email?: string | null;
+  public_phone?: string | null;
+  public_signal_url?: string | null;
+  public_signal_text?: string | null;
+  source_note?: string | null;
+  raw_row?: Record<string, unknown> | null;
+  fit_score?: number | null;
+  intent_score?: number | null;
+  evidence_status?: string | null;
+  evidence_summary?: string | null;
+  enrichment_status?: string | null;
+  review_status?: string | null;
+  inventory_status?: string | null;
+  is_test_data?: boolean | null;
+  website_scan?: Record<string, unknown> | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
 const QUICK_PASTE_PROFILE_NAME = "Property Pipeline Buyers";
@@ -64,6 +101,7 @@ const QUICK_PASTE_OPPORTUNITY_SIGNAL_KEYWORDS = [
 ];
 const QUICK_PASTE_BUYER_TYPE = "High-ticket property, construction, and real estate service businesses";
 const QUICK_PASTE_MAX_URLS = 500;
+const NAVIGATOR_QUALIFYING_SIGNAL_PATTERN = /\b(expanding|expansion|hiring|recruiting|new project|project launch|planning|planning application|permit|opening|launching|funding|raised|growth|pipeline|customers|leads|manual|delay|broken|switching|tender|rfp|request for proposal|procurement|quote request|looking for|need(?:s|ed)?|seeking|help with|outsourc(?:e|ing)|contract awarded|land acquired|site acquired|portfolio growth|new homes?)\b/i;
 
 export type QuickPasteImportInput = {
   urls: string;
@@ -97,6 +135,50 @@ type RunCounters = {
   source_failures: Array<Record<string, unknown>>;
 };
 
+export type OpportunityFeedbackStatus = "replied" | "booked" | "not_useful";
+
+type FeedbackAdjustedOpportunity = MatchableOpportunity & {
+  customer_feedback_adjustment?: number;
+  customer_feedback_reasons?: string[];
+};
+
+type CustomerFeedbackPreferences = {
+  industries: Map<string, number>;
+  locations: Map<string, number>;
+  intentCategories: Map<string, number>;
+  totalFeedback: number;
+};
+
+type OpportunityDiscoveryOptions = {
+  trigger?: DiscoveryTrigger;
+  profileId?: string;
+  includeLiveLeadEngine?: boolean;
+};
+
+const RSS_ITEMS_PER_FEED = 15;
+const RSS_PROFILE_TOKEN_STOPWORDS = new Set([
+  "and",
+  "for",
+  "the",
+  "with",
+  "from",
+  "high",
+  "value",
+  "ticket",
+  "buyers",
+  "buyer",
+  "pipeline",
+  "services",
+  "service",
+  "business",
+  "businesses",
+  "qualified",
+  "opportunities",
+  "opportunity",
+]);
+const RSS_PROPERTY_CONTEXT_PATTERN = /\b(property|real estate|construction|building|builder|contractor|developer|development|renovation|planning|permit|land|housing|homes|residential|commercial|architecture|infrastructure|industrial)\b/i;
+const RSS_OPPORTUNITY_SIGNAL_PATTERN = /\b(request for proposal|rfp|tender|procurement|invitation to bid|bid opportunity|quote request|(?:vendor|contractor|consultant|supplier) needs? to provide|request(?:ing)? (?:quotes?|proposals?|supplier|vendor|contractor|builder|agency|consultant|support|help)|looking for (?:a |an |new |qualified |local |specialist )?(?:supplier|vendor|contractor|builder|agency|consultant|partner|subcontractor|developer|architect|engineer|service|support|help|quotes?|proposals?)|need(?:s|ed)? (?:a |an |new |qualified |local |specialist )?(?:supplier|vendor|contractor|builder|agency|consultant|partner|subcontractor|developer|architect|engineer|service|support|help|quotes?|proposals?)|seeking (?:a |an |new |qualified |local |specialist |for )?(?:supplier|vendor|contractor|builder|agency|consultant|partner|subcontractor|developer|architect|engineer|service|support|help|quotes?|proposals?)|contract(?:s)? (?:award|awarded|opportunity)|planning application|permit (?:application|approved|issued)|land for sale|site release|site acquired|development proposal|new build|renovation project|construction project|project delivery)\b/i;
+
 function supabaseOrThrow() {
   const supabase = getSupabaseAdmin();
   if (!supabase) throw new Error(formatSupabaseServerEnvError() || "Supabase privileged access is not configured for opportunity automation.");
@@ -105,6 +187,100 @@ function supabaseOrThrow() {
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+function clampScore(value: number) {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function matchReasonObject(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value) ? { ...(value as Record<string, unknown>) } : {};
+}
+
+function relatedOpportunityObject(value: unknown) {
+  if (Array.isArray(value)) return relatedOpportunityObject(value[0]);
+  return value && typeof value === "object" ? value as Record<string, unknown> : {};
+}
+
+function preferenceKey(value: unknown) {
+  return normalizeText(value).replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 120);
+}
+
+function addPreference(map: Map<string, number>, value: unknown, weight: number) {
+  const key = preferenceKey(value);
+  if (!key) return;
+  map.set(key, (map.get(key) || 0) + weight);
+}
+
+function preferenceWeight(map: Map<string, number>, value: unknown) {
+  const key = preferenceKey(value);
+  return key ? map.get(key) || 0 : 0;
+}
+
+function emptyCustomerFeedbackPreferences(): CustomerFeedbackPreferences {
+  return {
+    industries: new Map(),
+    locations: new Map(),
+    intentCategories: new Map(),
+    totalFeedback: 0,
+  };
+}
+
+export function normalizeOpportunityFeedbackStatus(value: unknown): OpportunityFeedbackStatus | null {
+  const status = String(value || "").trim().toLowerCase();
+  return status === "replied" || status === "booked" || status === "not_useful" ? status : null;
+}
+
+export function customerFeedbackStatusFromMatchReason(matchReason: unknown): OpportunityFeedbackStatus | null {
+  const root = matchReasonObject(matchReason);
+  const feedback = root.customer_feedback && typeof root.customer_feedback === "object" ? root.customer_feedback as Record<string, unknown> : {};
+  return normalizeOpportunityFeedbackStatus(feedback.status);
+}
+
+export function feedbackWeightForStatus(status: OpportunityFeedbackStatus) {
+  if (status === "booked") return 12;
+  if (status === "replied") return 7;
+  return -14;
+}
+
+export function buildCustomerFeedbackPreferences(assignments: Array<Record<string, unknown>>): CustomerFeedbackPreferences {
+  const preferences = emptyCustomerFeedbackPreferences();
+  for (const assignment of assignments) {
+    const status = customerFeedbackStatusFromMatchReason(assignment.match_reason);
+    if (!status) continue;
+    const opportunity = relatedOpportunityObject(assignment.opportunities);
+    const weight = feedbackWeightForStatus(status);
+    addPreference(preferences.industries, opportunity.company_industry || opportunity.niche, weight);
+    addPreference(preferences.locations, opportunity.company_location || opportunity.company_country || opportunity.target_location, Math.trunc(weight / 2));
+    addPreference(preferences.intentCategories, opportunity.intent_category, Math.trunc(weight / 2));
+    preferences.totalFeedback += 1;
+  }
+  return preferences;
+}
+
+export function applyCustomerFeedbackPreferences<T extends MatchableOpportunity>(opportunities: T[], preferences: CustomerFeedbackPreferences): Array<T & FeedbackAdjustedOpportunity> {
+  if (preferences.totalFeedback === 0) return opportunities as Array<T & FeedbackAdjustedOpportunity>;
+  return opportunities.map((opportunity) => {
+    const industryDelta = preferenceWeight(preferences.industries, opportunity.company_industry || opportunity.niche);
+    const locationDelta = preferenceWeight(preferences.locations, opportunity.company_location || opportunity.company_country || opportunity.target_location);
+    const intentDelta = preferenceWeight(preferences.intentCategories, opportunity.intent_category);
+    const rawAdjustment = Math.round((industryDelta * 0.55) + (locationDelta * 0.25) + (intentDelta * 0.2));
+    const adjustment = Math.max(-18, Math.min(18, rawAdjustment));
+    if (adjustment === 0) return opportunity as T & FeedbackAdjustedOpportunity;
+
+    const reasons = [
+      industryDelta ? `industry ${industryDelta > 0 ? "favored" : "reduced"} by customer outcomes` : "",
+      locationDelta ? `location ${locationDelta > 0 ? "favored" : "reduced"} by customer outcomes` : "",
+      intentDelta ? `intent ${intentDelta > 0 ? "favored" : "reduced"} by customer outcomes` : "",
+    ].filter(Boolean);
+
+    return {
+      ...opportunity,
+      overall_score: clampScore(opportunity.overall_score + adjustment),
+      customer_feedback_adjustment: adjustment,
+      customer_feedback_reasons: reasons,
+    };
+  });
 }
 
 function sourceTypeFromPastedUrl(url: string) {
@@ -173,10 +349,10 @@ function defaultQuickPasteProfileRow() {
     target_locations: [],
     company_sizes: [],
     target_job_roles: ["owner", "founder", "ceo", "director", "property developer", "estate agent", "broker", "project manager", "construction manager"],
-    minimum_fit_score: 20,
-    minimum_intent_score: 0,
-    minimum_evidence_score: 0,
-    maximum_record_age_days: 90,
+    minimum_fit_score: 50,
+    minimum_intent_score: 80,
+    minimum_evidence_score: 65,
+    maximum_record_age_days: 60,
     opportunity_quantity: 25,
     delivery_frequency: "weekly" as const,
     exclusivity_mode: "customer_exclusive" as const,
@@ -188,6 +364,7 @@ function defaultQuickPasteProfileRow() {
       keywords: QUICK_PASTE_PROFILE_KEYWORDS,
       buyer_type: QUICK_PASTE_BUYER_TYPE,
       opportunity_signal_keywords: QUICK_PASTE_OPPORTUNITY_SIGNAL_KEYWORDS,
+      quality_policy: "named_buyer_current_need_required",
       created_by: "quick_paste_import",
     },
     updated_at: nowIso(),
@@ -247,8 +424,27 @@ function arrayFromDb(value: unknown) {
   return Array.isArray(value) ? value.map(String).filter(Boolean) : [];
 }
 
-function profileFromRow(row: Record<string, unknown>): CustomerSearchProfile {
+function isQuickPastePropertyProfile(profile: CustomerSearchProfile) {
+  const metadata = profile.metadata || {};
+  return profile.niche === QUICK_PASTE_PROFILE_NAME
+    || profile.customer_email === "admin@marketvibe.local"
+    || metadata.created_by === "quick_paste_import";
+}
+
+function hardenPropertyProfile(profile: CustomerSearchProfile): CustomerSearchProfile {
+  if (!isQuickPastePropertyProfile(profile)) return profile;
   return {
+    ...profile,
+    minimum_fit_score: Math.max(profile.minimum_fit_score, 50),
+    minimum_intent_score: Math.max(profile.minimum_intent_score, 80),
+    minimum_evidence_score: Math.max(profile.minimum_evidence_score, 65),
+    maximum_record_age_days: Math.min(profile.maximum_record_age_days || 60, 60),
+    allow_profile_only: false,
+  };
+}
+
+function profileFromRow(row: Record<string, unknown>): CustomerSearchProfile {
+  return hardenPropertyProfile({
     id: String(row.id || ""),
     customer_email: normalizeEmail(row.customer_email),
     product_code: String(row.product_code || "proof_pack") as PremiumProductCode,
@@ -270,7 +466,7 @@ function profileFromRow(row: Record<string, unknown>): CustomerSearchProfile {
     allow_profile_only: Boolean(row.allow_profile_only),
     replacement_policy: row.replacement_policy === "none" || row.replacement_policy === "admin_review" || row.replacement_policy === "automatic" ? row.replacement_policy : "objective_failures",
     metadata: row.metadata && typeof row.metadata === "object" ? row.metadata as Record<string, unknown> : {},
-  };
+  });
 }
 
 function opportunityFromRow(row: Record<string, unknown>): MatchableOpportunity {
@@ -386,78 +582,218 @@ function rssFeeds() {
     .slice(0, 10);
 }
 
+function decodeXmlEntities(value: string) {
+  let decoded = value;
+  for (let index = 0; index < 2; index += 1) {
+    decoded = decoded
+      .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+      .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(Number.parseInt(code, 16)))
+      .replace(/&nbsp;/g, " ")
+      .replace(/&bull;/g, " ")
+      .replace(/&ndash;/g, "-")
+      .replace(/&mdash;/g, "-")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, "\"")
+      .replace(/&apos;/g, "'");
+  }
+  return decoded;
+}
+
 function stripXml(value: string) {
-  return value.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return decodeXmlEntities(value.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
 }
 
-function xmlValue(item: string, tag: string) {
-  const match = item.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i"));
-  return stripXml(match?.[1] || "").replace(/^<!\[CDATA\[|\]\]>$/g, "").trim();
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-async function fetchRssCandidates(profile: CustomerSearchProfile): Promise<SourceCandidate[]> {
+export function extractXmlValue(item: string, tag: string) {
+  const escapedTag = escapeRegExp(tag);
+  const match = item.match(new RegExp(`<${escapedTag}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${escapedTag}>`, "i"));
+  return stripXml(match?.[1] || "").trim();
+}
+
+function extractXmlValues(item: string, tag: string) {
+  const escapedTag = escapeRegExp(tag);
+  const matches = item.matchAll(new RegExp(`<${escapedTag}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${escapedTag}>`, "gi"));
+  return Array.from(matches).map((match) => stripXml(match[1] || "").trim()).filter(Boolean);
+}
+
+function extractRssLink(item: string) {
+  const inlineLink = normalizeUrl(extractXmlValue(item, "link"));
+  if (inlineLink) return inlineLink;
+  const href = item.match(/<link\b[^>]*\bhref=["']([^"']+)["'][^>]*\/?>/i)?.[1];
+  return normalizeUrl(decodeXmlEntities(href || ""));
+}
+
+function safeIsoDate(value: string) {
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null;
+}
+
+function extractRssPublished(item: string) {
+  return extractXmlValue(item, "pubDate") || extractXmlValue(item, "published") || extractXmlValue(item, "updated") || extractXmlValue(item, "dc:date");
+}
+
+function rssProfileTerms(profile: CustomerSearchProfile) {
+  const phrases = [
+    profile.niche,
+    profile.target_service,
+    ...profile.target_industries,
+  ]
+    .map((value) => normalizeText(value))
+    .filter((value) => value.length >= 4);
+
+  const tokens = phrases
+    .flatMap((value) => value.split(/[^a-z0-9]+/i))
+    .map((value) => normalizeText(value))
+    .filter((value) => value.length >= 4 && !RSS_PROFILE_TOKEN_STOPWORDS.has(value));
+
+  return Array.from(new Set([...phrases, ...tokens]));
+}
+
+export function rssItemMatchesProfile(profile: CustomerSearchProfile, text: string) {
+  const haystack = normalizeText(text);
+  if (!haystack) return false;
+  if (hasLowValueOpportunityEvidence(text)) return false;
+
+  const profileTerms = rssProfileTerms(profile);
+  if (profileTerms.some((term) => haystack.includes(term)) && RSS_OPPORTUNITY_SIGNAL_PATTERN.test(text)) return true;
+
+  return RSS_PROPERTY_CONTEXT_PATTERN.test(text) && RSS_OPPORTUNITY_SIGNAL_PATTERN.test(text);
+}
+
+function inferRssLocation(feed: string, text: string, profile: CustomerSearchProfile) {
+  const haystack = normalizeText(text);
+  const profileMatches = profile.target_locations.filter((location) => {
+    const normalized = normalizeText(location);
+    return normalized.length >= 3 && haystack.includes(normalized);
+  });
+  if (profileMatches.length > 0) return profileMatches.join(", ");
+
+  const usaLocation = text.match(/\bUSA\s*\(([^)]+)\)/i)?.[1]?.trim();
+  if (usaLocation) return `${usaLocation}, United States`;
+  const canadaLocation = text.match(/\bCanada\s*\(([^)]+)\)/i)?.[1]?.trim();
+  if (canadaLocation) return `${canadaLocation}, Canada`;
+  const ukLocation = text.match(/\bUK\s*\(([^)]+)\)/i)?.[1]?.trim();
+  if (ukLocation) return `${ukLocation}, United Kingdom`;
+
+  try {
+    const host = new URL(feed).hostname.replace(/^www\./, "");
+    if (host.endsWith("london.gov.uk")) return "London, United Kingdom";
+    if (host.endsWith("enr.com") && /\b(dallas|texas|houston|austin|fort worth)\b/i.test(text)) return "Texas, United States";
+    if (host.endsWith("enr.com") && /\b(new york|nyc|manhattan|queens|brooklyn)\b/i.test(text)) return "New York, United States";
+    if (host.endsWith("enr.com") && /\b(california|los angeles|san francisco|san diego)\b/i.test(text)) return "California, United States";
+  } catch {
+    return "";
+  }
+
+  return "";
+}
+
+function countryFromLocation(location: string) {
+  if (/\bUnited Kingdom\b/i.test(location)) return "United Kingdom";
+  if (/\bUnited States\b/i.test(location)) return "United States";
+  if (/\bCanada\b/i.test(location)) return "Canada";
+  return null;
+}
+
+function companyNameFromRssTitle(title: string) {
+  const parts = title.split(/\s+-\s+/).map((value) => value.trim()).filter(Boolean);
+  if (/^[A-Z]+-\d+$/i.test(parts[0] || "") && parts.length >= 3) return parts[2];
+  return title.split(/[-|:]/)[0]?.trim() || title;
+}
+
+function industryFromRssText(text: string) {
+  if (/\b(real estate|property developer|property development|housing|affordable housing|land|site acquired|site release)\b/i.test(text)) return "Property and real estate";
+  if (/\b(construction|builder|contractor|architecture|architect|engineer|renovation|infrastructure|demolition|design support)\b/i.test(text)) return "Construction and built environment";
+  if (/\b(planning application|development proposal|permit application)\b/i.test(text)) return "Planning and development";
+  return null;
+}
+
+async function fetchRssCandidates(profile: CustomerSearchProfile): Promise<{ candidates: SourceCandidate[]; failures: Array<Record<string, unknown>> }> {
   const feeds = rssFeeds();
-  if (feeds.length === 0) return [];
+  if (feeds.length === 0) return { candidates: [], failures: [] };
   const candidates: SourceCandidate[] = [];
+  const failures: Array<Record<string, unknown>> = [];
   for (const feed of feeds) {
-    const response = await fetch(feed, {
-      headers: { "user-agent": "MarketVibeOpportunityEngine/1.0 (+https://marketvibe1.com)" },
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!response.ok) throw new Error(`RSS feed ${feed} returned ${response.status}`);
-    const xml = await response.text();
-    const items = xml.match(/<item[\s\S]*?<\/item>/gi) || [];
-    for (const item of items.slice(0, 10)) {
-      const title = xmlValue(item, "title");
-      const link = normalizeUrl(xmlValue(item, "link"));
-      const description = xmlValue(item, "description");
-      const published = xmlValue(item, "pubDate");
-      const text = `${title} ${description}`;
-      const haystack = normalizeText(text);
-      if (!haystack.includes(normalizeText(profile.niche).split(" ")[0] || normalizeText(profile.niche))) continue;
-      const companyName = title.split(/[-|:]/)[0]?.trim() || title;
-      candidates.push({
-        company_name: companyName.slice(0, 160),
-        source_type: "public_rss_feed",
+    try {
+      const response = await fetch(feed, {
+        headers: { "user-agent": "MarketVibeOpportunityEngine/1.0 (+https://marketvibe1.com)" },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!response.ok) throw new Error(`RSS feed returned ${response.status}`);
+      const xml = await response.text();
+      const items = xml.match(/<(item|entry)\b[\s\S]*?<\/\1>/gi) || [];
+      const recentItems = items
+        .map((item) => ({ item, timestamp: Date.parse(extractRssPublished(item)) }))
+        .sort((a, b) => (Number.isFinite(b.timestamp) ? b.timestamp : 0) - (Number.isFinite(a.timestamp) ? a.timestamp : 0))
+        .slice(0, RSS_ITEMS_PER_FEED)
+        .map((entry) => entry.item);
+      for (const item of recentItems) {
+        const title = extractXmlValue(item, "title");
+        const link = extractRssLink(item);
+        const description = extractXmlValue(item, "description") || extractXmlValue(item, "summary") || extractXmlValue(item, "content:encoded");
+        const published = extractRssPublished(item);
+        const categories = extractXmlValues(item, "category");
+        const text = [title, description, ...categories].filter(Boolean).join(" ");
+        if (/info only,\s*rfp not included/i.test(text)) continue;
+        if (!title || !rssItemMatchesProfile(profile, text)) continue;
+        const companyName = companyNameFromRssTitle(title);
+        const location = inferRssLocation(feed, text, profile);
+        candidates.push({
+          company_name: companyName.slice(0, 160),
+          company_location: location || null,
+          company_country: location ? countryFromLocation(location) : null,
+          company_industry: industryFromRssText(text),
+          source_type: "public_rss_feed",
+          source_name: feed,
+          source_url: link || feed,
+          source_title: title,
+          source_text: text,
+          source_published_at: published ? safeIsoDate(published) : null,
+          captured_at: nowIso(),
+          evidence_status: "public_signal_verified",
+          niche: profile.niche,
+          target_location: location || null,
+          raw_payload: { feed, title, description, categories },
+        });
+      }
+    } catch (error) {
+      failures.push({
         source_name: feed,
-        source_url: link || feed,
-        source_title: title,
-        source_text: text,
-        source_published_at: published ? new Date(published).toISOString() : null,
-        captured_at: nowIso(),
-        niche: profile.niche,
-        target_location: profile.target_locations.join(", "),
-        raw_payload: { feed, title, description },
+        source_type: "public_rss_feed",
+        source_url: feed,
+        error: error instanceof Error ? error.message : "RSS feed failed.",
       });
     }
   }
-  return candidates;
+  return { candidates, failures };
 }
 
-async function discoverCandidatesForProfile(profile: CustomerSearchProfile) {
+async function discoverCandidatesForProfile(profile: CustomerSearchProfile, options: { includeLiveLeadEngine?: boolean } = {}) {
   const candidates: SourceCandidate[] = [];
   const failures: Array<Record<string, unknown>> = [];
+  const includeLiveLeadEngine = options.includeLiveLeadEngine !== false;
 
-  try {
-    const live = await searchLiveLeads(leadSearchInputFromProfile(profile), Math.min(8, profile.opportunity_quantity));
-    candidates.push(...live.leads.filter((lead) => lead.sourceStatus === "live").map((lead) => opportunityFromBusinessLead(lead, profile)));
-  } catch (error) {
-    failures.push({
-      source_name: "MarketVibe live lead engine",
-      source_type: "public_business_website",
-      error: error instanceof Error ? error.message : "Live lead engine failed.",
-    });
+  if (includeLiveLeadEngine) {
+    try {
+      const live = await searchLiveLeads(leadSearchInputFromProfile(profile), Math.min(8, profile.opportunity_quantity));
+      candidates.push(...live.leads.filter((lead) => lead.sourceStatus === "live").map((lead) => opportunityFromBusinessLead(lead, profile)));
+    } catch (error) {
+      failures.push({
+        source_name: "MarketVibe live lead engine",
+        source_type: "public_business_website",
+        error: error instanceof Error ? error.message : "Live lead engine failed.",
+      });
+    }
   }
 
-  try {
-    candidates.push(...await fetchRssCandidates(profile));
-  } catch (error) {
-    failures.push({
-      source_name: "Configured RSS feeds",
-      source_type: "public_rss_feed",
-      error: error instanceof Error ? error.message : "RSS discovery failed.",
-    });
-  }
+  const rss = await fetchRssCandidates(profile);
+  candidates.push(...rss.candidates);
+  failures.push(...rss.failures);
 
   return { candidates, failures };
 }
@@ -503,12 +839,59 @@ async function automationPaused(supabase: SupabaseClient) {
   return Boolean(data?.automation_paused);
 }
 
+function isInternalOpportunityEmail(email: string) {
+  return normalizeEmail(email).endsWith("@marketvibe.local");
+}
+
+async function hasBillableOpportunityAccess(supabase: SupabaseClient, email: string, productCode: unknown) {
+  const customerEmail = normalizeEmail(email);
+  if (!customerEmail || isInternalOpportunityEmail(customerEmail) || !isPremiumProductCode(productCode)) return false;
+
+  const now = nowIso();
+  const entitlement = await supabase
+    .from("premium_entitlements")
+    .select("id")
+    .eq("customer_email", customerEmail)
+    .eq("product_code", productCode)
+    .eq("status", "active")
+    .or(`ends_at.is.null,ends_at.gt.${now}`)
+    .limit(1);
+  if (entitlement.error) throw entitlement.error;
+  if ((entitlement.data || []).length > 0) return true;
+
+  const order = await supabase
+    .from("premium_orders")
+    .select("id")
+    .eq("customer_email", customerEmail)
+    .eq("product_code", productCode)
+    .eq("status", "completed")
+    .limit(1);
+  if (order.error) throw order.error;
+  return (order.data || []).length > 0;
+}
+
 async function loadProfiles(supabase: SupabaseClient, profileId?: string) {
   let query = supabase.from("customer_search_profiles").select("*").eq("status", "active").order("created_at", { ascending: true }).limit(25);
   if (profileId) query = query.eq("id", profileId);
   const { data, error } = await query;
   if (error) throw error;
   return (data || []).map((row) => profileFromRow(row as Record<string, unknown>));
+}
+
+async function loadBillableProfiles(supabase: SupabaseClient, profileId?: string) {
+  const profiles = await loadProfiles(supabase, profileId);
+  const billableProfiles: CustomerSearchProfile[] = [];
+  let skippedProfiles = 0;
+
+  for (const profile of profiles) {
+    if (await hasBillableOpportunityAccess(supabase, profile.customer_email, profile.product_code)) {
+      billableProfiles.push(profile);
+    } else {
+      skippedProfiles += 1;
+    }
+  }
+
+  return { profiles: billableProfiles, skippedProfiles };
 }
 
 async function existingDedupeKeys(supabase: SupabaseClient, keys: string[]) {
@@ -554,6 +937,98 @@ async function ensureQuickPasteDefaultSearchProfile(supabase: SupabaseClient) {
     .single();
   if (upsertError || !data) throw upsertError || new Error("Default Quick Paste search profile could not be created.");
   return profileFromRow(data as Record<string, unknown>);
+}
+
+function navigatorOpportunityProfile(): CustomerSearchProfile {
+  return {
+    ...defaultQuickPasteProfileRow(),
+    id: "navigator-visible-card-profile",
+    niche: QUICK_PASTE_PROFILE_NAME,
+    target_service: QUICK_PASTE_BUYER_TYPE,
+    minimum_fit_score: 50,
+    minimum_intent_score: 80,
+    minimum_evidence_score: 65,
+    maximum_record_age_days: 60,
+    metadata: {
+      created_by: "sales_navigator_visible_card_bridge",
+      source_policy: "visible_card_only_no_private_fetch",
+    },
+  };
+}
+
+function navigatorProspectHasQualifiedSignal(prospect: NavigatorProspectOpportunityRow) {
+  if (prospect.review_status !== "approved") return false;
+  if (prospect.is_test_data || prospect.inventory_status === "rejected") return false;
+  if (prospect.evidence_status === "profile_only") return false;
+  const signalText = [
+    prospect.public_signal_text,
+    prospect.evidence_summary,
+    prospect.source_note,
+  ].filter(Boolean).join(" ");
+  return NAVIGATOR_QUALIFYING_SIGNAL_PATTERN.test(signalText);
+}
+
+function navigatorProspectSourceUrl(prospect: NavigatorProspectOpportunityRow) {
+  return normalizeUrl(prospect.public_signal_url)
+    || normalizeUrl(prospect.linkedin_profile_url)
+    || normalizeUrl(prospect.company_linkedin_url)
+    || normalizeUrl(prospect.company_website);
+}
+
+function navigatorProspectToCandidate(prospect: NavigatorProspectOpportunityRow): SourceCandidate | null {
+  if (!navigatorProspectHasQualifiedSignal(prospect)) return null;
+  const companyName = String(prospect.company_name || "").trim();
+  if (!companyName) return null;
+  const sourceUrl = navigatorProspectSourceUrl(prospect);
+  if (!sourceUrl) return null;
+
+  const location = [prospect.city, prospect.location].filter(Boolean).join(", ") || prospect.location || "";
+  const title = [prospect.company_name, prospect.job_title || prospect.full_name, "visible Navigator signal"].filter(Boolean).join(" - ");
+  const sourceText = [
+    prospect.public_signal_text,
+    prospect.evidence_summary,
+    prospect.source_note,
+  ].filter(Boolean).join(" ");
+
+  return {
+    company_name: companyName,
+    company_domain: normalizeDomain(prospect.company_domain || domainFromUrl(prospect.company_website)),
+    company_website: normalizeUrl(prospect.company_website),
+    company_location: location || null,
+    company_country: prospect.country || null,
+    company_industry: prospect.industry || QUICK_PASTE_PROFILE_NAME,
+    company_size: prospect.company_size || null,
+    company_description: prospect.evidence_summary || null,
+    contact_first_name: prospect.first_name || null,
+    contact_last_name: prospect.last_name || null,
+    contact_full_name: prospect.full_name || [prospect.first_name, prospect.last_name].filter(Boolean).join(" ") || null,
+    contact_job_title: prospect.job_title || null,
+    public_email: normalizeEmail(prospect.public_email),
+    public_phone: normalizePhone(prospect.public_phone),
+    source_type: "sales_navigator_visible_card",
+    source_name: "MarketVibe Sales Navigator Companion",
+    source_url: sourceUrl,
+    source_title: title.slice(0, 220),
+    source_text: sourceText,
+    captured_at: prospect.created_at || nowIso(),
+    last_verified_at: prospect.updated_at || prospect.created_at || nowIso(),
+    evidence_status: "public_signal_verified",
+    niche: QUICK_PASTE_PROFILE_NAME,
+    target_location: [prospect.city, prospect.country].filter(Boolean).join(", ") || prospect.location || null,
+    is_test_data: Boolean(prospect.is_test_data),
+    raw_payload: {
+      imported_prospect_id: prospect.id,
+      source: "sales_navigator_visible_card",
+      linkedin_profile_url: prospect.linkedin_profile_url || null,
+      company_linkedin_url: prospect.company_linkedin_url || null,
+      enrichment_status: prospect.enrichment_status || null,
+      imported_fit_score: prospect.fit_score ?? null,
+      imported_intent_score: prospect.intent_score ?? null,
+      raw_row: prospect.raw_row || {},
+      no_private_fetch: true,
+      visible_card_only: true,
+    },
+  };
 }
 
 function opportunityInsertRow(candidate: SourceCandidate, profile: CustomerSearchProfile, scores: OpportunityScores, qualification: ReturnType<typeof qualifyOpportunity>) {
@@ -702,6 +1177,79 @@ export async function importQuickPasteOpportunities(input: QuickPasteImportInput
   };
 }
 
+export async function syncApprovedNavigatorProspectsToOpportunities({
+  prospectIds,
+  trigger = "admin",
+  limit = 500,
+}: {
+  prospectIds?: string[];
+  trigger?: DiscoveryTrigger;
+  limit?: number;
+} = {}) {
+  const supabase = supabaseOrThrow();
+  const runId = await createRun(supabase, {
+    runType: "discovery",
+    trigger,
+    idempotencyKey: runIdempotencyKey("navigator-import", trigger, prospectIds?.length ? prospectIds.slice().sort().join(",").slice(0, 120) : "approved"),
+  });
+  const counters: RunCounters = { records_discovered: 0, records_rejected: 0, records_qualified: 0, records_added_to_inventory: 0, duplicate_count: 0, stale_records: 0, customer_shortages: 0, source_failures: [] };
+
+  try {
+    let query = supabase
+      .from("premium_imported_prospects")
+      .select("*")
+      .eq("review_status", "approved")
+      .eq("is_test_data", false)
+      .neq("inventory_status", "rejected")
+      .neq("evidence_status", "profile_only")
+      .order("updated_at", { ascending: false })
+      .limit(Math.max(1, Math.min(1000, Math.floor(limit))));
+    if (prospectIds?.length) query = query.in("id", prospectIds);
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    const profile = navigatorOpportunityProfile();
+    const candidates = ((data || []) as NavigatorProspectOpportunityRow[])
+      .map((prospect) => navigatorProspectToCandidate(prospect))
+      .filter(Boolean) as SourceCandidate[];
+    counters.records_discovered = candidates.length;
+
+    const existing = await existingDedupeKeys(supabase, candidates.map((candidate) => buildOpportunityDedupeKey(candidate)));
+    for (const candidate of candidates) {
+      const dedupeKey = buildOpportunityDedupeKey(candidate);
+      if (!dedupeKey || existing.has(dedupeKey)) {
+        counters.duplicate_count += 1;
+        continue;
+      }
+
+      const scores = calculateOpportunityScores(candidate, profile);
+      const qualification = qualifyOpportunity(candidate, scores, profile);
+      if (qualification.qualified) counters.records_qualified += 1;
+      else counters.records_rejected += 1;
+      if (qualification.inventory_status === "IN_INVENTORY") counters.records_added_to_inventory += 1;
+
+      const { error: insertError } = await supabase.from("opportunities").insert(opportunityInsertRow(candidate, profile, scores, qualification));
+      if (insertError?.code === "23505") {
+        counters.duplicate_count += 1;
+        existing.add(dedupeKey);
+        continue;
+      }
+      if (insertError) throw insertError;
+      existing.add(dedupeKey);
+    }
+
+    await finishRun(supabase, runId, "completed", counters, {
+      source: "sales_navigator_visible_card",
+      candidate_filter: "approved_non_test_non_profile_only_with_qualified_signal",
+    });
+    return { ok: true, runId, ...counters };
+  } catch (error) {
+    await finishRun(supabase, runId, "failed", counters, { message: error instanceof Error ? error.message : "Navigator opportunity sync failed." });
+    throw error;
+  }
+}
+
 export async function createOrUpdateSearchProfileFromOnboarding(input: {
   onboardingId?: string | null;
   email: string;
@@ -729,7 +1277,7 @@ export async function createOrUpdateSearchProfileFromOnboarding(input: {
   return { profileId: data?.id as string, profile };
 }
 
-export async function runOpportunityDiscovery({ trigger = "admin", profileId }: { trigger?: DiscoveryTrigger; profileId?: string } = {}) {
+export async function runOpportunityDiscovery({ trigger = "admin", profileId, includeLiveLeadEngine = true }: OpportunityDiscoveryOptions = {}) {
   const supabase = supabaseOrThrow();
   const counters: RunCounters = {
     records_discovered: 0,
@@ -755,7 +1303,7 @@ export async function runOpportunityDiscovery({ trigger = "admin", profileId }: 
 
     const profiles = await loadProfiles(supabase, profileId);
     for (const profile of profiles) {
-      const { candidates, failures } = await discoverCandidatesForProfile(profile);
+      const { candidates, failures } = await discoverCandidatesForProfile(profile, { includeLiveLeadEngine });
       counters.source_failures.push(...failures);
       counters.records_discovered += candidates.length;
       const keys = candidates.map((candidate) => buildOpportunityDedupeKey(candidate));
@@ -930,12 +1478,37 @@ async function deliveredIdsForCustomer(supabase: SupabaseClient, email: string) 
   return new Set((data || []).map((row) => String(row.opportunity_id)));
 }
 
+async function loadCustomerFeedbackPreferences(supabase: SupabaseClient, profile: CustomerSearchProfile) {
+  let query = supabase
+    .from("opportunity_assignments")
+    .select("match_reason, opportunities(company_industry,company_location,company_country,niche,target_location,intent_category)")
+    .eq("customer_email", normalizeEmail(profile.customer_email))
+    .in("assignment_status", ["delivered", "replaced"])
+    .order("updated_at", { ascending: false })
+    .limit(200);
+
+  query = profile.id ? query.eq("search_profile_id", profile.id) : query.eq("product_code", profile.product_code);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return buildCustomerFeedbackPreferences((data || []) as Array<Record<string, unknown>>);
+}
+
 export async function fillCustomerShortages({ trigger = "admin", profileId, quantity }: { trigger?: DiscoveryTrigger; profileId?: string; quantity?: number } = {}) {
   const supabase = supabaseOrThrow();
   const runId = await createRun(supabase, { runType: "matching", trigger, idempotencyKey: runIdempotencyKey("matching", trigger, profileId || "all") });
   const counters: RunCounters = { records_discovered: 0, records_rejected: 0, records_qualified: 0, records_added_to_inventory: 0, duplicate_count: 0, stale_records: 0, customer_shortages: 0, source_failures: [] };
+  let skippedProfilesWithoutPaidAccess = 0;
   try {
-    const profiles = await loadProfiles(supabase, profileId);
+    const billable = await loadBillableProfiles(supabase, profileId);
+    const profiles = billable.profiles;
+    skippedProfilesWithoutPaidAccess = billable.skippedProfiles;
+    if (profiles.length === 0) {
+      const reason = skippedProfilesWithoutPaidAccess > 0 ? "no_billable_customer_profiles" : "no_active_customer_profiles";
+      await finishRun(supabase, runId, "skipped", counters, { reason, skipped_profiles_without_paid_access: skippedProfilesWithoutPaidAccess });
+      return { ok: true, skipped: true, reason, skippedProfilesWithoutPaidAccess, runId, ...counters };
+    }
+
     const activeReservations = await loadActiveReservations(supabase);
     const { data, error } = await supabase
       .from("opportunities")
@@ -950,14 +1523,16 @@ export async function fillCustomerShortages({ trigger = "admin", profileId, quan
 
     for (const profile of profiles) {
       const delivered = await deliveredIdsForCustomer(supabase, profile.customer_email);
-      const candidates = opportunities.map((opportunity) => ({
+      const feedbackPreferences = await loadCustomerFeedbackPreferences(supabase, profile);
+      const candidates = applyCustomerFeedbackPreferences(opportunities.map((opportunity) => ({
         ...opportunity,
         previously_delivered_to: delivered.has(opportunity.id) ? [profile.customer_email] : [],
-      }));
+      })), feedbackPreferences);
       const selection = selectMatchingOpportunities({ opportunities: candidates, profile, activeExclusivity: activeReservations, quantity });
       counters.customer_shortages += selection.shortage;
 
       for (const opportunity of selection.selected) {
+        const feedbackAdjustedOpportunity = opportunity as FeedbackAdjustedOpportunity;
         const reservedAt = nowIso();
         const endsAt = profile.exclusivity_period_days > 0
           ? new Date(Date.now() + profile.exclusivity_period_days * 86_400_000).toISOString()
@@ -989,7 +1564,12 @@ export async function fillCustomerShortages({ trigger = "admin", profileId, quan
           product_code: profile.product_code,
           assignment_status: "assigned",
           delivery_status: "queued",
-          match_reason: { reasons: opportunity.match_reasons, scores: { fit: opportunity.fit_score, intent: opportunity.intent_score, evidence: opportunity.evidence_score, overall: opportunity.overall_score } },
+          match_reason: {
+            reasons: opportunity.match_reasons,
+            scores: { fit: opportunity.fit_score, intent: opportunity.intent_score, evidence: opportunity.evidence_score, overall: opportunity.overall_score },
+            customer_feedback_adjustment: feedbackAdjustedOpportunity.customer_feedback_adjustment || 0,
+            customer_feedback_reasons: feedbackAdjustedOpportunity.customer_feedback_reasons || [],
+          },
           reserved_at: reservedAt,
           assigned_at: reservedAt,
         });
@@ -1011,11 +1591,38 @@ export async function fillCustomerShortages({ trigger = "admin", profileId, quan
       }
     }
 
-    await finishRun(supabase, runId, "completed", counters);
-    return { ok: true, runId, ...counters };
+    await finishRun(supabase, runId, "completed", counters, { skipped_profiles_without_paid_access: skippedProfilesWithoutPaidAccess });
+    return { ok: true, skippedProfilesWithoutPaidAccess, runId, ...counters };
   } catch (error) {
     await finishRun(supabase, runId, "failed", counters, { message: error instanceof Error ? error.message : "Matching failed." });
     throw error;
+  }
+}
+
+async function removeAssignmentWithoutPaidAccess(supabase: SupabaseClient, row: Record<string, unknown>, opportunity: Record<string, unknown>) {
+  const blockedAt = nowIso();
+  const matchReason = matchReasonObject(row.match_reason);
+  const existingBlockers = Array.isArray(matchReason.delivery_blockers) ? matchReason.delivery_blockers : [];
+  await supabase.from("opportunity_assignments").update({
+    assignment_status: "removed",
+    delivery_status: "not_delivered",
+    match_reason: {
+      ...matchReason,
+      delivery_blockers: [...existingBlockers, "customer_has_no_active_paid_access"],
+    },
+    updated_at: blockedAt,
+  }).eq("id", row.id);
+
+  if (opportunity.id) {
+    const canReturnToInventory = opportunity.verification_status === "QUALIFIED" && opportunity.review_status === "approved";
+    await supabase.from("opportunities").update({
+      inventory_status: canReturnToInventory ? "IN_INVENTORY" : opportunity.inventory_status || "REJECTED",
+      assignment_status: "unassigned",
+      delivery_status: "not_delivered",
+      customer_email: null,
+      product_code: null,
+      updated_at: blockedAt,
+    }).eq("id", opportunity.id);
   }
 }
 
@@ -1033,7 +1640,41 @@ export async function publishDueOpportunityDeliveries({ trigger = "admin", sendE
     if (error) throw error;
     const grouped = new Map<string, Array<Record<string, unknown>>>();
     for (const row of data || []) {
-      const key = `${row.customer_email}:${row.product_code}:${row.search_profile_id || "none"}`;
+      const opportunity = row.opportunities && typeof row.opportunities === "object" ? row.opportunities as Record<string, unknown> : {};
+      const qualityFlags = opportunityDeliveryQualityFlags(dbRowToOpportunityInput(opportunity));
+      if (qualityFlags.length > 0) {
+        const blockedAt = nowIso();
+        await supabase.from("opportunity_assignments").update({
+          assignment_status: "removed",
+          delivery_status: "not_delivered",
+          match_reason: {
+            ...matchReasonObject(row.match_reason),
+            delivery_quality_blockers: qualityFlags,
+          },
+          updated_at: blockedAt,
+        }).eq("id", row.id);
+        if (opportunity.id) {
+          await supabase.from("opportunities").update({
+            inventory_status: "REJECTED",
+            verification_status: "REJECTED",
+            review_status: "rejected",
+            rejection_reason: qualityFlags.join(", "),
+            quality_flags: qualityFlags,
+            updated_at: blockedAt,
+          }).eq("id", opportunity.id);
+        }
+        counters.records_rejected += 1;
+        continue;
+      }
+      const customerEmail = normalizeEmail(String(row.customer_email || ""));
+      const productCode = String(row.product_code || "");
+      if (!await hasBillableOpportunityAccess(supabase, customerEmail, productCode)) {
+        await removeAssignmentWithoutPaidAccess(supabase, row as Record<string, unknown>, opportunity);
+        counters.records_rejected += 1;
+        continue;
+      }
+
+      const key = `${customerEmail}:${productCode}:${row.search_profile_id || "none"}`;
       grouped.set(key, [...(grouped.get(key) || []), row as Record<string, unknown>]);
     }
 
@@ -1201,10 +1842,10 @@ export async function getOpportunityEngineSummary() {
   return {
     automationPaused: Boolean(settings.data?.automation_paused),
     latestRun: latestRun.data || null,
-    nextScheduledRun: "06:30 UTC matching, 07:00 UTC discovery/verification when Vercel cron is configured",
+    nextScheduledRun: "06:45 UTC full opportunity pipeline when Vercel cron is configured",
     sourcesEnabled: [
-      "MarketVibe live lead engine",
       ...(rssFeeds().length ? ["Configured public RSS feeds"] : []),
+      "Manual reviewed public-signal imports",
     ],
     supabaseStatus,
     setupReady: true,
@@ -1318,6 +1959,77 @@ export function buildOpportunityDeliveryCsv(rows: Array<Record<string, unknown>>
     ];
   });
   return [headers, ...body].map((row) => row.map(csvEscape).join(",")).join("\n");
+}
+
+export async function recordOpportunityFeedback(input: {
+  assignmentId: string;
+  customerEmail: string;
+  status: OpportunityFeedbackStatus;
+  note?: string;
+  submittedBy?: "customer" | "admin" | "system";
+}) {
+  const status = normalizeOpportunityFeedbackStatus(input.status);
+  if (!status) throw new Error("Feedback status must be replied, booked, or not_useful.");
+
+  const supabase = supabaseOrThrow();
+  const { data: assignment, error: assignmentError } = await supabase
+    .from("opportunity_assignments")
+    .select("id,opportunity_id,customer_email,match_reason")
+    .eq("id", input.assignmentId)
+    .eq("customer_email", normalizeEmail(input.customerEmail))
+    .maybeSingle();
+  if (assignmentError) throw assignmentError;
+  if (!assignment) throw new Error("Delivery assignment was not found for this customer.");
+
+  const submittedAt = nowIso();
+  const note = String(input.note || "").trim().slice(0, 500);
+  const matchReason = matchReasonObject(assignment.match_reason);
+  const customerFeedback = {
+    status,
+    note,
+    submitted_at: submittedAt,
+    submitted_by: input.submittedBy || "customer",
+  };
+
+  const { error: updateError } = await supabase.from("opportunity_assignments").update({
+    match_reason: {
+      ...matchReason,
+      customer_feedback: customerFeedback,
+    },
+    updated_at: submittedAt,
+  }).eq("id", assignment.id);
+  if (updateError) throw updateError;
+
+  let replacementRequestId: string | null = null;
+  if (status === "not_useful") {
+    const { data: existingReplacement, error: existingReplacementError } = await supabase
+      .from("opportunity_replacement_requests")
+      .select("id")
+      .eq("assignment_id", assignment.id)
+      .in("status", ["requested", "approved", "fulfilled"])
+      .limit(1)
+      .maybeSingle();
+    if (existingReplacementError) throw existingReplacementError;
+
+    if (existingReplacement?.id) {
+      replacementRequestId = String(existingReplacement.id);
+    } else {
+      const replacement = await requestOpportunityReplacement({
+        assignmentId: String(assignment.id),
+        customerEmail: input.customerEmail,
+        reason: "outside_criteria",
+        details: note || "Customer marked this opportunity as not useful from the dashboard.",
+        requestedBy: "customer",
+      });
+      replacementRequestId = replacement.requestId;
+    }
+  }
+
+  return {
+    ok: true,
+    feedback: customerFeedback,
+    replacementRequestId,
+  };
 }
 
 export async function requestOpportunityReplacement(input: {

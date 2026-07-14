@@ -164,7 +164,23 @@ export async function sendPendingProofPackPdfs({ limit = 10 }: { limit?: number 
   let skipped = 0;
 
   for (const request of (requests || []) as SampleRequestRow[]) {
+    if (!String(request.niche || "").trim()) {
+      await supabase.from("sample_requests").update({
+        error_summary: { waiting_for: "customer_onboarding" },
+        updated_at: new Date().toISOString(),
+      }).eq("id", request.id);
+      skipped += 1;
+      continue;
+    }
     const leads = await fetchProofPackLeads(request.niche);
+    if (leads.length === 0) {
+      await supabase.from("sample_requests").update({
+        error_summary: { waiting_for: "matching_supply" },
+        updated_at: new Date().toISOString(),
+      }).eq("id", request.id);
+      skipped += 1;
+      continue;
+    }
     const pdf = buildProofPackPdfBuffer({ request, leads });
     const result = await sendSendGridEmail({
       to: request.customer_email,

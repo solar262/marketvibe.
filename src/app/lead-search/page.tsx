@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function LeadSearchPage() {
-  redirect("/engine");
+  redirect("/pricing");
 }

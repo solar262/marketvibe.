@@ -10,7 +10,7 @@ export default function CookiesPage() {
       <div className="mt-6 grid gap-4 text-sm leading-6 text-slate-600">
         <p><strong>Essential cookies:</strong> required for login, security, and checkout continuity.</p>
         <p><strong>Analytics:</strong> used to understand page visits and product interest without promising outcomes.</p>
-        <p><strong>Third parties:</strong> Vercel, Stripe, Brevo, and Supabase may process limited data needed to operate the service.</p>
+        <p><strong>Third parties:</strong> trusted hosting, payment, email, analytics, and storage providers may process limited data needed to operate the service.</p>
       </div>
       <Link href="/privacy" className="mt-6 inline-flex font-semibold text-slate-950 underline">Read the privacy policy</Link>
     </main>

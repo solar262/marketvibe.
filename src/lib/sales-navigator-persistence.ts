@@ -3,6 +3,7 @@ import { sendTransactionalEmail } from "@/lib/brevo";
 import { getPremiumEntitlements } from "@/lib/premium-persistence";
 import type { PremiumProductCode } from "@/lib/premium-products";
 import { appendCustomerAccessParams, createCustomerAccessToken } from "@/lib/customer-access";
+import { syncApprovedNavigatorProspectsToOpportunities } from "@/lib/opportunity-engine";
 import { persistImportedBuyerCompanies, type ImportPersistenceRow } from "@/lib/operations-pipeline";
 import {
   buildDeliveryCsv,
@@ -35,6 +36,8 @@ type ProspectRow = Partial<Record<ImportField, string | null>> & {
   evidence_summary?: string | null;
   enrichment_status?: string | null;
   review_status?: string | null;
+  inventory_status?: string | null;
+  is_test_data?: boolean | null;
   website_scan?: WebsiteScan | Record<string, unknown> | null;
   suggested_outreach_angle?: string | null;
   delivered_at?: string | null;
@@ -71,6 +74,123 @@ function chunk<T>(items: T[], size: number) {
   return chunks;
 }
 
+const AUTO_FULFILLMENT_TARGETS: Record<PremiumProductCode, number> = {
+  proof_pack: 25,
+  radar: 30,
+  growth_desk: 50,
+};
+
+const AUTO_FULFILLMENT_MINIMUMS: Record<PremiumProductCode, number> = {
+  proof_pack: 10,
+  radar: 10,
+  growth_desk: 15,
+};
+
+const AUTO_MATCH_STOP_WORDS = new Set([
+  "and",
+  "are",
+  "business",
+  "businesses",
+  "client",
+  "clients",
+  "companies",
+  "company",
+  "customer",
+  "customers",
+  "delivery",
+  "for",
+  "from",
+  "growth",
+  "lead",
+  "leads",
+  "market",
+  "marketing",
+  "more",
+  "need",
+  "needs",
+  "new",
+  "offer",
+  "opportunity",
+  "prospect",
+  "prospects",
+  "service",
+  "services",
+  "that",
+  "the",
+  "their",
+  "with",
+]);
+
+type AutoFulfillmentProfile = {
+  niche?: string;
+  country?: string;
+  city?: string;
+  territory?: string;
+  serviceOffer?: string;
+  idealBuyer?: string;
+};
+
+function normalizeAutoMatchText(value: unknown) {
+  return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function autoMatchTokens(value: unknown) {
+  return normalizeAutoMatchText(value)
+    .split(" ")
+    .filter((token) => token.length >= 4 && !AUTO_MATCH_STOP_WORDS.has(token));
+}
+
+function prospectMatchText(prospect: ProspectRow) {
+  return normalizeAutoMatchText([
+    prospect.company_name,
+    prospect.job_title,
+    prospect.industry,
+    prospect.company_size,
+    prospect.location,
+    prospect.country,
+    prospect.city,
+    prospect.public_signal_text,
+    prospect.evidence_summary,
+    prospect.source_note,
+  ].filter(Boolean).join(" "));
+}
+
+function locationMatches(prospect: ProspectRow, profile: AutoFulfillmentProfile) {
+  const requested = normalizeAutoMatchText([profile.country, profile.city, profile.territory].filter(Boolean).join(" "));
+  if (!requested) return true;
+  const supplied = normalizeAutoMatchText([prospect.country, prospect.city, prospect.location].filter(Boolean).join(" "));
+  if (!supplied) return true;
+  const requestedTokens = autoMatchTokens(requested);
+  return requestedTokens.length === 0 || requestedTokens.some((token) => supplied.includes(token));
+}
+
+function profileTokens(profile: AutoFulfillmentProfile) {
+  return autoMatchTokens([profile.niche, profile.serviceOffer, profile.idealBuyer].filter(Boolean).join(" "));
+}
+
+export function importedProspectAutoMatchScore(prospect: ProspectRow, profile: AutoFulfillmentProfile) {
+  if (prospect.review_status !== "approved") return 0;
+  if (prospect.is_test_data || prospect.inventory_status === "rejected") return 0;
+  if (prospect.evidence_status === "profile_only") return 0;
+  if (!locationMatches(prospect, profile)) return 0;
+
+  const text = prospectMatchText(prospect);
+  const tokens = profileTokens(profile);
+  const tokenHits = tokens.filter((token) => text.includes(token));
+  if (tokens.length > 0 && tokenHits.length === 0) return 0;
+  const evidenceBoost = prospect.evidence_status === "public_signal_verified" ? 25 : prospect.evidence_status === "website_verified" ? 15 : 0;
+  const intentScore = typeof prospect.intent_score === "number" ? prospect.intent_score : 0;
+  const fitScore = typeof prospect.fit_score === "number" ? prospect.fit_score : 0;
+  const tokenScore = Math.min(30, tokenHits.length * 10);
+  const locationBoost = locationMatches(prospect, profile) ? 10 : 0;
+  const score = Math.round((fitScore * 0.35) + (intentScore * 0.35) + tokenScore + evidenceBoost + locationBoost);
+  return Math.min(100, score);
+}
+
+export function importedProspectMatchesFulfillmentProfile(prospect: ProspectRow, profile: AutoFulfillmentProfile) {
+  return importedProspectAutoMatchScore(prospect, profile) >= 45;
+}
+
 export async function importProspectsFromRows({
   filename,
   rows,
@@ -79,6 +199,7 @@ export async function importProspectsFromRows({
   worksheetName,
   fileChecksum,
   rowFingerprints,
+  approveValidRows = false,
 }: {
   filename: string;
   rows: Record<string, string>[];
@@ -87,6 +208,7 @@ export async function importProspectsFromRows({
   worksheetName?: string;
   fileChecksum?: string;
   rowFingerprints?: string[];
+  approveValidRows?: boolean;
 }) {
   if (rows.length > MAX_IMPORT_ROWS) {
     throw new Error("CSV has too many rows. Maximum rows per upload is 10,000.");
@@ -169,6 +291,31 @@ export async function importProspectsFromRows({
     }
   }
 
+  let approvedRows = 0;
+  let approvedProspectIds: string[] = [];
+  if (approveValidRows) {
+    const approvableIds = new Set<string>();
+    for (const row of computed) {
+      if (row.evidence_status === "profile_only") continue;
+      const id = insertedByDedupeKey.get(row.dedupe_key) || existing.get(row.dedupe_key);
+      if (id) approvableIds.add(id);
+    }
+    const approvedAt = new Date().toISOString();
+    for (const idChunk of chunk(Array.from(approvableIds), 500)) {
+      const { error } = await supabase
+        .from("premium_imported_prospects")
+        .update({ review_status: "approved", updated_at: approvedAt })
+        .in("id", idChunk);
+      if (error) throw error;
+      approvedRows += idChunk.length;
+    }
+    approvedProspectIds = Array.from(approvableIds);
+  }
+
+  const opportunitySync = approvedProspectIds.length > 0
+    ? await syncApprovedNavigatorProspectsToOpportunities({ prospectIds: approvedProspectIds, trigger: "admin" })
+    : { records_discovered: 0, records_qualified: 0, records_rejected: 0, records_added_to_inventory: 0, duplicate_count: 0 };
+
   let pipelineResult = { companiesCreated: 0, duplicateCompanies: 0, queuedJobs: 0 };
   if (computed.length > 0) {
     const insertedRows: ImportPersistenceRow[] = rowsToInsert.map((row) => ({
@@ -208,6 +355,11 @@ export async function importProspectsFromRows({
         buyerCompaniesCreated: pipelineResult.companiesCreated,
         duplicateCompanies: pipelineResult.duplicateCompanies,
         websiteVerificationJobsQueued: pipelineResult.queuedJobs,
+        opportunitiesDiscovered: opportunitySync.records_discovered,
+        opportunitiesQualified: opportunitySync.records_qualified,
+        opportunitiesRejected: opportunitySync.records_rejected,
+        opportunitiesAddedToInventory: opportunitySync.records_added_to_inventory,
+        opportunityDuplicates: opportunitySync.duplicate_count,
       },
       completed_at: new Date().toISOString(),
     })
@@ -221,6 +373,12 @@ export async function importProspectsFromRows({
     importedRows: rowsToInsert.length,
     duplicateRows,
     rejectedRows: rejected.length,
+    approvedRows,
+    opportunitiesDiscovered: opportunitySync.records_discovered,
+    opportunitiesQualified: opportunitySync.records_qualified,
+    opportunitiesRejected: opportunitySync.records_rejected,
+    opportunitiesAddedToInventory: opportunitySync.records_added_to_inventory,
+    opportunityDuplicates: opportunitySync.duplicate_count,
     buyerCompaniesCreated: pipelineResult.companiesCreated,
     duplicateCompanies: pipelineResult.duplicateCompanies,
     websiteVerificationJobsQueued: pipelineResult.queuedJobs,
@@ -306,7 +464,16 @@ export async function updateProspectReview(ids: string[], reviewStatus: "approve
 
   const { error } = await supabase.from("premium_imported_prospects").update(update).in("id", ids);
   if (error) throw error;
-  return { updated: ids.length };
+  const opportunitySync = reviewStatus === "approved"
+    ? await syncApprovedNavigatorProspectsToOpportunities({ prospectIds: ids, trigger: "admin" })
+    : null;
+  return {
+    updated: ids.length,
+    opportunitiesAddedToInventory: opportunitySync?.records_added_to_inventory || 0,
+    opportunitiesQualified: opportunitySync?.records_qualified || 0,
+    opportunityDuplicates: opportunitySync?.duplicate_count || 0,
+    opportunitiesRejected: opportunitySync?.records_rejected || 0,
+  };
 }
 
 export async function enrichProspects(ids: string[]) {
@@ -397,12 +564,14 @@ export async function assignProspects({
   productCode,
   adminConfirmedCustomer,
   adminNotes,
+  onboardingId,
 }: {
   ids: string[];
   customerEmail: string;
   productCode: PremiumProductCode;
   adminConfirmedCustomer: boolean;
   adminNotes?: string;
+  onboardingId?: string | null;
 }) {
   const supabase = supabaseOrThrow();
   const email = normalizedEmail(customerEmail);
@@ -413,6 +582,7 @@ export async function assignProspects({
     prospect_id: id,
     customer_email: email,
     product_code: productCode,
+    onboarding_id: onboardingId || null,
     assignment_status: "assigned",
     admin_notes: adminNotes || null,
     updated_at: new Date().toISOString(),
@@ -465,6 +635,7 @@ export async function publishProspects({
   adminConfirmedCustomer,
   adminNotes,
   includeProfileOnly,
+  onboardingId,
 }: {
   ids: string[];
   customerEmail: string;
@@ -472,6 +643,7 @@ export async function publishProspects({
   adminConfirmedCustomer: boolean;
   adminNotes?: string;
   includeProfileOnly: boolean;
+  onboardingId?: string | null;
 }) {
   const supabase = supabaseOrThrow();
   const email = normalizedEmail(customerEmail);
@@ -504,7 +676,7 @@ export async function publishProspects({
     .single();
   if (batchError || !batch) throw batchError || new Error("Delivery batch could not be created.");
 
-  await assignProspects({ ids: prospects.map((prospect) => prospect.id), customerEmail: email, productCode, adminConfirmedCustomer, adminNotes });
+  await assignProspects({ ids: prospects.map((prospect) => prospect.id), customerEmail: email, productCode, adminConfirmedCustomer, adminNotes, onboardingId });
 
   const deliveredAt = new Date().toISOString();
   const { error: assignmentError } = await supabase
@@ -541,6 +713,17 @@ export async function publishProspects({
     });
   } catch (emailError) {
     await supabase
+      .from("premium_prospect_assignments")
+      .update({
+        assignment_status: "assigned",
+        delivered_at: null,
+        delivery_batch_id: null,
+        updated_at: new Date().toISOString(),
+      })
+      .in("prospect_id", prospects.map((prospect) => prospect.id))
+      .eq("customer_email", email)
+      .eq("product_code", productCode);
+    await supabase
       .from("premium_delivery_batches")
       .update({
         status: "email_failed",
@@ -557,6 +740,169 @@ export async function publishProspects({
   if (deliveredError) throw deliveredError;
 
   return { deliveryBatchId: batch.id as string, opportunityCount: prospects.length, dashboardUrl, csvUrl, token };
+}
+
+export async function autoFulfillImportedProspectsForOnboarding({
+  onboardingId,
+  customerEmail,
+  productCode,
+  niche,
+  country,
+  city,
+  territory,
+  serviceOffer,
+  idealBuyer,
+  quantity,
+}: {
+  onboardingId?: string | null;
+  customerEmail: string;
+  productCode: PremiumProductCode;
+  niche: string;
+  country: string;
+  city?: string;
+  territory?: string;
+  serviceOffer?: string;
+  idealBuyer?: string;
+  quantity?: number;
+}) {
+  const supabase = supabaseOrThrow();
+  const email = normalizedEmail(customerEmail);
+  const targetQuantity = Math.max(1, Math.min(100, Math.floor(quantity || AUTO_FULFILLMENT_TARGETS[productCode])));
+  const minimumQuantity = Math.min(targetQuantity, AUTO_FULFILLMENT_MINIMUMS[productCode]);
+  const profile = { niche, country, city, territory, serviceOffer, idealBuyer };
+
+  const { data: existingAssignments, error: assignmentError } = await supabase
+    .from("premium_prospect_assignments")
+    .select("prospect_id,customer_email,assignment_status")
+    .in("assignment_status", ["assigned", "published"]);
+  if (assignmentError) throw assignmentError;
+  const unavailableIds = new Set((existingAssignments || [])
+    .filter((assignment) => String(assignment.assignment_status) === "published" || normalizedEmail(String(assignment.customer_email || "")) !== email)
+    .map((assignment) => String(assignment.prospect_id)));
+
+  const { data: prospects, error: prospectError } = await supabase
+    .from("premium_imported_prospects")
+    .select("*")
+    .eq("review_status", "approved")
+    .eq("is_test_data", false)
+    .neq("inventory_status", "rejected")
+    .neq("evidence_status", "profile_only")
+    .order("intent_score", { ascending: false })
+    .order("fit_score", { ascending: false })
+    .limit(500);
+  if (prospectError) throw prospectError;
+
+  const selected = ((prospects || []) as ProspectRow[])
+    .filter((prospect) => prospect.id && !unavailableIds.has(String(prospect.id)))
+    .map((prospect) => ({
+      prospect,
+      score: importedProspectAutoMatchScore(prospect, profile),
+    }))
+    .filter((item) => item.score >= 45)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, targetQuantity)
+    .map((item) => item.prospect);
+
+  if (selected.length < minimumQuantity) {
+    await supabase.from("premium_onboarding").update({
+      status: "awaiting_supply",
+      updated_at: new Date().toISOString(),
+    }).eq("id", onboardingId || "");
+    return {
+      ok: true,
+      status: "awaiting_supply" as const,
+      customerEmail: email,
+      productCode,
+      matchedProspects: selected.length,
+      targetQuantity,
+      minimumQuantity,
+    };
+  }
+
+  try {
+    const delivery = await publishProspects({
+      ids: selected.map((prospect) => String(prospect.id)),
+      customerEmail: email,
+      productCode,
+      adminConfirmedCustomer: true,
+      adminNotes: `Automatic fulfillment from paid onboarding${onboardingId ? ` ${onboardingId}` : ""}.`,
+      includeProfileOnly: false,
+      onboardingId,
+    });
+    await supabase.from("premium_onboarding").update({
+      status: "fulfilled",
+      updated_at: new Date().toISOString(),
+    }).eq("id", onboardingId || "");
+    return {
+      ok: true,
+      status: "delivered" as const,
+      customerEmail: email,
+      productCode,
+      matchedProspects: selected.length,
+      targetQuantity,
+      minimumQuantity,
+      delivery,
+    };
+  } catch (error) {
+    await supabase.from("premium_onboarding").update({
+      status: "fulfillment_failed",
+      updated_at: new Date().toISOString(),
+    }).eq("id", onboardingId || "");
+    return {
+      ok: false,
+      status: "failed" as const,
+      customerEmail: email,
+      productCode,
+      matchedProspects: selected.length,
+      targetQuantity,
+      minimumQuantity,
+      error: error instanceof Error ? error.message : "Automatic fulfillment failed.",
+    };
+  }
+}
+
+export async function autoFulfillPendingImportedProspectOnboardings({ limit = 20 }: { limit?: number } = {}) {
+  const supabase = supabaseOrThrow();
+  const { data, error } = await supabase
+    .from("premium_onboarding")
+    .select("*")
+    .in("status", ["submitted", "awaiting_supply", "fulfillment_failed"])
+    .order("created_at", { ascending: true })
+    .limit(Math.max(1, Math.min(100, Math.floor(limit))));
+  if (error) throw error;
+
+  const results = [];
+  for (const onboarding of data || []) {
+    try {
+      results.push(await autoFulfillImportedProspectsForOnboarding({
+        onboardingId: String(onboarding.id),
+        customerEmail: String(onboarding.customer_email || ""),
+        productCode: onboarding.product_code as PremiumProductCode,
+        niche: String(onboarding.niche || ""),
+        country: String(onboarding.country || ""),
+        city: String(onboarding.city || ""),
+        territory: String(onboarding.territory || ""),
+        serviceOffer: String(onboarding.service_offer || ""),
+        idealBuyer: String(onboarding.ideal_buyer || ""),
+      }));
+    } catch (error) {
+      results.push({
+        ok: false,
+        status: "failed" as const,
+        onboardingId: String(onboarding.id || ""),
+        error: error instanceof Error ? error.message : "Automatic fulfillment failed.",
+      });
+    }
+  }
+
+  return {
+    ok: results.every((result) => result.ok),
+    attempted: results.length,
+    delivered: results.filter((result) => result.status === "delivered").length,
+    awaitingSupply: results.filter((result) => result.status === "awaiting_supply").length,
+    failed: results.filter((result) => result.status === "failed").length,
+    results,
+  };
 }
 
 export async function getDeliveredProspectsForCustomer(email: string, token: string) {

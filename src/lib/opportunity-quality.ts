@@ -130,12 +130,18 @@ export type ActiveExclusivity = {
   status: "active" | "released" | "expired";
 };
 
-const directIntentPattern = /\b(request(?:ing)?|rfp|proposal|quote|supplier|vendor|recommend(?:ation)?|looking for|need(?:s|ed)?|seeking|hiring (?:an?|for)|tender|procurement|contractor|agency|consultant|help with|outsourc(?:e|ing))\b/i;
-const opportunityPattern = /\b(expansion|new location|opening|funding|raised|launch(?:ed|ing)?|project|planning application|permit|contract awarded|major hiring|growth|migration|rebrand|new website|implementation)\b/i;
+const directIntentPattern = /\b(rfp|request for proposal|invitation to bid|bid opportunity|tender|procurement|quote request|(?:vendor|contractor|consultant|supplier) needs? to provide|request(?:ing)? (?:quotes?|proposals?|supplier|vendor|contractor|builder|agency|consultant|support|help)|supplier recommendations?|vendor recommendations?|looking for (?:a |an |new |qualified |local |specialist )?(?:supplier|vendor|contractor|builder|agency|consultant|partner|subcontractor|developer|architect|engineer|service|support|help|quotes?|proposals?)|need(?:s|ed)? (?:a |an |new |qualified |local |specialist )?(?:supplier|vendor|contractor|builder|agency|consultant|partner|subcontractor|developer|architect|engineer|service|support|help|quotes?|proposals?)|seeking (?:a |an |new |qualified |local |specialist |for )?(?:supplier|vendor|contractor|builder|agency|consultant|partner|subcontractor|developer|architect|engineer|service|support|help|quotes?|proposals?)|hiring (?:a |an |for |new |qualified |local |specialist )?(?:supplier|vendor|contractor|builder|agency|consultant|partner|subcontractor|developer|architect|engineer|service|support)|help with|outsourc(?:e|ing))\b/i;
+const opportunityPattern = /\b(expansion|new location|opening|raised|launch(?:ed|ing)?|project|planning application|permit|contract awarded|major hiring|growth|migration|rebrand|new website|implementation)\b/i;
 const weakSignalPattern = /\b(marketing|sales|customers|leads|pipeline|operations|manual|delay|broken|slow|booking|contact|reviews|seo|visibility|traffic|conversion)\b/i;
 const relevantRolePattern = /\b(founder|owner|ceo|chief|vp|head|director|manager|partner|principal|operations|marketing|growth|sales|revenue|commercial|procurement|property|construction)\b/i;
 const directoryPattern = /\b(yelp|yellowpages|trustpilot|clutch|g2|capterra|facebook|instagram|linkedin|google|bing|duckduckgo|reddit\.com\/r\/all)\b/i;
 const listiclePattern = /\b(best|top|directory|list|near me|reviews?)\b/i;
+const genericLeadRoundupPattern = /\b(?:industrial leads for the week|leads for the week|weekly leads|lead roundup|opportunity roundup)\b/i;
+const policyGuidanceOnlyPattern = /\b(?:legal guidance|funding guidance|funding requirement|project funding|funding creates|build grants|capture(?:s|d)? [^.]{0,40} grants|programme funding|housing revenue account|appropriation of general fund|public consultation|consultation closes|regulatory guidance|policy update|grant guidance|sprinklers in care homes|refugee housing programme)\b/i;
+const vagueOpportunityTitlePattern = /^(?:empty and under|untitled|unknown|n\/a|none)$/i;
+const publicTenderDirectoryTitlePattern = /^[A-Z]{3,12}-\d+\s+-/i;
+const publicTenderDirectorySourcePattern = /^(?:rfpmart\.com|governmentbids\.com|bidnetdirect\.com|find-tender\.service\.gov\.uk|sam\.gov)$/i;
+const genericProcurementServicePattern = /\b(?:title (?:services|searches|examinations)|property and casualty|insurance broker|commodity brokerage|staff augmentation|vehicle transport|professional legal services|maintenance and repair staff|student athletic|catastrophic accident)\b/i;
 
 export function normalizeText(value: unknown) {
   return String(value || "").replace(/\s+/g, " ").trim().toLowerCase();
@@ -199,6 +205,57 @@ export function isBlockedSourceUrl(url: string) {
   if (host === "linkedin.com" || host.endsWith(".linkedin.com")) return true;
   if (/\/search\b/i.test(parsed.pathname)) return true;
   return false;
+}
+
+function isVisibleNavigatorCardSource(input: Pick<OpportunityInput, "source_type" | "source_url">) {
+  if (input.source_type !== "sales_navigator_visible_card") return false;
+  const normalized = normalizeUrl(input.source_url);
+  if (!normalized) return false;
+  try {
+    const parsed = new URL(normalized);
+    const host = parsed.hostname.replace(/^www\./, "");
+    return (host === "linkedin.com" || host.endsWith(".linkedin.com"))
+      && /^\/(?:sales\/lead|sales\/company|in|company)\//i.test(parsed.pathname);
+  } catch {
+    return false;
+  }
+}
+
+function sourceUrlCountsAsEvidence(input: Pick<OpportunityInput, "source_type" | "source_url">) {
+  return Boolean(input.source_url && (!isBlockedSourceUrl(input.source_url) || isVisibleNavigatorCardSource(input)));
+}
+
+export function hasLowValueOpportunityEvidence(value: unknown) {
+  const raw = String(value || "").trim();
+  const text = normalizeText(raw);
+  return Boolean(
+    text
+      && (
+        genericLeadRoundupPattern.test(text)
+        || policyGuidanceOnlyPattern.test(text)
+        || publicTenderDirectoryTitlePattern.test(raw)
+        || genericProcurementServicePattern.test(text)
+      )
+  );
+}
+
+export function opportunityDeliveryQualityFlags(input: Pick<OpportunityInput, "company_name" | "source_url" | "source_title" | "source_text">) {
+  const flags: string[] = [];
+  const title = String(input.source_title || "").trim();
+  const evidence = [input.company_name, title, input.source_text].filter(Boolean).join(" ");
+  const sourceHost = domainFromUrl(input.source_url);
+
+  if (vagueOpportunityTitlePattern.test(title) || vagueOpportunityTitlePattern.test(String(input.company_name || "").trim())) {
+    flags.push("vague_opportunity_record");
+  }
+  if (genericLeadRoundupPattern.test(evidence)) flags.push("generic_lead_roundup");
+  if (policyGuidanceOnlyPattern.test(evidence)) flags.push("policy_or_guidance_only");
+  if (genericProcurementServicePattern.test(evidence)) flags.push("generic_procurement_service");
+  if (publicTenderDirectorySourcePattern.test(sourceHost) || publicTenderDirectoryTitlePattern.test(title)) {
+    flags.push("public_tender_directory_without_named_buyer");
+  }
+
+  return Array.from(new Set(flags));
 }
 
 export function buildOpportunityDedupeKeys(input: OpportunityInput) {
@@ -319,9 +376,11 @@ export function calculateOpportunityScores(input: OpportunityInput, profile?: Pa
 
   let evidence = 0;
   let evidenceStatus: EvidenceStatus = input.evidence_status || "unavailable";
-  if (input.source_url && !isBlockedSourceUrl(input.source_url)) {
+  if (sourceUrlCountsAsEvidence(input)) {
     evidence += 25;
-    evidenceReasons.push("Source URL is present and not a blocked search or social-login source.");
+    evidenceReasons.push(input.source_type === "sales_navigator_visible_card"
+      ? "Visible Sales Navigator card URL is stored as controlled provenance."
+      : "Source URL is present and not a blocked search or social-login source.");
   }
   if (normalizeText(input.source_text).length >= 40) {
     evidence += 20;
@@ -385,11 +444,12 @@ export function qualifyOpportunity(input: OpportunityInput, scores: OpportunityS
   const maxAge = profile?.maximum_record_age_days || 90;
   const ageDays = sourceDate ? Math.max(0, Math.floor((now.getTime() - Date.parse(sourceDate)) / 86_400_000)) : 9999;
 
+  flags.push(...opportunityDeliveryQualityFlags(input));
   if (input.is_test_data) flags.push("test_data");
   if (!normalizeText(input.company_name)) flags.push("missing_company");
   if (domain && isFakeOrExampleDomain(domain)) flags.push("fake_or_example_domain");
   if (!input.company_website && !input.source_url) flags.push("missing_company_reference");
-  if (!input.source_url || isBlockedSourceUrl(input.source_url)) flags.push("broken_or_blocked_source_url");
+  if (!sourceUrlCountsAsEvidence(input)) flags.push("broken_or_blocked_source_url");
   if (!normalizeText(input.source_text)) flags.push("empty_evidence");
   if (directoryPattern.test(input.source_url || "") && listiclePattern.test(`${input.source_title || ""} ${input.source_text || ""}`)) flags.push("directory_or_listicle_only");
   if (scores.intent_category === "profile_only" && !profile?.allow_profile_only) flags.push("profile_only_not_allowed");
@@ -400,14 +460,15 @@ export function qualifyOpportunity(input: OpportunityInput, scores: OpportunityS
   if (scores.evidence_score < (profile?.minimum_evidence_score || 50)) flags.push("evidence_below_minimum");
   if (scores.overall_score < 55) flags.push("overall_below_minimum");
 
-  const qualified = flags.length === 0;
+  const qualityFlags = Array.from(new Set(flags));
+  const qualified = qualityFlags.length === 0;
   return {
     qualified,
     inventory_status: qualified ? "IN_INVENTORY" : ageDays > maxAge ? "EXPIRED" : "REJECTED",
     review_status: qualified ? "approved" : "rejected",
     verification_status: qualified ? "QUALIFIED" : ageDays > maxAge ? "EXPIRED" : "REJECTED",
-    rejection_reason: qualified ? "" : flags.join(", "),
-    quality_flags: flags,
+    rejection_reason: qualified ? "" : qualityFlags.join(", "),
+    quality_flags: qualityFlags,
   };
 }
 
@@ -461,6 +522,8 @@ export function matchOpportunityToProfile(opportunity: MatchableOpportunity, pro
   if (profile.status === "paused") return { matched: false, reasons: ["Profile is paused."] };
   if (!["QUALIFIED", "IN_INVENTORY"].includes(opportunity.inventory_status)) return { matched: false, reasons: [`Inventory status is ${opportunity.inventory_status}.`] };
   if (opportunity.is_test_data) return { matched: false, reasons: ["Test data is excluded."] };
+  const deliveryQualityFlags = opportunityDeliveryQualityFlags(opportunity);
+  if (deliveryQualityFlags.length > 0) return { matched: false, reasons: deliveryQualityFlags.map((flag) => `Delivery quality blocker: ${flag.replaceAll("_", " ")}.`) };
   if (opportunity.previously_delivered_to?.includes(profile.customer_email)) return { matched: false, reasons: ["Customer already received this opportunity."] };
   if (opportunity.fit_score < profile.minimum_fit_score) return { matched: false, reasons: ["Fit score is below profile minimum."] };
   if (opportunity.intent_score < profile.minimum_intent_score) return { matched: false, reasons: ["Intent score is below profile minimum."] };

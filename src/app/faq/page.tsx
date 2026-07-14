@@ -14,8 +14,8 @@ const proofPoints = [
   "Radar at €299/month",
   "Growth Desk at €750/month",
   "Stripe card checkout",
-  "Server-side entitlements",
-  "Brevo onboarding and delivery e-mails",
+  "Secure customer access",
+  "Onboarding and delivery e-mails",
 ];
 
 export default function FAQPage() {
@@ -51,7 +51,7 @@ export default function FAQPage() {
               <ShieldCheck className="h-6 w-6" />
               <h2 className="mt-3 text-xl font-semibold">Clear buying terms</h2>
               <p className="mt-2 text-sm leading-6">
-                Proof Pack, Radar, and Growth Desk are distinct product codes with separate Stripe modes, entitlements, and onboarding paths.
+                Proof Pack is a one-off purchase. Radar and Growth Desk are monthly subscriptions with their own onboarding and delivery experience.
               </p>
             </div>
 

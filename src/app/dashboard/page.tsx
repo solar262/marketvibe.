@@ -1,14 +1,22 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { ArrowRight, BriefcaseBusiness, Download, FileCheck2, LockKeyhole, Radar, ShieldCheck } from "lucide-react";
 import { getPremiumEntitlements, getProofPackItems } from "@/lib/premium-persistence";
 import { premiumProductLabel, type PremiumProductCode } from "@/lib/premium-products";
 import { getDeliveredProspectsForCustomer, type DeliveredProspect } from "@/lib/sales-navigator-persistence";
 import { resolveCustomerAccess } from "@/lib/customer-access";
 import { BillingPortalButton } from "@/components/BillingPortalButton";
-import { ReplacementRequestForm } from "@/components/ReplacementRequestForm";
-import { getCustomerOpportunityDeliveries } from "@/lib/opportunity-engine";
+import { OpportunityFeedbackForm } from "@/components/OpportunityFeedbackForm";
+import { customerFeedbackStatusFromMatchReason, getCustomerOpportunityDeliveries } from "@/lib/opportunity-engine";
 
 const products: PremiumProductCode[] = ["proof_pack", "radar", "growth_desk"];
+
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 function asProductCode(value: unknown): PremiumProductCode | null {
   return value === "proof_pack" || value === "radar" || value === "growth_desk" ? value : null;
@@ -47,7 +55,7 @@ export default async function DashboardPage({
             <p className="text-sm font-semibold text-[#a855f7]">Dashboard</p>
             <h1 className="mt-2 font-serif text-4xl font-semibold tracking-tight">MarketVibe Workspace</h1>
             <p className="mt-2 max-w-2xl text-violet-100/70">
-              Access is based on active paid entitlements tied to your billing email.
+              Access is based on your paid MarketVibe purchase and secure customer link.
             </p>
           </div>
           <Link href="/pricing" className="inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-violet-950/30 transition hover:brightness-110">
@@ -60,7 +68,7 @@ export default async function DashboardPage({
             <LockKeyhole className="h-6 w-6 text-[#a855f7]" />
             <h2 className="mt-4 text-xl font-semibold">Use your secure access link</h2>
             <p className="mt-2 text-sm leading-6 text-violet-100/65">
-              Paid dashboards require the secure link from checkout or your MarketVibe access email. Email alone is not enough to open customer data.
+              Paid workspaces require the secure link from checkout or your MarketVibe access email. Email alone is not enough to open customer data.
             </p>
             <Link href="/contact?offer=access-help" className="mt-4 inline-flex rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-500 px-5 py-3 text-sm font-bold text-white hover:brightness-110">
               Get access help
@@ -71,7 +79,7 @@ export default async function DashboardPage({
         {canLoadPaidWorkspace && !hasAccess && (
           <section className="mt-8 rounded-lg border border-amber-300/20 bg-amber-300/10 p-6 text-amber-50">
             <LockKeyhole className="h-7 w-7" />
-            <h2 className="mt-4 text-2xl font-semibold">No active paid entitlement found</h2>
+            <h2 className="mt-4 text-2xl font-semibold">No active paid access found</h2>
             <p className="mt-2 max-w-2xl leading-7">
               We checked {email}, but did not find active Proof Pack, Radar, or Growth Desk access. Use the same email from checkout or return to pricing.
             </p>
@@ -96,7 +104,7 @@ export default async function DashboardPage({
                         {product === "proof_pack"
                           ? `${proofItems.length} delivered proof-pack rows`
                           : product === "radar"
-                            ? "Recurring buyer-intent dashboard access"
+                            ? "Recurring buyer-intent workspace access"
                             : "Managed niche and territory delivery"}
                       </p>
                     </div>
@@ -121,12 +129,13 @@ export default async function DashboardPage({
                 <div className="mt-5 grid gap-3">
                   {opportunityItems.length === 0 ? (
                     <p className="rounded-lg border border-white/10 bg-black/20 p-4 text-sm leading-6 text-violet-100/70">
-                      No autonomous opportunity deliveries are published yet. MarketVibe only publishes records after source, evidence, scoring, freshness, and matching checks pass.
+                      No opportunity deliveries are ready yet. MarketVibe publishes only when there is enough relevant context for your profile.
                     </p>
                   ) : (
                     opportunityItems.slice(0, 30).map((assignment: Record<string, unknown>) => {
                       const item = (assignment.opportunities || {}) as Record<string, unknown>;
                       const scoreReasons = item.score_reasons && typeof item.score_reasons === "object" ? item.score_reasons as Record<string, unknown> : {};
+                      const feedbackStatus = customerFeedbackStatusFromMatchReason(assignment.match_reason);
                       return (
                         <div key={String(assignment.id)} className="rounded-lg border border-white/10 bg-black/20 p-4">
                           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -150,7 +159,7 @@ export default async function DashboardPage({
                             {item.source_url ? <Link href={String(item.source_url)} className="text-violet-200 hover:text-white">Source evidence</Link> : null}
                           </div>
                           <p className="mt-3 text-xs text-violet-100/50">Found {String(item.captured_at || "").slice(0, 10)} · verified {String(item.last_verified_at || "pending").slice(0, 10)} · delivered {String(assignment.delivered_at || "").slice(0, 10)}</p>
-                          <ReplacementRequestForm assignmentId={String(assignment.id)} email={email} accessToken={accessToken} sessionId={sessionId} />
+                          <OpportunityFeedbackForm assignmentId={String(assignment.id)} email={email} accessToken={accessToken} sessionId={sessionId} initialStatus={feedbackStatus} />
                         </div>
                       );
                     })
@@ -162,7 +171,7 @@ export default async function DashboardPage({
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h2 className="text-xl font-semibold">Proof Pack delivery</h2>
-                    <p className="mt-1 text-sm text-violet-100/65">Rows are created from verified saved live signals when available.</p>
+                    <p className="mt-1 text-sm text-violet-100/65">Rows are created from source-backed live signals when available.</p>
                   </div>
                   {proofItems.length > 0 && proofCsvParams.toString() && (
                     <Link href={`/api/proof-pack/csv?${proofCsvParams.toString()}`} className="inline-flex items-center gap-2 rounded-lg border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">
@@ -173,7 +182,7 @@ export default async function DashboardPage({
                 <div className="mt-5 grid gap-3">
                   {proofItems.length === 0 ? (
                     <p className="rounded-lg border border-white/10 bg-black/20 p-4 text-sm leading-6 text-violet-100/70">
-                      No proof-pack rows are ready yet. If you just submitted onboarding, delivery will complete once verified saved signals are available.
+                      No proof-pack rows are ready yet. If you just submitted onboarding, delivery will complete once relevant source-backed signals are available.
                     </p>
                   ) : (
                     proofItems.slice(0, 10).map((item: { id: string; business_name: string; intent_score: number; pain_point: string; source_url?: string | null }) => (
@@ -224,14 +233,14 @@ export default async function DashboardPage({
 
               {hasAccess && <div className="rounded-lg border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
                 <ShieldCheck className="h-6 w-6 text-[#a855f7]" />
-                <h2 className="mt-4 text-xl font-semibold">Entitlement check</h2>
+                <h2 className="mt-4 text-xl font-semibold">Access check</h2>
                 <p className="mt-2 text-sm leading-6 text-violet-100/65">
-                  This workspace did not grant access from an email-only query or plan parameter. It loaded active product rows for {email} after secure access verification.
+                  This workspace is protected by your secure customer access link for {email}.
                 </p>
                 <div className="mt-5 grid gap-2 text-sm text-violet-100/80">
                   {entitlements.map((item: { id: string; product_code: string; status: string }) => (
                     <p key={item.id} className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
-                      {item.product_code} · {item.status}
+                      {premiumProductLabel(asProductCode(item.product_code) || "proof_pack")} · {item.status}
                     </p>
                   ))}
                 </div>

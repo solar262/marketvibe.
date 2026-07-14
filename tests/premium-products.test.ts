@@ -167,6 +167,13 @@ const radarCronSource = readFileSync(join(process.cwd(), "src", "app", "api", "c
 assert.match(radarCronSource, /requireCron/, "Daily Radar email cron must be protected by cron authentication.");
 const radarEmailSource = readFileSync(join(process.cwd(), "src", "lib", "radar-email.ts"), "utf8");
 assert.match(radarEmailSource, /SENDGRID_DAILY_RADAR_TEMPLATE_ID/, "Daily Radar email must use a SendGrid template ID.");
+const checkoutRouteSource = readFileSync(join(process.cwd(), "src", "app", "api", "checkout", "route.ts"), "utf8");
+assert.match(checkoutRouteSource, /Checkout is temporarily unavailable/, "Production checkout must fail closed when Stripe is not configured.");
+assert.match(checkoutRouteSource, /process\.env\.NODE_ENV === "production"/, "Demo checkout fallback must not run in production.");
+const autopilotCronSource = readFileSync(join(process.cwd(), "src", "app", "api", "cron", "autopilot", "route.ts"), "utf8");
+assert.match(autopilotCronSource, /requireCron/, "Autopilot cron route must be protected by cron authentication.");
+const vercelConfigSource = readFileSync(join(process.cwd(), "vercel.json"), "utf8");
+assert.doesNotMatch(vercelConfigSource, /\/api\/cron\/autopilot/, "Placeholder autopilot cron must not be scheduled in production.");
 const migrationSource = readFileSync(join(process.cwd(), "supabase", "migrations", "0011_proof_pack_radar_email.sql"), "utf8");
 assert.match(migrationSource, /create table if not exists sample_requests/, "Proof-Pack checkout migration must create sample_requests.");
 assert.match(migrationSource, /create table if not exists lead_vault/, "Daily Radar migration must create lead_vault.");
