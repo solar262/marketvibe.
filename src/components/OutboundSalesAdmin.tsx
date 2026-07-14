@@ -55,6 +55,9 @@ export function OutboundSalesAdmin({ initialLeads, overview, filters }: Props) {
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [autopilotMessage, setAutopilotMessage] = useState("");
+  const [autopilotError, setAutopilotError] = useState("");
+  const [dryRunPassed, setDryRunPassed] = useState(false);
 
   const selectedIds = useMemo(() => Object.entries(selected).filter(([, checked]) => checked).map(([id]) => id), [selected]);
 
@@ -109,8 +112,10 @@ export function OutboundSalesAdmin({ initialLeads, overview, filters }: Props) {
 
   async function runAutopilot(dryRun: boolean) {
     setBusy(dryRun ? "autopilot-dry" : "autopilot");
-    setError("");
-    setMessage("");
+    setAutopilotError("");
+    setAutopilotMessage("");
+    if (dryRun) setDryRunPassed(false);
+
     try {
       const response = await fetch("/api/admin/outbound/autopilot", {
         method: "POST",
@@ -119,11 +124,37 @@ export function OutboundSalesAdmin({ initialLeads, overview, filters }: Props) {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Autopilot failed.");
+
       const summary = data.autopilot || {};
-      setMessage(`Autopilot ${dryRun ? "dry run" : "run"}: discovered ${summary.discovered || 0}, imported ${summary.imported || 0}, approved ${summary.approved || 0}, queued ${summary.queued || 0}, failed ${summary.failed || 0}.`);
-      if (!dryRun) window.setTimeout(() => window.location.reload(), 1200);
-    } catch (autopilotError) {
-      setError(autopilotError instanceof Error ? autopilotError.message : "Autopilot failed.");
+      const qualifiedSignals = Number(summary.qualifiedSignals || 0);
+      const discovered = Number(summary.discovered || 0);
+      const matched = Number(summary.matched || 0);
+      const imported = Number(summary.imported || 0);
+      const approved = Number(summary.approved || 0);
+      const queued = Number(summary.queued || 0);
+      const failed = Number(summary.failed || 0);
+      const inventoryError = String(summary.inventoryError || "").trim();
+
+      if (inventoryError) {
+        setAutopilotError(`Stopped safely: ${inventoryError}`);
+        return;
+      }
+
+      if (qualifiedSignals === 0) {
+        setAutopilotError("Stopped safely: no qualified buyer-intent signals are available.");
+        return;
+      }
+
+      const resultText = `${dryRun ? "Dry run" : "Autopilot run"} complete — qualified signals: ${qualifiedSignals}, prospects discovered: ${discovered}, matches: ${matched}, imported: ${imported}, approved: ${approved}, queued: ${queued}, failed: ${failed}.`;
+      setAutopilotMessage(resultText);
+
+      if (dryRun) {
+        setDryRunPassed(matched > 0 && failed === 0);
+      } else {
+        window.setTimeout(() => window.location.reload(), 1200);
+      }
+    } catch (autopilotRunError) {
+      setAutopilotError(autopilotRunError instanceof Error ? autopilotRunError.message : "Autopilot failed.");
     } finally {
       setBusy("");
     }
@@ -160,7 +191,7 @@ export function OutboundSalesAdmin({ initialLeads, overview, filters }: Props) {
               <h2 className="font-semibold text-emerald-950">Outbound autopilot</h2>
             </div>
             <p className="mt-2 text-sm leading-6 text-emerald-900">
-              Runs on schedule without manual copy/paste: finds public UK/US B2B buyer prospects, imports them, approves eligible business contacts, queues the cold sequence, and lets the email cron send within the daily cap.
+              Matches public UK/US B2B prospects to qualified source-backed buyer-intent signals. Nothing is imported or queued unless a valid match exists.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -168,12 +199,28 @@ export function OutboundSalesAdmin({ initialLeads, overview, filters }: Props) {
               {busy === "autopilot-dry" && <Loader2 className="h-4 w-4 animate-spin" />}
               Dry run
             </button>
-            <button type="button" onClick={() => runAutopilot(false)} disabled={busy === "autopilot"} className="inline-flex items-center gap-2 rounded-md bg-emerald-800 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-900 disabled:opacity-60">
+            <button
+              type="button"
+              onClick={() => runAutopilot(false)}
+              disabled={busy === "autopilot" || !dryRunPassed}
+              title={dryRunPassed ? "Run the verified matched batch" : "Complete a successful dry run with at least one match first"}
+              className="inline-flex items-center gap-2 rounded-md bg-emerald-800 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-50"
+            >
               {busy === "autopilot" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
               Run autopilot
             </button>
           </div>
         </div>
+
+        {(autopilotMessage || autopilotError) && (
+          <div className={`mt-4 rounded-md border p-3 text-sm font-semibold ${autopilotError ? "border-red-200 bg-red-50 text-red-900" : "border-emerald-300 bg-white text-emerald-950"}`}>
+            {autopilotError || autopilotMessage}
+          </div>
+        )}
+
+        {!dryRunPassed && !autopilotMessage && !autopilotError && (
+          <p className="mt-3 text-xs font-medium text-emerald-800">Run autopilot stays locked until a Dry run confirms at least one safe match.</p>
+        )}
       </section>
 
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
