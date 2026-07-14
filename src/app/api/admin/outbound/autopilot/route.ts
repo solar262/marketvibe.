@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdminJson, safeApiError } from "@/lib/admin-api";
 import { runOutboundAutopilot } from "@/lib/outbound-autopilot";
-import { processDueSalesEmails, salesOutboundRunLimit } from "@/lib/sales-pipeline";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -19,16 +18,32 @@ export async function POST(request: Request) {
   if (unauthorized) return unauthorized;
 
   try {
-    const body = await request.json().catch(() => ({})) as { dryRun?: boolean; markets?: number; leadsPerMarket?: number };
+    const body = await request.json().catch(() => ({})) as {
+      dryRun?: boolean;
+      markets?: number;
+      leadsPerMarket?: number;
+    };
+
     const dryRun = Boolean(body.dryRun);
+
     const autopilot = await runOutboundAutopilot({
       dryRun,
-      markets: optionalSafeNumber(body.markets, 1, 8),
-      leadsPerMarket: optionalSafeNumber(body.leadsPerMarket, 1, 10),
+      markets: optionalSafeNumber(body.markets, 1, 2) ?? 1,
+      leadsPerMarket: optionalSafeNumber(body.leadsPerMarket, 1, 3) ?? 2,
       queue: true,
     });
-    const emails = dryRun ? { processed: 0, sent: 0, skipped: 0, failed: 0 } : await processDueSalesEmails({ limit: salesOutboundRunLimit() });
-    return NextResponse.json({ ok: autopilot.failed === 0, autopilot, emails });
+
+    return NextResponse.json({
+      ok: autopilot.failed === 0,
+      autopilot,
+      emails: {
+        processed: 0,
+        sent: 0,
+        skipped: 0,
+        failed: 0,
+        note: "Email sending runs separately through the email cron.",
+      },
+    });
   } catch (error) {
     return safeApiError(error, "Outbound autopilot failed.");
   }
