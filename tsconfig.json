@@ -20,6 +20,7 @@
     ],
     "paths": {
       "@/lib/opportunity-engine": ["./src/lib/opportunity-engine-outbound-compat.ts"],
+      "@/lib/sales-pipeline": ["./src/lib/sales-pipeline-outbound-compat.ts"],
       "@/*": ["./src/*"]
     }
   },
