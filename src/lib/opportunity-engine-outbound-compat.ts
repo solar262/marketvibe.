@@ -40,7 +40,7 @@ function firstText(row: OpportunityRow, keys: string[]) {
   return "";
 }
 
-function normalizeInventoryRow(row: unknown) {
+function normalizeInventoryRow(row: any): any {
   if (!row || typeof row !== "object" || Array.isArray(row)) return row;
 
   const item = row as OpportunityRow;
@@ -87,7 +87,7 @@ function normalizeInventoryRow(row: unknown) {
   };
 }
 
-export async function listInventory(filters: Record<string, string> = {}) {
+export async function listInventory(filters: Record<string, string> = {}): Promise<any[]> {
   const rows = await listInventoryBase(filters);
   return rows.map(normalizeInventoryRow);
 }
