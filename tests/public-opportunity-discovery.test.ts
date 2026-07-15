@@ -45,6 +45,18 @@ const candidate = gdeltArticleToProfileCandidate({
 assert.ok(candidate);
 assert.equal(candidate.source_type, "public_buyer_intent_news");
 assert.equal(candidate.company_name, "Acme");
+assert.equal(candidate.niche, profile.niche);
+assert.equal(candidate.company_location, "Vienna, Austria");
+
+const relevantWithoutLocation = gdeltArticleToProfileCandidate({
+  url: "https://example-news.com/technology/acme-seeking-crm-implementation-partner",
+  title: "Acme seeking CRM implementation partner",
+  seendate: "20260715T083000Z",
+  domain: "example-news.com",
+}, profile);
+assert.ok(relevantWithoutLocation);
+assert.equal(relevantWithoutLocation.company_location, null);
+assert.equal(relevantWithoutLocation.target_location, null);
 
 const irrelevant = gdeltArticleToProfileCandidate({
   url: "https://example-news.com/sport/vienna-football-results",
@@ -54,17 +66,25 @@ const irrelevant = gdeltArticleToProfileCandidate({
 assert.equal(irrelevant, null);
 
 assert.equal(isDeliverableBuyerIntentOpportunity({
+  source_type: "public_buyer_intent_news",
   source_url: "https://example-news.com/acme",
   source_title: "Acme seeking CRM implementation partner",
   source_text: "Acme is seeking a CRM implementation partner for a migration project.",
   intent_category: "verified_direct_intent",
+  evidence_status: "public_signal_verified",
+  verification_status: "QUALIFIED",
+  review_status: "approved",
   is_test_data: false,
 }), true);
 
 assert.equal(isDeliverableBuyerIntentOpportunity({
+  source_type: "public_buyer_intent_news",
   source_url: "https://example-news.com/acme",
-  source_text: "Acme company profile",
-  intent_category: "profile_only",
+  source_text: "Acme is seeking a CRM implementation partner.",
+  intent_category: "verified_direct_intent",
+  evidence_status: "profile_only",
+  verification_status: "VALIDATING",
+  review_status: "pending",
   is_test_data: false,
 }), false);
 
