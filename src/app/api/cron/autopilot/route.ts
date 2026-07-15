@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { sendTransactionalEmail } from "@/lib/brevo";
 import { ensureBuyerPipelineJobs } from "@/lib/buyer-pipeline-recovery";
 import { requireCron } from "@/lib/cron-auth";
+import { fillDueCustomerShortages } from "@/lib/delivery-cadence";
 import {
   backfillImportedBuyerCompanies,
   runBuyerPipelineWorker,
 } from "@/lib/operations-pipeline";
 import {
-  fillCustomerShortages,
   getOpportunityEngineSummary,
   publishDueOpportunityDeliveries,
   refreshStaleOpportunities,
@@ -135,7 +135,7 @@ export async function GET(request: Request) {
     runOpportunityVerification({ trigger: "cron" })));
 
   steps.push(await runStep("customer-shortage-recovery", () =>
-    fillCustomerShortages({ trigger: "cron" })));
+    fillDueCustomerShortages({ trigger: "cron" })));
 
   steps.push(await runStep("stale-opportunity-replacement", () =>
     refreshStaleOpportunities({ trigger: "cron" })));
