@@ -44,10 +44,16 @@ function profileFromRow(row: Record<string, unknown>): CustomerSearchProfile {
   };
 }
 
-function deliveryWindowMs(frequency: CustomerSearchProfile["delivery_frequency"]) {
-  if (frequency === "daily") return 24 * 3_600_000;
-  if (frequency === "monthly") return 30 * 24 * 3_600_000;
-  return 7 * 24 * 3_600_000;
+function periodStart(frequency: CustomerSearchProfile["delivery_frequency"], now: Date) {
+  if (frequency === "daily") {
+    return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  }
+  if (frequency === "monthly") {
+    return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
+  }
+  const day = now.getUTCDay();
+  const daysSinceMonday = (day + 6) % 7;
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysSinceMonday);
 }
 
 export function remainingOpportunityQuantity(
@@ -63,7 +69,7 @@ export function remainingOpportunityQuantity(
         const timestamp = assignment.delivered_at || assignment.assigned_at || assignment.created_at;
         if (!timestamp) return false;
         const parsed = Date.parse(timestamp);
-        return Number.isFinite(parsed) && parsed >= now.getTime() - deliveryWindowMs(profile.delivery_frequency);
+        return Number.isFinite(parsed) && parsed >= periodStart(profile.delivery_frequency, now);
       }).length;
   return Math.max(0, profile.opportunity_quantity - counted);
 }
