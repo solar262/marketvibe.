@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { getLatestSavedLeads } from "@/lib/lead-persistence";
 import { sendTransactionalEmail } from "@/lib/brevo";
-import { recordPremiumOnboarding, saveProofPackItems } from "@/lib/premium-persistence";
+import { recordPremiumOnboarding } from "@/lib/premium-persistence";
 import { isPremiumProductCode, premiumProductLabel } from "@/lib/premium-products";
 import { verifyPremiumAccess } from "@/lib/premium-access";
 import { appendCustomerAccessParams, createCustomerAccessToken } from "@/lib/customer-access";
@@ -81,25 +80,6 @@ export async function POST(request: Request) {
     searchProfileId = profile.profileId;
   }
 
-  let savedPackItems = 0;
-  if (productCode === "proof_pack" && onboarding.onboardingId) {
-    const leads = (await getLatestSavedLeads(80))
-      .filter((lead) => lead.sourceStatus === "live")
-      .filter((lead) => lead.sourceUrl || lead.googleProfileUrl || lead.website)
-      .filter((lead) => {
-        const text = `${lead.businessCategory} ${lead.city} ${lead.country} ${lead.audit.summary}`.toLowerCase();
-        return text.includes(String(payload.niche || "").toLowerCase().split(" ")[0]) || text.includes(String(payload.country || "").toLowerCase());
-      })
-      .slice(0, 30);
-
-    const result = await saveProofPackItems({
-      onboardingId: onboarding.onboardingId,
-      email: access.email || email,
-      leads,
-    });
-    savedPackItems = result.count;
-  }
-
   try {
     const accessToken = createCustomerAccessToken(access.email || email);
     const dashboardUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://www.marketvibe1.com"}${appendCustomerAccessParams("/dashboard", access.email || email, accessToken)}`;
@@ -109,10 +89,8 @@ export async function POST(request: Request) {
       htmlContent: `
         <p>Your ${premiumProductLabel(productCode)} onboarding has been received.</p>
         <p>${productCode === "proof_pack"
-          ? savedPackItems > 0
-            ? `We found ${savedPackItems} verified saved opportunities for your pack. Your dashboard and CSV are ready.`
-            : "We are processing verified opportunities. We will not pad your pack with fabricated companies or source links."
-          : "Your access is being prepared from your niche and territory details."
+          ? "We are matching verified opportunities to your brief. Your PDF, dashboard, and CSV will be delivered after source, evidence, scoring, freshness, and matching checks pass."
+          : "Your access is being prepared from your niche and territory details. Verified opportunity deliveries will appear in your secure dashboard."
         }</p>
         <p><a href="${dashboardUrl}">Open your dashboard</a></p>
       `,
@@ -126,7 +104,7 @@ export async function POST(request: Request) {
     ok: true,
     onboardingId: onboarding.onboardingId,
     searchProfileId,
-    savedPackItems,
+    savedPackItems: 0,
     dashboardUrl: appendCustomerAccessParams("/dashboard", access.email || email, createCustomerAccessToken(access.email || email)),
   });
 }

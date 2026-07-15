@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, BriefcaseBusiness, Download, FileCheck2, LockKeyhole, Radar, ShieldCheck } from "lucide-react";
-import { getPremiumEntitlements, getProofPackItems } from "@/lib/premium-persistence";
+import { getPremiumEntitlements } from "@/lib/premium-persistence";
 import { premiumProductLabel, type PremiumProductCode } from "@/lib/premium-products";
 import { getDeliveredProspectsForCustomer, type DeliveredProspect } from "@/lib/sales-navigator-persistence";
 import { resolveCustomerAccess } from "@/lib/customer-access";
@@ -25,7 +25,6 @@ export default async function DashboardPage({
   const email = customerAccess.ok ? customerAccess.email : requestedEmail;
   const canLoadPaidWorkspace = Boolean(customerAccess.ok && customerAccess.email);
   const entitlements = canLoadPaidWorkspace ? await getPremiumEntitlements(email).catch(() => []) : [];
-  const proofItems = canLoadPaidWorkspace ? await getProofPackItems(email).catch(() => []) : [];
   const importedItems: DeliveredProspect[] = email && deliveryToken ? await getDeliveredProspectsForCustomer(email, deliveryToken).catch(() => []) : [];
   const opportunityItems = canLoadPaidWorkspace ? await getCustomerOpportunityDeliveries(email).catch(() => []) : [];
   const activeProducts = new Set(
@@ -34,10 +33,13 @@ export default async function DashboardPage({
       .filter((value): value is PremiumProductCode => Boolean(value)),
   );
   const hasAccess = canLoadPaidWorkspace && activeProducts.size > 0;
-  const proofCsvParams = new URLSearchParams();
-  if (email) proofCsvParams.set("email", email);
-  if (accessToken) proofCsvParams.set("access_token", accessToken);
-  if (sessionId) proofCsvParams.set("session_id", sessionId);
+  const hasProofPackDeliveries = opportunityItems.some(
+    (assignment: Record<string, unknown>) => assignment.product_code === "proof_pack",
+  );
+  const accessParams = new URLSearchParams();
+  if (email) accessParams.set("email", email);
+  if (accessToken) accessParams.set("access_token", accessToken);
+  if (sessionId) accessParams.set("session_id", sessionId);
 
   return (
     <main className="min-h-screen bg-[#08030f] px-4 py-10 text-white sm:px-6 lg:px-8">
@@ -87,17 +89,22 @@ export default async function DashboardPage({
               <section className="mt-8 grid gap-4 md:grid-cols-3">
                 {products.map((product) => {
                   const active = activeProducts.has(product);
+                  const deliveredCount = opportunityItems.filter(
+                    (assignment: Record<string, unknown>) => assignment.product_code === product,
+                  ).length;
                   return (
                     <div key={product} className={`rounded-lg border p-5 shadow-xl shadow-black/10 backdrop-blur-xl ${active ? "border-violet-300/30 bg-white/8" : "border-white/10 bg-white/5 opacity-60"}`}>
                       {product === "proof_pack" ? <FileCheck2 className="h-6 w-6 text-[#a855f7]" /> : product === "radar" ? <Radar className="h-6 w-6 text-[#a855f7]" /> : <BriefcaseBusiness className="h-6 w-6 text-[#a855f7]" />}
                       <p className="mt-4 text-sm font-semibold text-violet-200">{premiumProductLabel(product)}</p>
                       <p className="mt-2 text-2xl font-semibold">{active ? "Active" : "Not active"}</p>
                       <p className="mt-2 text-sm leading-6 text-violet-100/65">
-                        {product === "proof_pack"
-                          ? `${proofItems.length} delivered proof-pack rows`
+                        {active
+                          ? `${deliveredCount} verified ${deliveredCount === 1 ? "opportunity" : "opportunities"} delivered`
                           : product === "radar"
-                            ? "Recurring buyer-intent dashboard access"
-                            : "Managed niche and territory delivery"}
+                            ? "Recurring verified opportunity delivery"
+                            : product === "growth_desk"
+                              ? "Managed niche and territory delivery"
+                              : "One-off verified opportunity pack"}
                       </p>
                     </div>
                   );
@@ -110,18 +117,25 @@ export default async function DashboardPage({
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h2 className="text-xl font-semibold">Verified opportunity delivery</h2>
-                    <p className="mt-1 text-sm text-violet-100/65">Source-backed opportunities matched to your onboarding profile.</p>
+                    <p className="mt-1 text-sm text-violet-100/65">The single source for opportunities matched to your onboarding profile.</p>
                   </div>
                   {opportunityItems.length > 0 && (
-                    <Link href={`/api/opportunities/csv?${proofCsvParams.toString()}`} className="inline-flex items-center gap-2 rounded-lg border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">
-                      <Download className="h-4 w-4" /> Opportunity CSV
-                    </Link>
+                    <div className="flex flex-wrap gap-2">
+                      {activeProducts.has("proof_pack") && hasProofPackDeliveries && (
+                        <Link href={`/api/proof-pack/pdf?${accessParams.toString()}`} className="inline-flex items-center gap-2 rounded-lg border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">
+                          <Download className="h-4 w-4" /> Proof Pack PDF
+                        </Link>
+                      )}
+                      <Link href={`/api/opportunities/csv?${accessParams.toString()}`} className="inline-flex items-center gap-2 rounded-lg border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">
+                        <Download className="h-4 w-4" /> Opportunity CSV
+                      </Link>
+                    </div>
                   )}
                 </div>
                 <div className="mt-5 grid gap-3">
                   {opportunityItems.length === 0 ? (
                     <p className="rounded-lg border border-white/10 bg-black/20 p-4 text-sm leading-6 text-violet-100/70">
-                      No autonomous opportunity deliveries are published yet. MarketVibe only publishes records after source, evidence, scoring, freshness, and matching checks pass.
+                      No verified opportunity deliveries are published yet. MarketVibe only publishes records after source, evidence, scoring, freshness, and matching checks pass.
                     </p>
                   ) : (
                     opportunityItems.slice(0, 30).map((assignment: Record<string, unknown>) => {
@@ -158,69 +172,31 @@ export default async function DashboardPage({
                 </div>
               </div>}
 
-              {hasAccess && <div className="rounded-lg border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h2 className="text-xl font-semibold">Proof Pack delivery</h2>
-                    <p className="mt-1 text-sm text-violet-100/65">Rows are created from verified saved live signals when available.</p>
-                  </div>
-                  {proofItems.length > 0 && proofCsvParams.toString() && (
-                    <Link href={`/api/proof-pack/csv?${proofCsvParams.toString()}`} className="inline-flex items-center gap-2 rounded-lg border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">
-                      <Download className="h-4 w-4" /> CSV
-                    </Link>
-                  )}
-                </div>
-                <div className="mt-5 grid gap-3">
-                  {proofItems.length === 0 ? (
-                    <p className="rounded-lg border border-white/10 bg-black/20 p-4 text-sm leading-6 text-violet-100/70">
-                      No proof-pack rows are ready yet. If you just submitted onboarding, delivery will complete once verified saved signals are available.
-                    </p>
-                  ) : (
-                    proofItems.slice(0, 10).map((item: { id: string; business_name: string; intent_score: number; pain_point: string; source_url?: string | null }) => (
-                      <div key={item.id} className="rounded-lg border border-white/10 bg-black/20 p-4">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <h3 className="font-semibold">{item.business_name}</h3>
-                          <span className="rounded-lg bg-violet-500/20 px-2.5 py-1 text-sm font-semibold text-violet-100">{item.intent_score}</span>
-                        </div>
-                        <p className="mt-2 text-sm leading-6 text-violet-100/65">{item.pain_point}</p>
-                        {item.source_url && <Link href={item.source_url} className="mt-3 inline-flex text-sm font-semibold text-violet-200 hover:text-white">Open source</Link>}
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>}
-
-              <div className="rounded-lg border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+              {importedItems.length > 0 && <div className="rounded-lg border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
                 <h2 className="text-xl font-semibold">Imported customer delivery</h2>
                 <p className="mt-1 text-sm text-violet-100/65">
                   Imported records require the secure delivery link from the MarketVibe email.
                 </p>
                 <div className="mt-5 grid gap-3">
-                  {importedItems.length === 0 ? (
-                    <p className="rounded-lg border border-white/10 bg-black/20 p-4 text-sm leading-6 text-violet-100/70">
-                      No imported delivery records are visible for this secure link.
-                    </p>
-                  ) : (
-                    importedItems.slice(0, 20).map((item) => (
-                      <div key={`${item.id}-${item.delivered_at}`} className="rounded-lg border border-white/10 bg-black/20 p-4">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <h3 className="font-semibold">{item.company_name}</h3>
-                          <span className="rounded-lg bg-violet-500/20 px-2.5 py-1 text-sm font-semibold text-violet-100">Fit {item.fit_score}</span>
-                        </div>
-                        <p className="mt-1 text-sm text-violet-100/70">{[item.full_name, item.job_title].filter(Boolean).join(" · ")}</p>
-                        <p className="mt-2 text-sm leading-6 text-violet-100/65">{item.evidence_summary}</p>
-                        <p className="mt-2 text-sm font-semibold text-violet-200">Intent: {item.intent_score ?? "Intent not evidenced"}</p>
-                        <p className="mt-2 text-sm leading-6 text-violet-100/65">{item.suggested_outreach_angle}</p>
-                        <div className="mt-3 flex flex-wrap gap-3 text-sm">
-                          {item.company_website && <Link href={item.company_website} className="text-violet-200 hover:text-white">Website</Link>}
-                          {item.linkedin_profile_url && <Link href={item.linkedin_profile_url} className="text-violet-200 hover:text-white">LinkedIn source reference</Link>}
-                          {item.public_signal_url && <Link href={item.public_signal_url} className="text-violet-200 hover:text-white">Public signal</Link>}
-                        </div>
+                  {importedItems.slice(0, 20).map((item) => (
+                    <div key={`${item.id}-${item.delivered_at}`} className="rounded-lg border border-white/10 bg-black/20 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <h3 className="font-semibold">{item.company_name}</h3>
+                        <span className="rounded-lg bg-violet-500/20 px-2.5 py-1 text-sm font-semibold text-violet-100">Fit {item.fit_score}</span>
                       </div>
-                    ))
-                  )}
+                      <p className="mt-1 text-sm text-violet-100/70">{[item.full_name, item.job_title].filter(Boolean).join(" · ")}</p>
+                      <p className="mt-2 text-sm leading-6 text-violet-100/65">{item.evidence_summary}</p>
+                      <p className="mt-2 text-sm font-semibold text-violet-200">Intent: {item.intent_score ?? "Intent not evidenced"}</p>
+                      <p className="mt-2 text-sm leading-6 text-violet-100/65">{item.suggested_outreach_angle}</p>
+                      <div className="mt-3 flex flex-wrap gap-3 text-sm">
+                        {item.company_website && <Link href={item.company_website} className="text-violet-200 hover:text-white">Website</Link>}
+                        {item.linkedin_profile_url && <Link href={item.linkedin_profile_url} className="text-violet-200 hover:text-white">LinkedIn source reference</Link>}
+                        {item.public_signal_url && <Link href={item.public_signal_url} className="text-violet-200 hover:text-white">Public signal</Link>}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
+              </div>}
 
               {hasAccess && <div className="rounded-lg border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
                 <ShieldCheck className="h-6 w-6 text-[#a855f7]" />
