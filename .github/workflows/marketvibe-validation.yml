@@ -19,5 +19,19 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm test
-      - run: npm run build
+      - name: Premium product tests
+        run: npx tsx tests/premium-products.test.ts
+      - name: Import tests
+        run: npx tsx tests/sales-navigator-import.test.ts
+      - name: Opportunity lifecycle tests
+        run: npx tsx tests/opportunity-lifecycle.test.ts
+      - name: Premium delivery email tests
+        run: npx tsx tests/premium-delivery-email.test.ts
+      - name: Property source tests
+        run: npx tsx tests/property-opportunity-sources.test.ts
+      - name: Public opportunity discovery tests
+        run: npx tsx tests/public-opportunity-discovery.test.ts
+      - name: Operational completion tests
+        run: npx tsx tests/operational-completion.test.ts
+      - name: Production build
+        run: npm run build
