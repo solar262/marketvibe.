@@ -7,6 +7,7 @@ import { resolveCustomerAccess } from "@/lib/customer-access";
 import { BillingPortalButton } from "@/components/BillingPortalButton";
 import { ReplacementRequestForm } from "@/components/ReplacementRequestForm";
 import { getCustomerOpportunityDeliveries } from "@/lib/opportunity-engine";
+import { filterDeliverableBuyerIntentAssignments } from "@/lib/customer-delivery-quality";
 
 const products: PremiumProductCode[] = ["proof_pack", "radar", "growth_desk"];
 
@@ -26,7 +27,8 @@ export default async function DashboardPage({
   const canLoadPaidWorkspace = Boolean(customerAccess.ok && customerAccess.email);
   const entitlements = canLoadPaidWorkspace ? await getPremiumEntitlements(email).catch(() => []) : [];
   const importedItems: DeliveredProspect[] = email && deliveryToken ? await getDeliveredProspectsForCustomer(email, deliveryToken).catch(() => []) : [];
-  const opportunityItems = canLoadPaidWorkspace ? await getCustomerOpportunityDeliveries(email).catch(() => []) : [];
+  const rawOpportunityItems = canLoadPaidWorkspace ? await getCustomerOpportunityDeliveries(email).catch(() => []) : [];
+  const opportunityItems = filterDeliverableBuyerIntentAssignments(rawOpportunityItems as Array<Record<string, unknown>>);
   const activeProducts = new Set(
     entitlements
       .map((item: { product_code?: unknown }) => asProductCode(item.product_code))
