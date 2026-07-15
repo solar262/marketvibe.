@@ -1,5 +1,6 @@
-import { fillCustomerShortages } from "@/lib/opportunity-engine";
+import { assignVerifiedBuyerIntentOpportunities } from "@/lib/buyer-intent-matching";
 import { opportunityConfigForProduct } from "@/lib/opportunity-products";
+import { filterProfilesWithActiveEntitlements } from "@/lib/paid-profile-access";
 import type { PremiumProductCode } from "@/lib/premium-products";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
@@ -13,25 +14,35 @@ export async function fillDueCustomerShortages({ trigger = "cron" }: { trigger?:
   const supabase = getSupabaseAdmin();
   if (!supabase) throw new Error("Supabase privileged access is not configured.");
 
-  const { data: profiles, error } = await supabase
+  const { data: profileRows, error } = await supabase
     .from("customer_search_profiles")
     .select("id,customer_email,product_code,status")
     .eq("status", "active")
     .limit(100);
   if (error) throw error;
 
+  const profiles = await filterProfilesWithActiveEntitlements(
+    supabase,
+    (profileRows || []).map((row) => ({
+      id: String(row.id),
+      customer_email: String(row.customer_email || ""),
+      product_code: String(row.product_code || "proof_pack") as PremiumProductCode,
+      status: String(row.status || "active"),
+    })),
+  );
+
   const results: Array<Record<string, unknown>> = [];
   let totalShortage = 0;
   let totalAssigned = 0;
 
-  for (const rawProfile of profiles || []) {
-    const productCode = String(rawProfile.product_code || "proof_pack") as PremiumProductCode;
-    if (!['proof_pack', 'radar', 'growth_desk'].includes(productCode)) continue;
+  for (const profile of profiles) {
+    const productCode = profile.product_code;
+    if (!["proof_pack", "radar", "growth_desk"].includes(productCode)) continue;
     const config = opportunityConfigForProduct(productCode);
     let countQuery = supabase
       .from("opportunity_assignments")
       .select("id", { count: "exact", head: true })
-      .eq("search_profile_id", rawProfile.id)
+      .eq("search_profile_id", profile.id)
       .in("assignment_status", ["assigned", "published", "delivered"]);
     const start = windowStart(config.deliveryFrequency);
     if (start) countQuery = countQuery.gte("assigned_at", start);
@@ -42,8 +53,8 @@ export async function fillDueCustomerShortages({ trigger = "cron" }: { trigger?:
     const remaining = Math.max(0, config.opportunityQuantity - alreadyAllocated);
     if (remaining === 0) {
       results.push({
-        profileId: rawProfile.id,
-        customerEmail: rawProfile.customer_email,
+        profileId: profile.id,
+        customerEmail: profile.customer_email,
         productCode,
         status: "cadence_satisfied",
         allocatedInWindow: alreadyAllocated,
@@ -52,29 +63,33 @@ export async function fillDueCustomerShortages({ trigger = "cron" }: { trigger?:
       continue;
     }
 
-    const result = await fillCustomerShortages({
+    const result = await assignVerifiedBuyerIntentOpportunities({
       trigger,
-      profileId: String(rawProfile.id),
+      profileId: profile.id,
       quantity: remaining,
     });
-    totalShortage += Number(result.customer_shortages || 0);
-    totalAssigned += Number(result.records_added_to_inventory || 0);
+    const shortage = Number(result.customer_shortages || 0);
+    const assigned = Number(result.records_added_to_inventory || 0);
+    totalShortage += shortage;
+    totalAssigned += assigned;
     results.push({
-      profileId: rawProfile.id,
-      customerEmail: rawProfile.customer_email,
+      profileId: profile.id,
+      customerEmail: profile.customer_email,
       productCode,
-      status: "processed",
+      status: shortage > 0 ? "shortage" : "processed",
       allocatedInWindow: alreadyAllocated,
       requested: remaining,
-      assigned: result.records_added_to_inventory,
-      shortage: result.customer_shortages,
+      assigned,
+      shortage,
       runId: result.runId,
     });
   }
 
   return {
-    ok: true,
-    profilesExamined: profiles?.length || 0,
+    ok: totalShortage === 0,
+    status: totalShortage === 0 ? "healthy" : "degraded",
+    profilesExamined: profiles.length,
+    excludedWithoutPaidAccess: (profileRows?.length || 0) - profiles.length,
     totalAssigned,
     totalShortage,
     results,
