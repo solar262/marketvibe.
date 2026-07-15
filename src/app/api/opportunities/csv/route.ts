@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveCustomerAccess } from "@/lib/customer-access";
+import { filterDeliverableBuyerIntentAssignments } from "@/lib/customer-delivery-quality";
 import { buildOpportunityDeliveryCsv, getCustomerOpportunityDeliveries } from "@/lib/opportunity-engine";
 
 export const runtime = "nodejs";
@@ -17,12 +18,13 @@ export async function GET(request: Request) {
   }
 
   const rows = await getCustomerOpportunityDeliveries(access.email);
-  const csv = buildOpportunityDeliveryCsv(rows as Array<Record<string, unknown>>);
+  const deliverableRows = filterDeliverableBuyerIntentAssignments(rows as Array<Record<string, unknown>>);
+  const csv = buildOpportunityDeliveryCsv(deliverableRows);
   return new Response(csv, {
     headers: {
       "content-type": "text/csv; charset=utf-8",
       "content-disposition": "attachment; filename=marketvibe-opportunities.csv",
+      "cache-control": "private, no-store",
     },
   });
 }
-
