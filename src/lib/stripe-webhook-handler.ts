@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { track } from "@vercel/analytics/server";
 import { deliverStripeSession } from "@/lib/buyer-delivery";
+import { syncSearchProfilesForSubscription } from "@/lib/paid-profile-access";
 import {
   markStripeEventProcessing,
   updateEntitlementForSubscription,
@@ -48,6 +49,7 @@ export async function handleVerifiedStripeEvent(event: Stripe.Event) {
         subscription,
         event.type === "customer.subscription.deleted" ? "cancelled" : undefined,
       );
+      await syncSearchProfilesForSubscription(subscription.id);
     }
 
     if (event.type === "invoice.payment_failed") {
@@ -55,14 +57,12 @@ export async function handleVerifiedStripeEvent(event: Stripe.Event) {
       const subscriptionId = typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id;
       if (subscriptionId) {
         await updateEntitlementStatusBySubscriptionId(subscriptionId, "past_due");
+        await syncSearchProfilesForSubscription(subscriptionId);
       }
     }
 
     return { received: true, duplicate: false };
   } catch (error) {
-    // The event was reserved before fulfillment began. Release that reservation
-    // when processing fails so Stripe's next retry can complete the order instead
-    // of being incorrectly discarded as a duplicate.
     await releaseFailedStripeEvent(event.id).catch((releaseError) => {
       console.error("[stripe-webhook] failed to release event for retry", {
         eventId: event.id,

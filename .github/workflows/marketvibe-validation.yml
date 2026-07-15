@@ -1,0 +1,45 @@
+name: MarketVibe validation
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Premium product tests
+        run: npx tsx tests/premium-products.test.ts
+      - name: Import tests
+        run: npx tsx tests/sales-navigator-import.test.ts
+      - name: Opportunity lifecycle tests
+        run: npx tsx tests/opportunity-lifecycle.test.ts
+      - name: Premium delivery email tests
+        run: npx tsx tests/premium-delivery-email.test.ts
+      - name: Property source tests
+        run: npx tsx tests/property-opportunity-sources.test.ts
+      - name: Public opportunity discovery tests
+        run: npx tsx tests/public-opportunity-discovery.test.ts
+      - name: Operational completion tests
+        run: npx tsx tests/operational-completion.test.ts
+      - name: Production build
+        shell: bash
+        run: set -o pipefail; npm run build 2>&1 | tee marketvibe-build.log
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marketvibe-build-diagnostics
+          path: marketvibe-build.log
+          if-no-files-found: ignore

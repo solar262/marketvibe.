@@ -49,7 +49,7 @@ const pdfText = pdf.toString("utf8");
 assert.equal(pdf.subarray(0, 8).toString("utf8"), "%PDF-1.4");
 assert.match(pdfText, /MarketVibe Proof Pack/);
 assert.match(pdfText, /Northbank Developments/);
-assert.match(pdfText, /verified property and construction opportunity intelligence/i);
+assert.match(pdfText, /verified buyer-intent opportunity intelligence/i);
 assert.match(pdfText, /%%EOF$/);
 
 console.log("Brevo premium delivery PDF tests passed.");
