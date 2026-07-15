@@ -11,9 +11,9 @@ import {
   getOpportunityEngineSummary,
   publishDueOpportunityDeliveries,
   refreshStaleOpportunities,
-  runOpportunityVerification,
 } from "@/lib/opportunity-engine";
 import { sendPendingPremiumDeliveryEmails } from "@/lib/premium-delivery-email";
+import { runProfileAwareOpportunityVerification } from "@/lib/profile-aware-verification";
 import { runCustomerProfileOpportunityDiscovery } from "@/lib/public-opportunity-discovery";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
@@ -132,7 +132,7 @@ export async function GET(request: Request) {
     runCustomerProfileOpportunityDiscovery({ trigger: "cron" })));
 
   steps.push(await runStep("opportunity-verification", () =>
-    runOpportunityVerification({ trigger: "cron" })));
+    runProfileAwareOpportunityVerification({ trigger: "cron" })));
 
   steps.push(await runStep("customer-shortage-recovery", () =>
     fillDueCustomerShortages({ trigger: "cron" })));
