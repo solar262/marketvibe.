@@ -139,9 +139,6 @@ export async function GET(request: Request) {
     return result;
   }));
 
-  steps.push(await runStep("stale-opportunity-reverification", () =>
-    runProfileAwareOpportunityVerification({ trigger: "cron", limit: 100 })));
-
   steps.push(await runStep("customer-delivery", async () => {
     const published = await publishVerifiedBuyerIntentDeliveries({
       trigger: "cron",
