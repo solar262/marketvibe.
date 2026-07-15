@@ -32,7 +32,7 @@ type DiscoveryTrigger = "admin" | "cron" | "test";
 type SupabaseClient = NonNullable<ReturnType<typeof getSupabaseAdmin>>;
 
 type OpportunityRow = {
-  id: string;
+  id?: string;
   company_name?: string | null;
   company_industry?: string | null;
   source_type?: string | null;
@@ -218,7 +218,8 @@ async function fetchGdeltArticles(query: string, maxRecords = 50): Promise<Gdelt
   });
   if (!response.ok) throw new Error(`GDELT DOC 2.0 returned ${response.status}.`);
   const payload = await response.json().catch(() => null) as { articles?: GdeltArticle[] } | null;
-  return Array.isArray(payload?.articles) ? payload.articles : [];
+  if (!payload) throw new Error("GDELT DOC 2.0 returned an invalid JSON response.");
+  return Array.isArray(payload.articles) ? payload.articles : [];
 }
 
 async function loadPropertyProfiles(supabase: SupabaseClient, profileId?: string) {
@@ -488,7 +489,7 @@ export async function enforcePropertyOpportunityIntegrity() {
   if (error) throw error;
 
   const rows = (data || []) as OpportunityRow[];
-  const rejectedIds = rows.filter((row) => !isGenuinePropertyOpportunity(row)).map((row) => row.id);
+  const rejectedIds = rows.filter((row) => !isGenuinePropertyOpportunity(row)).map((row) => row.id).filter(Boolean) as string[];
 
   if (rejectedIds.length > 0) {
     const { error: updateError } = await supabase
