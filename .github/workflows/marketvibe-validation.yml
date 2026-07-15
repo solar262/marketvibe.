@@ -34,4 +34,12 @@ jobs:
       - name: Operational completion tests
         run: npx tsx tests/operational-completion.test.ts
       - name: Production build
-        run: npm run build
+        shell: bash
+        run: set -o pipefail; npm run build 2>&1 | tee marketvibe-build.log
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marketvibe-build-diagnostics
+          path: marketvibe-build.log
+          if-no-files-found: ignore
