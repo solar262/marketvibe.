@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { requireCron } from "@/lib/cron-auth";
-import { runPropertyDiscoveryWithIntegrity } from "@/lib/property-opportunity-integrity";
+import { runBuyerIntentDiscovery } from "@/lib/buyer-intent-discovery";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export async function GET(request: Request) {
   const unauthorized = requireCron(request);
   if (unauthorized) return unauthorized;
-  return NextResponse.json(await runPropertyDiscoveryWithIntegrity({ trigger: "cron" }));
+  return NextResponse.json(await runBuyerIntentDiscovery({ trigger: "cron" }));
 }
