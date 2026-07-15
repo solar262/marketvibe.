@@ -7,14 +7,16 @@ import {
   runBuyerPipelineWorker,
 } from "@/lib/operations-pipeline";
 import {
-  fillCustomerShortages,
   getOpportunityEngineSummary,
   publishDueOpportunityDeliveries,
-  refreshStaleOpportunities,
-  runOpportunityVerification,
 } from "@/lib/opportunity-engine";
 import { sendPendingPremiumDeliveryEmails } from "@/lib/premium-delivery-email";
-import { runPropertyDiscoveryWithIntegrity } from "@/lib/property-opportunity-integrity";
+import {
+  refreshBuyerIntentOpportunities,
+  runBuyerIntentDiscovery,
+  runBuyerIntentVerification,
+} from "@/lib/buyer-intent-discovery";
+import { runDueBuyerIntentMatching } from "@/lib/buyer-intent-operations";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 export const runtime = "nodejs";
@@ -128,17 +130,17 @@ export async function GET(request: Request) {
     return { backfill, recovery, worker };
   }));
 
-  steps.push(await runStep("opportunity-discovery", () =>
-    runPropertyDiscoveryWithIntegrity({ trigger: "cron" })));
+  steps.push(await runStep("buyer-intent-discovery", () =>
+    runBuyerIntentDiscovery({ trigger: "cron" })));
 
-  steps.push(await runStep("opportunity-verification", () =>
-    runOpportunityVerification({ trigger: "cron" })));
+  steps.push(await runStep("buyer-intent-verification", () =>
+    runBuyerIntentVerification({ trigger: "cron" })));
 
-  steps.push(await runStep("customer-shortage-recovery", () =>
-    fillCustomerShortages({ trigger: "cron" })));
+  steps.push(await runStep("buyer-intent-refresh", () =>
+    refreshBuyerIntentOpportunities({ trigger: "cron" })));
 
-  steps.push(await runStep("stale-opportunity-replacement", () =>
-    refreshStaleOpportunities({ trigger: "cron" })));
+  steps.push(await runStep("cadence-aware-customer-matching", () =>
+    runDueBuyerIntentMatching({ trigger: "cron", sendAlert: true })));
 
   steps.push(await runStep("customer-delivery", async () => {
     const published = await publishDueOpportunityDeliveries({
@@ -161,7 +163,7 @@ export async function GET(request: Request) {
       ok,
       status: ok ? "healthy" : "degraded",
       message: ok
-        ? "Autonomous revenue and customer-delivery recovery completed."
+        ? "Autonomous buyer-intent discovery, verification, matching, and customer delivery completed."
         : "Autopilot completed with failed stages; successful stages were not blocked.",
       startedAt,
       finishedAt,
