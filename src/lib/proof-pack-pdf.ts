@@ -89,7 +89,7 @@ export function proofPackPdfItemsFromOpportunityRows(rows: Array<Record<string, 
 function documentLines(items: ProofPackPdfItem[], customerEmail?: string, generatedAt?: string): PdfLine[] {
   const lines: PdfLine[] = [
     { text: "MarketVibe Proof Pack", size: 18, leading: 24 },
-    { text: "Verified property and construction opportunity intelligence", size: 11, leading: 18 },
+    { text: "Verified buyer-intent opportunity intelligence", size: 11, leading: 18 },
   ];
 
   if (customerEmail) lines.push({ text: `Prepared for: ${cleanPdfText(customerEmail)}` });
@@ -97,7 +97,7 @@ function documentLines(items: ProofPackPdfItem[], customerEmail?: string, genera
 
   if (items.length === 0) {
     lines.push(
-      { text: "No verified property or construction opportunities are available in this delivery." },
+      { text: "No verified buyer-intent opportunities are available in this delivery." },
       { text: "MarketVibe does not pad Proof Packs with unverified records." },
     );
     return lines;
