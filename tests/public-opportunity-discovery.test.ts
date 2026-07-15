@@ -3,6 +3,7 @@ import {
   buildProfileOpportunityQuery,
   gdeltArticleToProfileCandidate,
   isDeliverableBuyerIntentOpportunity,
+  publicArticleToProfileCandidate,
 } from "../src/lib/public-opportunity-discovery";
 import type { CustomerSearchProfile } from "../src/lib/opportunity-quality";
 
@@ -45,6 +46,21 @@ const candidate = gdeltArticleToProfileCandidate({
 assert.ok(candidate);
 assert.equal(candidate.source_type, "public_buyer_intent_news");
 assert.equal(candidate.company_name, "Acme");
+assert.equal(candidate.company_industry, null);
+assert.equal(candidate.niche, null);
+assert.equal(candidate.target_location, null);
+assert.equal(candidate.evidence_status, "profile_only");
+
+const rssCandidate = publicArticleToProfileCandidate({
+  provider: "Google News RSS",
+  url: "https://example-news.com/acme-rfp",
+  title: "Acme issues RFP for CRM migration partner",
+  description: "The Vienna business is seeking software implementation support.",
+  published_at: "2026-07-15T08:30:00Z",
+  sourcecountry: "Austria",
+}, profile);
+assert.ok(rssCandidate);
+assert.equal(rssCandidate.source_name, "Google News RSS");
 
 const irrelevant = gdeltArticleToProfileCandidate({
   url: "https://example-news.com/sport/vienna-football-results",
@@ -58,13 +74,19 @@ assert.equal(isDeliverableBuyerIntentOpportunity({
   source_title: "Acme seeking CRM implementation partner",
   source_text: "Acme is seeking a CRM implementation partner for a migration project.",
   intent_category: "verified_direct_intent",
+  evidence_status: "public_signal_verified",
+  verification_status: "QUALIFIED",
+  review_status: "approved",
+  last_verified_at: "2026-07-15T09:00:00Z",
   is_test_data: false,
 }), true);
 
 assert.equal(isDeliverableBuyerIntentOpportunity({
   source_url: "https://example-news.com/acme",
-  source_text: "Acme company profile",
-  intent_category: "profile_only",
+  source_text: "Acme is seeking a CRM implementation partner.",
+  intent_category: "verified_direct_intent",
+  evidence_status: "profile_only",
+  review_status: "pending",
   is_test_data: false,
 }), false);
 
