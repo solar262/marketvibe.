@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
+import { requestBuyerIntentReplacement } from "@/lib/buyer-intent-replacements";
 import { resolveCustomerAccess } from "@/lib/customer-access";
-import { requestOpportunityReplacement } from "@/lib/opportunity-engine";
 
 export const runtime = "nodejs";
 
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    return NextResponse.json(await requestOpportunityReplacement({
+    return NextResponse.json(await requestBuyerIntentReplacement({
       assignmentId,
       customerEmail: access.email,
       reason,
@@ -34,4 +34,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Replacement request failed." }, { status: 400 });
   }
 }
-
