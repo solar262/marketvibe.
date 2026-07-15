@@ -1,7 +1,6 @@
-import { runOpportunityVerification } from "@/lib/opportunity-engine";
+import { calculateEvidenceGroundedScores } from "@/lib/buyer-intent-evidence";
 import {
   buildCustomerSummary,
-  calculateOpportunityScores,
   normalizeText,
   normalizeUrl,
   qualifyOpportunity,
@@ -9,11 +8,13 @@ import {
   type CustomerSearchProfile,
   type OpportunityInput,
 } from "@/lib/opportunity-quality";
+import { profileHasActiveEntitlement } from "@/lib/paid-profile-access";
 import type { PremiumProductCode } from "@/lib/premium-products";
 import { scanPublicWebsite } from "@/lib/sales-navigator-import";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 type Trigger = "admin" | "cron" | "test";
+type SupabaseClient = NonNullable<ReturnType<typeof getSupabaseAdmin>>;
 
 function nowIso() {
   return new Date().toISOString();
@@ -83,122 +84,202 @@ function opportunityFromRow(row: Record<string, unknown>): OpportunityInput {
   };
 }
 
-export async function runProfileAwareOpportunityVerification({ trigger = "admin", limit = 25 }: { trigger?: Trigger; limit?: number } = {}) {
+async function createRun(supabase: SupabaseClient, trigger: Trigger) {
+  const bucket = trigger === "cron" ? new Date().toISOString().slice(0, 13) : `${nowIso()}:${Math.random().toString(36).slice(2, 8)}`;
+  const { data, error } = await supabase.from("opportunity_source_runs").insert({
+    run_type: "profile_aware_verification",
+    trigger_source: trigger,
+    idempotency_key: `profile-aware-verification:${bucket}`,
+  }).select("id").single();
+  if (error || !data) throw error || new Error("Verification run could not be created.");
+  return String(data.id);
+}
+
+async function finishRun(supabase: SupabaseClient, runId: string, status: "completed" | "partial" | "failed", counters: Record<string, unknown>, errorSummary: Record<string, unknown> = {}) {
+  const { error } = await supabase.from("opportunity_source_runs").update({
+    status,
+    finished_at: nowIso(),
+    records_discovered: Number(counters.examined || 0),
+    records_qualified: Number(counters.qualified || 0),
+    records_rejected: Number(counters.rejected || 0),
+    source_failures: counters.failures || [],
+    error_summary: errorSummary,
+  }).eq("id", runId);
+  if (error) throw error;
+}
+
+export async function runProfileAwareOpportunityVerification({ trigger = "admin", limit = 100 }: { trigger?: Trigger; limit?: number } = {}) {
   const supabase = getSupabaseAdmin();
   if (!supabase) throw new Error("Supabase privileged access is not configured.");
+  const runId = await createRun(supabase, trigger);
+  const counters = { examined: 0, qualified: 0, rejected: 0, deferred: 0, inactiveProfiles: 0, failures: [] as Array<Record<string, unknown>> };
 
-  const { data, error } = await supabase
-    .from("opportunities")
-    .select("*")
-    .eq("source_type", "public_buyer_intent_news")
-    .in("inventory_status", ["DISCOVERED", "VALIDATING", "IN_INVENTORY", "QUALIFIED"])
-    .lte("next_verification_at", nowIso())
-    .eq("is_test_data", false)
-    .limit(limit);
-  if (error) throw error;
+  try {
+    const { data, error } = await supabase
+      .from("opportunities")
+      .select("*")
+      .eq("source_type", "public_buyer_intent_news")
+      .in("inventory_status", ["DISCOVERED", "VALIDATING", "IN_INVENTORY", "QUALIFIED"])
+      .lte("next_verification_at", nowIso())
+      .eq("is_test_data", false)
+      .limit(Math.max(1, Math.min(limit, 250)));
+    if (error) throw error;
 
-  const counters = { examined: 0, qualified: 0, rejected: 0, deferred: 0, failures: [] as Array<Record<string, unknown>> };
-
-  for (const raw of data || []) {
-    const row = raw as Record<string, unknown>;
-    counters.examined += 1;
-    const rawPayload = row.raw_payload && typeof row.raw_payload === "object" ? row.raw_payload as Record<string, unknown> : {};
-    const profileId = String(rawPayload.search_profile_id || "");
-    if (!profileId) {
-      counters.rejected += 1;
-      await supabase.from("opportunities").update({
-        inventory_status: "REJECTED",
-        verification_status: "REJECTED",
-        review_status: "rejected",
-        rejection_reason: "missing_customer_search_profile",
-        quality_flags: ["missing_customer_search_profile"],
-        updated_at: nowIso(),
-      }).eq("id", row.id);
-      continue;
-    }
-
-    const { data: profileRow, error: profileError } = await supabase.from("customer_search_profiles").select("*").eq("id", profileId).maybeSingle();
-    if (profileError || !profileRow) {
-      counters.failures.push({ opportunityId: row.id, error: profileError?.message || "Search profile not found." });
-      continue;
-    }
-    const profile = profileFromRow(profileRow as Record<string, unknown>);
-    const input = opportunityFromRow(row);
-    const sourceUrl = normalizeUrl(input.source_url);
-
-    try {
-      const scan = await scanPublicWebsite(sourceUrl);
-      const sourceEvidence = normalizeText(scan.textEvidence);
-      if (!sourceEvidence) {
-        counters.deferred += 1;
+    for (const raw of data || []) {
+      const row = raw as Record<string, unknown>;
+      counters.examined += 1;
+      const rawPayload = row.raw_payload && typeof row.raw_payload === "object" ? row.raw_payload as Record<string, unknown> : {};
+      const profileId = String(rawPayload.search_profile_id || "");
+      if (!profileId) {
+        counters.rejected += 1;
         await supabase.from("opportunities").update({
-          inventory_status: "VALIDATING",
-          verification_status: "VALIDATING",
-          review_status: "pending",
-          next_verification_at: new Date(Date.now() + 86_400_000).toISOString(),
-          rejection_reason: "source_page_has_no_readable_evidence",
+          inventory_status: "REJECTED",
+          verification_status: "REJECTED",
+          review_status: "rejected",
+          rejection_reason: "missing_customer_search_profile",
+          quality_flags: ["missing_customer_search_profile"],
           updated_at: nowIso(),
         }).eq("id", row.id);
         continue;
       }
 
-      const verifiedInput: OpportunityInput = {
-        ...input,
-        source_url: scan.finalUrl || sourceUrl,
-        source_text: `${input.source_text} ${scan.textEvidence}`.replace(/\s+/g, " ").trim().slice(0, 5000),
-        last_verified_at: nowIso(),
-        evidence_status: "public_signal_verified",
-      };
-      const scores = calculateOpportunityScores(verifiedInput, profile);
-      const qualification = qualifyOpportunity(verifiedInput, scores, profile);
-      const update = {
-        source_url: verifiedInput.source_url,
-        source_text: verifiedInput.source_text,
-        last_verified_at: nowIso(),
-        next_verification_at: new Date(Date.now() + 7 * 86_400_000).toISOString(),
-        fit_score: scores.fit_score,
-        intent_score: scores.intent_score,
-        evidence_score: scores.evidence_score,
-        freshness_score: scores.freshness_score,
-        overall_score: scores.overall_score,
-        score_reasons: scores.reasons,
-        intent_category: scores.intent_category,
-        evidence_status: scores.evidence_status,
-        verification_status: qualification.verification_status,
-        review_status: qualification.review_status,
-        inventory_status: qualification.inventory_status,
-        rejection_reason: qualification.rejection_reason || null,
-        quality_flags: qualification.quality_flags,
-        customer_summary: buildCustomerSummary(verifiedInput, scores),
-        recommended_action: recommendedAction(verifiedInput, scores),
-        updated_at: nowIso(),
-      };
-      const { error: updateError } = await supabase.from("opportunities").update(update).eq("id", row.id);
-      if (updateError) throw updateError;
-      await supabase.from("opportunity_verification_events").insert({
-        opportunity_id: row.id,
-        verification_status: qualification.verification_status,
-        website_status: "not_applicable",
-        source_status: "resolved",
-        evidence_found: true,
-        notes: `Source verified against customer search profile ${profileId}.`,
-        raw_result: { scores, qualification, search_profile_id: profileId },
-      });
-      if (qualification.qualified) counters.qualified += 1;
-      else counters.rejected += 1;
-    } catch (verificationError) {
-      counters.deferred += 1;
-      counters.failures.push({ opportunityId: row.id, error: verificationError instanceof Error ? verificationError.message : "Source verification failed." });
-      await supabase.from("opportunities").update({
-        inventory_status: "VALIDATING",
-        verification_status: "VALIDATING",
-        review_status: "pending",
-        next_verification_at: new Date(Date.now() + 86_400_000).toISOString(),
-        updated_at: nowIso(),
-      }).eq("id", row.id);
-    }
-  }
+      const { data: profileRow, error: profileError } = await supabase
+        .from("customer_search_profiles")
+        .select("*")
+        .eq("id", profileId)
+        .maybeSingle();
+      if (profileError || !profileRow) {
+        counters.rejected += 1;
+        await supabase.from("opportunities").update({
+          inventory_status: "REJECTED",
+          verification_status: "REJECTED",
+          review_status: "rejected",
+          rejection_reason: "customer_search_profile_not_found",
+          quality_flags: ["customer_search_profile_not_found"],
+          updated_at: nowIso(),
+        }).eq("id", row.id);
+        continue;
+      }
 
-  const legacy = await runOpportunityVerification({ trigger, limit });
-  return { ok: counters.failures.length === 0, profileAware: counters, legacy };
+      const profile = profileFromRow(profileRow as Record<string, unknown>);
+      if (profile.status !== "active" || !await profileHasActiveEntitlement(supabase, profile)) {
+        counters.inactiveProfiles += 1;
+        counters.rejected += 1;
+        await supabase.from("opportunities").update({
+          inventory_status: "REJECTED",
+          verification_status: "REJECTED",
+          review_status: "rejected",
+          rejection_reason: "paid_customer_profile_inactive",
+          quality_flags: ["paid_customer_profile_inactive"],
+          updated_at: nowIso(),
+        }).eq("id", row.id);
+        continue;
+      }
+
+      const input = opportunityFromRow(row);
+      const sourceUrl = normalizeUrl(input.source_url);
+      try {
+        const scan = await scanPublicWebsite(sourceUrl);
+        const sourceEvidence = normalizeText(scan.textEvidence);
+        if (!sourceEvidence) {
+          counters.deferred += 1;
+          await supabase.from("opportunities").update({
+            inventory_status: "VALIDATING",
+            verification_status: "VALIDATING",
+            review_status: "pending",
+            next_verification_at: new Date(Date.now() + 86_400_000).toISOString(),
+            rejection_reason: "source_page_has_no_readable_evidence",
+            updated_at: nowIso(),
+          }).eq("id", row.id);
+          continue;
+        }
+
+        const sourceVerifiedInput: OpportunityInput = {
+          ...input,
+          source_url: scan.finalUrl || sourceUrl,
+          source_text: `${input.source_text} ${scan.textEvidence}`.replace(/\s+/g, " ").trim().slice(0, 5000),
+          last_verified_at: nowIso(),
+          evidence_status: "public_signal_verified",
+        };
+        const { grounding, scores } = calculateEvidenceGroundedScores(sourceVerifiedInput, profile);
+        const qualification = grounding.profileRelevant
+          ? qualifyOpportunity(grounding.grounded, scores, profile)
+          : {
+              qualified: false,
+              inventory_status: "REJECTED" as const,
+              review_status: "rejected" as const,
+              verification_status: "REJECTED" as const,
+              rejection_reason: "source_evidence_does_not_match_customer_profile",
+              quality_flags: ["source_evidence_does_not_match_customer_profile"],
+            };
+
+        const update = {
+          company_industry: grounding.grounded.company_industry || null,
+          company_location: grounding.grounded.company_location || null,
+          company_country: grounding.grounded.company_country || null,
+          niche: grounding.grounded.niche || null,
+          target_location: grounding.grounded.target_location || null,
+          source_url: grounding.grounded.source_url,
+          source_text: grounding.grounded.source_text,
+          last_verified_at: nowIso(),
+          next_verification_at: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+          fit_score: scores.fit_score,
+          intent_score: scores.intent_score,
+          evidence_score: scores.evidence_score,
+          freshness_score: scores.freshness_score,
+          overall_score: scores.overall_score,
+          score_reasons: scores.reasons,
+          intent_category: scores.intent_category,
+          evidence_status: qualification.qualified ? "public_signal_verified" : scores.evidence_status,
+          verification_status: qualification.verification_status,
+          review_status: qualification.review_status,
+          inventory_status: qualification.inventory_status,
+          rejection_reason: qualification.rejection_reason || null,
+          quality_flags: qualification.quality_flags,
+          customer_summary: buildCustomerSummary(grounding.grounded, scores),
+          recommended_action: recommendedAction(grounding.grounded, scores),
+          updated_at: nowIso(),
+        };
+        const { error: updateError } = await supabase.from("opportunities").update(update).eq("id", row.id);
+        if (updateError) throw updateError;
+        await supabase.from("opportunity_verification_events").insert({
+          opportunity_id: row.id,
+          verification_status: qualification.verification_status,
+          website_status: "not_applicable",
+          source_status: "resolved",
+          evidence_found: true,
+          notes: `Source verified against active paid customer search profile ${profileId}.`,
+          raw_result: {
+            scores,
+            qualification,
+            search_profile_id: profileId,
+            evidence_grounding: {
+              matched_location: grounding.matchedLocation,
+              exact_phrases: grounding.exactPhrases,
+              matched_tokens: grounding.matchedTokens,
+            },
+          },
+        });
+        if (qualification.qualified) counters.qualified += 1;
+        else counters.rejected += 1;
+      } catch (verificationError) {
+        counters.deferred += 1;
+        counters.failures.push({ opportunityId: row.id, error: verificationError instanceof Error ? verificationError.message : "Source verification failed." });
+        await supabase.from("opportunities").update({
+          inventory_status: "VALIDATING",
+          verification_status: "VALIDATING",
+          review_status: "pending",
+          next_verification_at: new Date(Date.now() + 86_400_000).toISOString(),
+          updated_at: nowIso(),
+        }).eq("id", row.id);
+      }
+    }
+
+    const status = counters.failures.length ? "partial" : "completed";
+    await finishRun(supabase, runId, status, counters);
+    return { ok: counters.failures.length === 0, runId, profileAware: counters };
+  } catch (error) {
+    await finishRun(supabase, runId, "failed", counters, { message: error instanceof Error ? error.message : "Profile-aware verification failed." });
+    throw error;
+  }
 }
