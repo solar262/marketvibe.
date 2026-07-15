@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
 import { requireCron } from "@/lib/cron-auth";
-import { refreshStaleOpportunities } from "@/lib/opportunity-engine";
+import { refreshBuyerIntentOpportunities } from "@/lib/buyer-intent-discovery";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export async function GET(request: Request) {
   const unauthorized = requireCron(request);
   if (unauthorized) return unauthorized;
-  return NextResponse.json(await refreshStaleOpportunities({ trigger: "cron" }));
+  return NextResponse.json(await refreshBuyerIntentOpportunities({ trigger: "cron" }));
 }
-
