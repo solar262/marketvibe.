@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { resolveCustomerAccess } from "@/lib/customer-access";
 import { getCustomerOpportunityDeliveries } from "@/lib/opportunity-engine";
-import { isGenuinePropertyOpportunity } from "@/lib/property-opportunity-integrity";
 import { buildProofPackPdf, proofPackPdfItemsFromOpportunityRows } from "@/lib/proof-pack-pdf";
+import { isDeliverableBuyerIntentOpportunity } from "@/lib/public-opportunity-discovery";
 
 export const runtime = "nodejs";
 
@@ -22,14 +22,12 @@ export async function GET(request: Request) {
   const proofPackRows = rows.filter((row) => {
     if (String(row.product_code || "") !== "proof_pack") return false;
     const opportunity = (row.opportunities || {}) as Record<string, unknown>;
-    return isGenuinePropertyOpportunity(
-      opportunity as Parameters<typeof isGenuinePropertyOpportunity>[0],
-    );
+    return isDeliverableBuyerIntentOpportunity(opportunity);
   });
 
   if (proofPackRows.length === 0) {
     return NextResponse.json(
-      { error: "No verified property or construction opportunities are ready for this Proof Pack." },
+      { error: "No verified buyer-intent opportunities are ready for this Proof Pack." },
       { status: 404 },
     );
   }

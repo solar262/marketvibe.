@@ -1,7 +1,7 @@
 import { sendTransactionalEmail } from "@/lib/brevo";
 import { appendCustomerAccessParams, createCustomerAccessToken } from "@/lib/customer-access";
-import { isGenuinePropertyOpportunity } from "@/lib/property-opportunity-integrity";
 import { buildProofPackPdf, proofPackPdfItemsFromOpportunityRows } from "@/lib/proof-pack-pdf";
+import { isDeliverableBuyerIntentOpportunity } from "@/lib/public-opportunity-discovery";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 type DeliveryBatchRow = {
@@ -21,19 +21,17 @@ function escapeHtml(value: unknown) {
     .replace(/'/g, "&#039;");
 }
 
-function genuinePropertyAssignments(rows: Array<Record<string, unknown>>) {
+function verifiedAssignments(rows: Array<Record<string, unknown>>) {
   return rows.filter((row) => {
     const opportunity = (row.opportunities || {}) as Record<string, unknown>;
-    return isGenuinePropertyOpportunity(
-      opportunity as Parameters<typeof isGenuinePropertyOpportunity>[0],
-    );
+    return isDeliverableBuyerIntentOpportunity(opportunity);
   });
 }
 
 function radarHighlights(rows: Array<Record<string, unknown>>) {
   return rows.slice(0, 5).map((row) => {
     const opportunity = (row.opportunities || {}) as Record<string, unknown>;
-    const company = String(opportunity.company_name || "Property opportunity");
+    const company = String(opportunity.company_name || "Buyer-intent opportunity");
     const sourceTitle = String(opportunity.source_title || opportunity.source_name || "Verified public source");
     const score = Number(opportunity.overall_score || 0);
     return {
@@ -64,13 +62,13 @@ function deliveryCopy({
       subject: `Your MarketVibe Proof Pack PDF is ready (${count} verified opportunities)`,
       htmlContent: `
         <p>Your MarketVibe Proof Pack is ready.</p>
-        <p>It contains ${count} verified property and construction opportunities. The PDF is attached to this email.</p>
+        <p>It contains ${count} verified buyer-intent opportunities matched to your niche, territory, offer, and ideal buyer. The PDF is attached to this email.</p>
         <p><a href="${pdfUrl}">Download the PDF again</a></p>
         <p><a href="${dashboardUrl}">Open your dashboard</a></p>
         <p><a href="${csvUrl}">Download the CSV</a></p>
-        <p>MarketVibe does not include generic company profiles or unverified local-business records.</p>
+        <p>MarketVibe does not include generic company profiles, fabricated companies, or unverified lead-list records.</p>
       `,
-      textContent: `Your MarketVibe Proof Pack is ready.\n\nIt contains ${count} verified property and construction opportunities. The PDF is attached to this email.\n\nDownload PDF:\n${pdfUrl}\n\nDashboard:\n${dashboardUrl}\n\nCSV:\n${csvUrl}\n\nMarketVibe does not include generic company profiles or unverified local-business records.`,
+      textContent: `Your MarketVibe Proof Pack is ready.\n\nIt contains ${count} verified buyer-intent opportunities matched to your niche, territory, offer, and ideal buyer. The PDF is attached to this email.\n\nDownload PDF:\n${pdfUrl}\n\nDashboard:\n${dashboardUrl}\n\nCSV:\n${csvUrl}\n\nMarketVibe does not include generic company profiles, fabricated companies, or unverified lead-list records.`,
     };
   }
 
@@ -86,12 +84,12 @@ function deliveryCopy({
       subject: `Your MarketVibe Radar update: ${count} verified opportunities`,
       htmlContent: `
         <p>Your latest MarketVibe Radar delivery is ready.</p>
-        <p>${count} verified property and construction opportunities have been matched to your profile.</p>
+        <p>${count} verified buyer-intent opportunities have been matched to your customer profile.</p>
         ${htmlHighlights ? `<ul>${htmlHighlights}</ul>` : ""}
         <p><a href="${dashboardUrl}">Review the full Radar delivery</a></p>
         <p><a href="${csvUrl}">Download the CSV</a></p>
       `,
-      textContent: `Your latest MarketVibe Radar delivery is ready.\n\n${count} verified property and construction opportunities have been matched to your profile.\n\n${textHighlights}\n\nReview the full delivery:\n${dashboardUrl}\n\nDownload CSV:\n${csvUrl}`,
+      textContent: `Your latest MarketVibe Radar delivery is ready.\n\n${count} verified buyer-intent opportunities have been matched to your customer profile.\n\n${textHighlights}\n\nReview the full delivery:\n${dashboardUrl}\n\nDownload CSV:\n${csvUrl}`,
     };
   }
 
@@ -99,11 +97,11 @@ function deliveryCopy({
     subject: `Your managed MarketVibe delivery is ready (${count} verified opportunities)`,
     htmlContent: `
       <p>Your managed Growth Desk delivery is ready.</p>
-      <p>${count} verified property and construction opportunities have been matched to your brief.</p>
+      <p>${count} verified buyer-intent opportunities have been matched to your niche, territory, offer, and ideal-buyer brief.</p>
       <p><a href="${dashboardUrl}">Open your dashboard</a></p>
       <p><a href="${csvUrl}">Download the CSV</a></p>
     `,
-    textContent: `Your managed Growth Desk delivery is ready.\n\n${count} verified property and construction opportunities have been matched to your brief.\n\nDashboard:\n${dashboardUrl}\n\nCSV:\n${csvUrl}`,
+    textContent: `Your managed Growth Desk delivery is ready.\n\n${count} verified buyer-intent opportunities have been matched to your niche, territory, offer, and ideal-buyer brief.\n\nDashboard:\n${dashboardUrl}\n\nCSV:\n${csvUrl}`,
   };
 }
 
@@ -151,7 +149,7 @@ export async function sendPendingPremiumDeliveryEmails({ limit = 50 }: { limit?:
       continue;
     }
 
-    const assignments = genuinePropertyAssignments((assignmentData || []) as Array<Record<string, unknown>>);
+    const assignments = verifiedAssignments((assignmentData || []) as Array<Record<string, unknown>>);
     if (assignments.length === 0) {
       counters.skippedNoVerifiedOpportunities += 1;
       continue;

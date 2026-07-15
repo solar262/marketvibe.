@@ -2,19 +2,19 @@ import { NextResponse } from "next/server";
 import { sendTransactionalEmail } from "@/lib/brevo";
 import { ensureBuyerPipelineJobs } from "@/lib/buyer-pipeline-recovery";
 import { requireCron } from "@/lib/cron-auth";
+import { fillDueCustomerShortages } from "@/lib/delivery-cadence";
 import {
   backfillImportedBuyerCompanies,
   runBuyerPipelineWorker,
 } from "@/lib/operations-pipeline";
 import {
-  fillCustomerShortages,
   getOpportunityEngineSummary,
   publishDueOpportunityDeliveries,
   refreshStaleOpportunities,
-  runOpportunityVerification,
 } from "@/lib/opportunity-engine";
 import { sendPendingPremiumDeliveryEmails } from "@/lib/premium-delivery-email";
-import { runPropertyDiscoveryWithIntegrity } from "@/lib/property-opportunity-integrity";
+import { runProfileAwareOpportunityVerification } from "@/lib/profile-aware-verification";
+import { runCustomerProfileOpportunityDiscovery } from "@/lib/public-opportunity-discovery";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 export const runtime = "nodejs";
@@ -129,13 +129,13 @@ export async function GET(request: Request) {
   }));
 
   steps.push(await runStep("opportunity-discovery", () =>
-    runPropertyDiscoveryWithIntegrity({ trigger: "cron" })));
+    runCustomerProfileOpportunityDiscovery({ trigger: "cron" })));
 
   steps.push(await runStep("opportunity-verification", () =>
-    runOpportunityVerification({ trigger: "cron" })));
+    runProfileAwareOpportunityVerification({ trigger: "cron" })));
 
   steps.push(await runStep("customer-shortage-recovery", () =>
-    fillCustomerShortages({ trigger: "cron" })));
+    fillDueCustomerShortages({ trigger: "cron" })));
 
   steps.push(await runStep("stale-opportunity-replacement", () =>
     refreshStaleOpportunities({ trigger: "cron" })));
