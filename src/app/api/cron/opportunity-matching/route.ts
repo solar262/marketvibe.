@@ -8,5 +8,6 @@ export const maxDuration = 60;
 export async function GET(request: Request) {
   const unauthorized = requireCron(request);
   if (unauthorized) return unauthorized;
-  return NextResponse.json(await fillDueCustomerShortages({ trigger: "cron" }));
+  const result = await fillDueCustomerShortages({ trigger: "cron" });
+  return NextResponse.json(result, { status: result.ok ? 200 : 503 });
 }
