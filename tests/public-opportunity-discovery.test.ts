@@ -35,8 +35,8 @@ assert.match(query, /software/i);
 assert.match(query, /Vienna/i);
 
 const candidate = gdeltArticleToProfileCandidate({
-  url: "https://example-news.com/technology/acme-seeking-crm-implementation-partner-in-vienna",
-  title: "Acme seeking CRM implementation partner in Vienna",
+  url: "https://example-news.com/technology/acme-seeks-crm-implementation-partner-in-vienna",
+  title: "Acme seeks CRM implementation partner in Vienna",
   seendate: "20260715T083000Z",
   domain: "example-news.com",
   sourcecountry: "Austria",
@@ -49,8 +49,8 @@ assert.equal(candidate.niche, profile.niche);
 assert.equal(candidate.company_location, "Vienna, Austria");
 
 const relevantWithoutLocation = gdeltArticleToProfileCandidate({
-  url: "https://example-news.com/technology/acme-seeking-crm-implementation-partner",
-  title: "Acme seeking CRM implementation partner",
+  url: "https://example-news.com/technology/acme-seeks-crm-implementation-partner",
+  title: "Acme seeks CRM implementation partner",
   seendate: "20260715T083000Z",
   domain: "example-news.com",
 }, profile);
@@ -68,7 +68,7 @@ assert.equal(irrelevant, null);
 assert.equal(isDeliverableBuyerIntentOpportunity({
   source_type: "public_buyer_intent_news",
   source_url: "https://example-news.com/acme",
-  source_title: "Acme seeking CRM implementation partner",
+  source_title: "Acme seeks CRM implementation partner",
   source_text: "Acme is seeking a CRM implementation partner for a migration project.",
   intent_category: "verified_direct_intent",
   evidence_status: "public_signal_verified",
