@@ -14,7 +14,7 @@ import {
   runOpportunityVerification,
 } from "@/lib/opportunity-engine";
 import { sendPendingPremiumDeliveryEmails } from "@/lib/premium-delivery-email";
-import { runPropertyDiscoveryWithIntegrity } from "@/lib/property-opportunity-integrity";
+import { runCustomerProfileOpportunityDiscovery } from "@/lib/public-opportunity-discovery";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 export const runtime = "nodejs";
@@ -129,7 +129,7 @@ export async function GET(request: Request) {
   }));
 
   steps.push(await runStep("opportunity-discovery", () =>
-    runPropertyDiscoveryWithIntegrity({ trigger: "cron" })));
+    runCustomerProfileOpportunityDiscovery({ trigger: "cron" })));
 
   steps.push(await runStep("opportunity-verification", () =>
     runOpportunityVerification({ trigger: "cron" })));
