@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx tests/premium-products.test.ts && tsx tests/sales-navigator-import.test.ts && tsx tests/opportunity-lifecycle.test.ts && tsx tests/premium-delivery-email.test.ts && tsx tests/property-opportunity-sources.test.ts && tsx tests/public-opportunity-discovery.test.ts",
+    "test": "tsx tests/premium-products.test.ts && tsx tests/sales-navigator-import.test.ts && tsx tests/opportunity-lifecycle.test.ts && tsx tests/premium-delivery-email.test.ts && tsx tests/property-opportunity-sources.test.ts && tsx tests/public-opportunity-discovery.test.ts && tsx tests/operational-completion.test.ts",
     "test:reddit-radar": "node scripts/test-reddit-radar.mjs",
     "test:facebook-radar": "node scripts/test-facebook-radar.mjs",
     "smoke:cron-routes": "node scripts/smoke-cron-routes.mjs",
