@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireCron } from "@/lib/cron-auth";
-import { fillCustomerShortages } from "@/lib/opportunity-engine";
+import { fillDueCustomerShortages } from "@/lib/delivery-cadence";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -8,6 +8,5 @@ export const maxDuration = 60;
 export async function GET(request: Request) {
   const unauthorized = requireCron(request);
   if (unauthorized) return unauthorized;
-  return NextResponse.json(await fillCustomerShortages({ trigger: "cron" }));
+  return NextResponse.json(await fillDueCustomerShortages({ trigger: "cron" }));
 }
-
