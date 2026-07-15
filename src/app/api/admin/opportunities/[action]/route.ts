@@ -1,19 +1,20 @@
 import { NextResponse } from "next/server";
 import { requireAdminJson, safeApiError } from "@/lib/admin-api";
-import { getSupabaseAdmin } from "@/lib/supabase";
+import { publishVerifiedBuyerIntentDeliveries } from "@/lib/buyer-intent-delivery";
+import { assignVerifiedBuyerIntentOpportunities } from "@/lib/buyer-intent-matching";
 import {
-  approveReplacementRequest,
-  fillCustomerShortages,
-  publishDueOpportunityDeliveries,
-  refreshStaleOpportunities,
-  requestOpportunityReplacement,
-  runOpportunityVerification,
-  setOpportunityAutomationPaused,
-} from "@/lib/opportunity-engine";
+  approveBuyerIntentReplacement,
+  requestBuyerIntentReplacement,
+} from "@/lib/buyer-intent-replacements";
+import { fillDueCustomerShortages } from "@/lib/delivery-cadence";
+import { setOpportunityAutomationPaused } from "@/lib/opportunity-engine";
 import {
   PROPERTY_PROFILE_NICHE,
   runPropertyDiscoveryWithIntegrity,
 } from "@/lib/property-opportunity-integrity";
+import { runProfileAwareOpportunityVerification } from "@/lib/profile-aware-verification";
+import { runCustomerProfileOpportunityDiscovery } from "@/lib/public-opportunity-discovery";
+import { getSupabaseAdmin } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -127,15 +128,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ act
 
   try {
     if (action === "create-property-profile") return NextResponse.json(await createPropertyOpportunityProfile());
-    if (action === "run-discovery") return NextResponse.json(await runPropertyDiscoveryWithIntegrity({ trigger: "admin", profileId: body.profileId }));
-    if (action === "run-verification") return NextResponse.json(await runOpportunityVerification({ trigger: "admin" }));
-    if (action === "refresh-stale") return NextResponse.json(await refreshStaleOpportunities({ trigger: "admin" }));
-    if (action === "fill-shortages") return NextResponse.json(await fillCustomerShortages({ trigger: "admin", profileId: body.profileId }));
-    if (action === "publish-deliveries") return NextResponse.json(await publishDueOpportunityDeliveries({ trigger: "admin", sendEmail: body.sendEmail !== false }));
+    if (action === "run-discovery") return NextResponse.json(await runCustomerProfileOpportunityDiscovery({ trigger: "admin", profileId: body.profileId }));
+    if (action === "run-verification") return NextResponse.json(await runProfileAwareOpportunityVerification({ trigger: "admin", limit: 100 }));
+    if (action === "refresh-stale") return NextResponse.json(await runProfileAwareOpportunityVerification({ trigger: "admin", limit: 100 }));
+    if (action === "fill-shortages") {
+      return NextResponse.json(body.profileId
+        ? await assignVerifiedBuyerIntentOpportunities({ trigger: "admin", profileId: String(body.profileId) })
+        : await fillDueCustomerShortages({ trigger: "admin" }));
+    }
+    if (action === "publish-deliveries") return NextResponse.json(await publishVerifiedBuyerIntentDeliveries({ trigger: "admin", sendEmail: body.sendEmail !== false }));
     if (action === "pause") return NextResponse.json(await setOpportunityAutomationPaused(true, String(body.reason || "Paused by admin.")));
     if (action === "resume") return NextResponse.json(await setOpportunityAutomationPaused(false));
     if (action === "request-replacement") {
-      return NextResponse.json(await requestOpportunityReplacement({
+      return NextResponse.json(await requestBuyerIntentReplacement({
         assignmentId: String(body.assignmentId || ""),
         customerEmail: String(body.customerEmail || ""),
         reason: String(body.reason || "other"),
@@ -144,7 +149,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ act
       }));
     }
     if (action === "approve-replacement") {
-      return NextResponse.json(await approveReplacementRequest(String(body.requestId || ""), "admin", String(body.reviewNote || "")));
+      return NextResponse.json(await approveBuyerIntentReplacement(String(body.requestId || ""), "admin", String(body.reviewNote || "")));
     }
     return NextResponse.json({ error: "Unknown opportunity admin action." }, { status: 404 });
   } catch (error) {
