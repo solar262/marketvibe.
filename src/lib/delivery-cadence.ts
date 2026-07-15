@@ -81,7 +81,8 @@ export async function fillDueCustomerShortages({ trigger = "cron" }: { trigger?:
       requested: remaining,
       assigned,
       shortage,
-      runId: result.runId,
+      runId: "runId" in result ? result.runId : null,
+      reason: "reason" in result ? result.reason : null,
     });
   }
 
