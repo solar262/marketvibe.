@@ -1,17 +1,14 @@
 import { NextResponse } from "next/server";
 import { sendTransactionalEmail } from "@/lib/brevo";
 import { ensureBuyerPipelineJobs } from "@/lib/buyer-pipeline-recovery";
+import { publishVerifiedBuyerIntentDeliveries } from "@/lib/buyer-intent-delivery";
 import { requireCron } from "@/lib/cron-auth";
 import { fillDueCustomerShortages } from "@/lib/delivery-cadence";
 import {
   backfillImportedBuyerCompanies,
   runBuyerPipelineWorker,
 } from "@/lib/operations-pipeline";
-import {
-  getOpportunityEngineSummary,
-  publishDueOpportunityDeliveries,
-  refreshStaleOpportunities,
-} from "@/lib/opportunity-engine";
+import { getOpportunityEngineSummary } from "@/lib/opportunity-engine";
 import { sendPendingPremiumDeliveryEmails } from "@/lib/premium-delivery-email";
 import { runProfileAwareOpportunityVerification } from "@/lib/profile-aware-verification";
 import { runCustomerProfileOpportunityDiscovery } from "@/lib/public-opportunity-discovery";
@@ -132,16 +129,21 @@ export async function GET(request: Request) {
     runCustomerProfileOpportunityDiscovery({ trigger: "cron" })));
 
   steps.push(await runStep("opportunity-verification", () =>
-    runProfileAwareOpportunityVerification({ trigger: "cron" })));
+    runProfileAwareOpportunityVerification({ trigger: "cron", limit: 100 })));
 
-  steps.push(await runStep("customer-shortage-recovery", () =>
-    fillDueCustomerShortages({ trigger: "cron" })));
+  steps.push(await runStep("customer-shortage-recovery", async () => {
+    const result = await fillDueCustomerShortages({ trigger: "cron" });
+    if (!result.ok) {
+      throw new Error(`${result.totalShortage} verified buyer-intent opportunities are still missing across active paid customer profiles.`);
+    }
+    return result;
+  }));
 
-  steps.push(await runStep("stale-opportunity-replacement", () =>
-    refreshStaleOpportunities({ trigger: "cron" })));
+  steps.push(await runStep("stale-opportunity-reverification", () =>
+    runProfileAwareOpportunityVerification({ trigger: "cron", limit: 100 })));
 
   steps.push(await runStep("customer-delivery", async () => {
-    const published = await publishDueOpportunityDeliveries({
+    const published = await publishVerifiedBuyerIntentDeliveries({
       trigger: "cron",
       sendEmail: false,
     });
