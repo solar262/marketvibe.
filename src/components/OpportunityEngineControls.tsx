@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Loader2, Pause, Play, RefreshCw, Rocket, ShieldCheck, Target } from "lucide-react";
 
 const actions = [
-  ["create-property-profile", "Activate property profile and run discovery", Target],
+  ["create-property-profile", "Activate property profile and clean inventory", Target],
   ["run-verification", "Run verification now", ShieldCheck],
   ["refresh-stale", "Refresh stale records", RefreshCw],
   ["fill-shortages", "Fill customer shortages", Rocket],
@@ -57,7 +57,7 @@ export function OpportunityEngineControls() {
         </button>
       ))}
       <p className="md:col-span-2 xl:col-span-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-        Dedicated public property and construction discovery is active. The legacy local-business website-audit engine remains quarantined.
+        Property opportunities use dedicated property and construction sources only. The legacy local-business website-audit engine is quarantined.
       </p>
       {message && <p className="md:col-span-2 xl:col-span-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-900">{message}</p>}
       {error && <p className="md:col-span-2 xl:col-span-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-900">{error}</p>}
