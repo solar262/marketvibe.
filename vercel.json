@@ -45,6 +45,14 @@
       "schedule": "30 9 * * *"
     },
     {
+      "path": "/api/cron/sales-pipeline-2",
+      "schedule": "0 10 * * *"
+    },
+    {
+      "path": "/api/cron/sales-pipeline-3",
+      "schedule": "30 10 * * *"
+    },
+    {
       "path": "/api/cron/outbound-autopilot",
       "schedule": "0 9 * * 1-5"
     },
