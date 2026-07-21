@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { requireCron } from "@/lib/cron-auth";
-import { sendPendingProofPackPdfs } from "@/lib/proof-pack-delivery";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -10,8 +9,10 @@ export async function GET(request: Request) {
   const unauthorized = requireCron(request);
   if (unauthorized) return unauthorized;
 
-  const url = new URL(request.url);
-  const limit = Number(url.searchParams.get("limit") || "10");
-  const result = await sendPendingProofPackPdfs({ limit });
-  return NextResponse.json(result);
+  return NextResponse.json({
+    ok: true,
+    skipped: true,
+    reason: "legacy_lead_vault_proof_pack_delivery_retired",
+    replacement: "/api/cron/opportunity-delivery",
+  });
 }

@@ -1,0 +1,38 @@
+MARKETVIBE SALES NAVIGATOR COMPANION - START HERE
+
+1. Open Microsoft Edge.
+2. Go to:
+   edge://extensions
+3. Turn on Developer mode.
+4. Click Load unpacked.
+5. Select this FOLDER, not a file:
+   C:\marketvibe-pro\browser-extension\sales-navigator-companion
+6. Confirm you see:
+   MarketVibe Sales Navigator Companion
+
+DAILY USE
+
+1. Log in to Sales Navigator:
+   https://www.linkedin.com/sales/search/people
+2. The MarketVibe panel appears bottom-right.
+3. Click Start finder.
+4. Let it open searches and capture visible qualified result cards.
+   The finder targets builders, construction firms, property developers,
+   luxury real-estate companies, estate agents, and decision-makers.
+   It rejects marketing agencies, lead-generation agencies, SEO agencies,
+   advertising agencies, and consultants as lead records.
+5. The tool pauses after a conservative batch. Do not force continuous runs.
+6. Click Send to MarketVibe.
+7. If asked, log in to MarketVibe admin:
+   https://www.marketvibe1.com/admin/import
+8. The import page will automatically import the captured batch.
+9. Download CSV only if you want a backup.
+10. Wait before starting another batch.
+
+IMPORTANT
+
+- The tool captures visible result cards only.
+- It does not collect cookies, passwords, private messages, or hidden LinkedIn API data.
+- If LinkedIn asks for verification, stop and complete it manually.
+- If LinkedIn shows Too Many Requests, stop and wait. Do not restart immediately.
+- If the panel does not show, refresh the Sales Navigator tab after loading the extension.

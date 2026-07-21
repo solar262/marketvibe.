@@ -26,16 +26,30 @@ async function providerItems(): Promise<SetupItem[]> {
     .from("marketvibe_provider_configurations")
     .select("provider_name,health_status,health_message,credential_state,last_successful_run")
     .order("provider_name", { ascending: true });
-  return (data || []).map((provider) => ({
-    name: String(provider.provider_name),
-    required: ["Uploaded XLSX and CSV files", "Company websites"].includes(String(provider.provider_name)),
-    status: String(provider.health_status) as SetupItem["status"],
-    explanation: String(provider.health_message || "Provider state is persisted."),
-    setupLocation: "/admin/setup",
-    maskedCredential: `credential_state: ${provider.credential_state}`,
-    lastSuccessfulTest: provider.last_successful_run ? String(provider.last_successful_run) : "No successful run recorded",
-    ownerAction: provider.health_status === "Operational" ? "No action required." : "Configure provider credentials or disable this provider.",
-  }));
+  return (data || []).map((provider) => {
+    const name = String(provider.provider_name);
+    const emailConfigured = Boolean(process.env.BREVO_API_KEY && process.env.BREVO_SENDER_EMAIL);
+    const stripeConfigured = Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET);
+    const schedulerConfigured = Boolean(process.env.CRON_SECRET);
+    const environmentConnected = name === "Transactional email provider" && emailConfigured
+      || name === "Stripe billing" && stripeConfigured
+      || name === "Vercel Cron scheduler" && schedulerConfigured;
+    const status: SetupItem["status"] = environmentConnected || provider.health_status === "Operational"
+      ? "Connected"
+      : provider.health_status === "Degraded"
+        ? "Degraded"
+        : "Blocked";
+    return {
+      name,
+      required: ["Uploaded XLSX and CSV files", "Company websites", "Vercel Cron scheduler"].includes(name),
+      status,
+      explanation: environmentConnected ? "Required production configuration is present." : String(provider.health_message || "Provider state is persisted."),
+      setupLocation: "/admin/setup",
+      maskedCredential: environmentConnected ? "production configuration: present" : `credential_state: ${provider.credential_state}`,
+      lastSuccessfulTest: environmentConnected ? "Current environment check" : provider.last_successful_run ? String(provider.last_successful_run) : "No successful run recorded",
+      ownerAction: status === "Connected" ? "No action required." : "Configure provider credentials or disable this provider.",
+    };
+  });
 }
 
 export default async function SetupWizardPage() {

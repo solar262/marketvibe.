@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "MarketVibe Sales Navigator Companion",
+  "version": "0.1.7",
+  "description": "Local companion for turning permitted visible Sales Navigator results into MarketVibe CSV/import rows.",
+  "permissions": ["storage", "clipboardWrite"],
+  "host_permissions": [
+    "https://www.linkedin.com/*",
+    "https://linkedin.com/*",
+    "https://www.marketvibe1.com/*",
+    "https://marketvibe1.com/*",
+    "http://localhost:*/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.linkedin.com/sales/*",
+        "https://www.linkedin.com/search/*",
+        "https://www.marketvibe1.com/admin/import*",
+        "https://marketvibe1.com/admin/import*",
+        "http://localhost:*/admin/import*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

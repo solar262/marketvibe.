@@ -11,25 +11,21 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
-      "/tools",
-      "/calculators",
-      "/business-ideas",
-      "/affiliate-niches",
-      "/digital-products",
-      "/reports",
       "/products",
       "/categories",
       "/cart",
-      "/checkout",
-      "/shipping",
-      "/refund",
-      "/admin/products",
-      "/admin/orders",
-      "/admin/fulfillment",
+      "/digital-products",
+      "/lead-packs",
+      "/business-ideas",
+      "/calculators",
+      "/tools",
+      "/affiliate-niches",
+      "/legacy-delivery",
+      "/checkout"
     ].map((source) => ({
       source: `${source}/:path*`,
-      destination: source.startsWith("/admin") ? "/admin" : "/dashboard",
-      permanent: false,
+      destination: "/pricing",
+      permanent: true,
     }));
   },
 };

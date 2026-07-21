@@ -1,30 +1,13 @@
 import { NextResponse } from "next/server";
-import { requireAdminJson, safeApiError } from "@/lib/admin-api";
-import { publishProspects } from "@/lib/sales-navigator-persistence";
-import { isPremiumProductCode } from "@/lib/premium-products";
+import { requireAdminJson } from "@/lib/admin-api";
 
 export const runtime = "nodejs";
 
-export async function POST(request: Request) {
+export async function POST() {
   const unauthorized = await requireAdminJson();
   if (unauthorized) return unauthorized;
-
-  try {
-    const payload = await request.json();
-    const ids = Array.isArray(payload.ids) ? payload.ids.map(String) : [];
-    if (!isPremiumProductCode(payload.productCode)) {
-      return NextResponse.json({ error: "Choose a valid product." }, { status: 400 });
-    }
-    const result = await publishProspects({
-      ids,
-      customerEmail: String(payload.customerEmail || ""),
-      productCode: payload.productCode,
-      adminConfirmedCustomer: Boolean(payload.adminConfirmedCustomer),
-      adminNotes: String(payload.adminNotes || ""),
-      includeProfileOnly: Boolean(payload.includeProfileOnly),
-    });
-    return NextResponse.json({ ok: true, result });
-  } catch (error) {
-    return safeApiError(error, "Publish failed.");
-  }
+  return NextResponse.json({
+    error: "Direct imported-prospect delivery is retired. Approve source-backed signals and deliver them through the Opportunity Engine.",
+    fulfillmentMode: "verified_opportunity_engine",
+  }, { status: 410 });
 }

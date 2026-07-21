@@ -22,6 +22,8 @@ export async function GET(request: Request) {
 
   const backfill = await backfillImportedBuyerCompanies({ supabase });
   const recovery = await ensureBuyerPipelineJobs({ supabase });
-  const result = await runBuyerPipelineWorker({ supabase, workerId: "cron-buyer-pipeline" });
+  const requestedLimit = Number(new URL(request.url).searchParams.get("limit") || 5);
+  const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(Math.floor(requestedLimit), 1), 20) : 5;
+  const result = await runBuyerPipelineWorker({ supabase, workerId: "cron-buyer-pipeline", limit });
   return NextResponse.json({ ok: true, job: "buyer-pipeline", backfill, recovery, result });
 }

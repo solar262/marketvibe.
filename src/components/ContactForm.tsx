@@ -16,7 +16,7 @@ export function ContactForm({ offer }: { offer: string }) {
     const form = new FormData(formElement);
 
     try {
-      const response = await fetch("/api/contact", {
+      const response = await fetch(offer === "data-request" ? "/api/data-requests" : "/api/contact", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(Object.fromEntries(form.entries())),
@@ -40,7 +40,7 @@ export function ContactForm({ offer }: { offer: string }) {
       <input type="hidden" name="offer" value={offer} />
       {offer !== "general" && (
         <p className="rounded-md bg-violet-50 p-3 text-sm font-semibold text-violet-900">
-          Enquiry type: {offer === "agency-partner" ? "Agency Partner" : "Data Licence"}
+          Enquiry type: {offer === "agency-partner" ? "Agency Partner" : offer === "data-licence" ? "Data Licence" : offer === "data-request" ? "Data request" : offer}
         </p>
       )}
       <label className="grid gap-1 text-sm font-medium">
@@ -55,6 +55,18 @@ export function ContactForm({ offer }: { offer: string }) {
         Email
         <input required type="email" name="email" className={inputClass} />
       </label>
+      {offer === "data-request" && (
+        <label className="grid gap-1 text-sm font-medium">
+          Request type
+          <select required name="requestType" defaultValue="access" className={inputClass}>
+            <option value="access">Access my data</option>
+            <option value="correction">Correct my data</option>
+            <option value="deletion">Delete my data</option>
+            <option value="objection">Object to processing</option>
+            <option value="suppression">Stop all marketing</option>
+          </select>
+        </label>
+      )}
       <label className="grid gap-1 text-sm font-medium">
         Message
         <textarea required name="message" rows={5} className={inputClass} />
@@ -66,7 +78,7 @@ export function ContactForm({ offer }: { offer: string }) {
         {status === "sending" ? "Sending…" : "Send message"}
       </button>
       {status === "sent" && (
-        <p className="rounded-md bg-violet-50 p-3 text-sm text-violet-900">Message sent.</p>
+        <p className="rounded-md bg-violet-50 p-3 text-sm text-violet-900">{offer === "data-request" ? "Request recorded. Marketing suppression is immediate where applicable." : "Message sent."}</p>
       )}
       {status === "error" && (
         <p className="rounded-md bg-red-50 p-3 text-sm text-red-800">{errorMessage}</p>

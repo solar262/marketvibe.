@@ -3,6 +3,7 @@ import { track } from "@vercel/analytics/server";
 import { deliverStripeSession } from "@/lib/buyer-delivery";
 import {
   markStripeEventProcessing,
+  releaseStripeEventForRetry,
   updateEntitlementForSubscription,
   updateEntitlementStatusBySubscriptionId,
 } from "@/lib/premium-persistence";
@@ -13,6 +14,7 @@ export async function handleVerifiedStripeEvent(event: Stripe.Event) {
     return { received: true, duplicate: true };
   }
 
+  try {
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
     if (session.payment_status === "paid" || session.mode === "subscription") {
@@ -44,6 +46,10 @@ export async function handleVerifiedStripeEvent(event: Stripe.Event) {
   }
 
   return { received: true, duplicate: false };
+  } catch (error) {
+    await releaseStripeEventForRetry(event.id);
+    throw error;
+  }
 }
 
 export async function stripeWebhookResponse(request: Request) {

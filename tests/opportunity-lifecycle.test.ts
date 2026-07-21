@@ -483,9 +483,9 @@ assert.match(engineSource, /premium_orders/, "Customer matching and delivery mus
 assert.match(engineSource, /@marketvibe\.local/, "Internal source profiles must not be treated as billable customer delivery profiles.");
 assert.match(engineSource, /no_billable_customer_profiles/, "Matching must skip cleanly when no paid customer profiles exist.");
 assert.match(engineSource, /customer_has_no_active_paid_access/, "Delivery must block queued assignments without active paid access.");
-assert.match(engineSource, /syncApprovedNavigatorProspectsToOpportunities/, "Approved Navigator imports must be promoted into the opportunity engine.");
-assert.match(engineSource, /sales_navigator_visible_card/, "Navigator opportunities must preserve visible-card provenance.");
-assert.match(engineSource, /NAVIGATOR_QUALIFYING_SIGNAL_PATTERN/, "Navigator promotion must require a real buying or pain signal.");
+assert.match(engineSource, /syncApprovedNavigatorProspectsToOpportunities/, "Navigator imports must have an explicit opportunity-engine boundary.");
+assert.match(engineSource, /sales_navigator_visible_card/, "Navigator records must preserve visible-card provenance.");
+assert.match(engineSource, /navigator_bridge_disabled_for_new_model/, "Navigator records must remain internal research stock instead of customer inventory.");
 const navigatorCompanionSource = readFileSync(join(process.cwd(), "browser-extension", "sales-navigator-companion", "content.js"), "utf8");
 assert.match(navigatorCompanionSource, /targetHit && roleHit && signalHit/, "Navigator companion must require a visible signal before capture.");
 assert.match(navigatorCompanionSource, /SEARCH_SIGNAL_MODIFIERS/, "Navigator companion searches must include signal modifiers.");

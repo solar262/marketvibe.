@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ClipboardPaste, Download, FileUp, Loader2, Send, ShieldCheck } from "lucide-react";
+import { ClipboardPaste, Download, FileUp, Loader2, ShieldCheck } from "lucide-react";
 
 type ImportField =
   | "first_name"
@@ -120,12 +120,6 @@ const fields: Array<{ value: ImportField; label: string }> = [
   ["source_note", "Source note"],
 ].map(([value, label]) => ({ value: value as ImportField, label }));
 
-const productOptions = [
-  ["proof_pack", "Proof Pack"],
-  ["radar", "Radar"],
-  ["growth_desk", "Growth Desk"],
-] as const;
-
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, init);
   const contentType = response.headers.get("content-type") || "";
@@ -152,7 +146,6 @@ export function AdminImportConsole() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [filters, setFilters] = useState({ batchId: "", evidenceStatus: "", enrichmentStatus: "", company: "", country: "", city: "", industry: "", minFitScore: "" });
-  const [assignment, setAssignment] = useState({ customerEmail: "", productCode: "proof_pack", count: "25", adminNotes: "", adminConfirmedCustomer: false, includeProfileOnly: false });
   const [quickPaste, setQuickPaste] = useState({ urls: "", niche: "", location: "", sourceNote: "", publicSignalText: "" });
   const [quickPasteResult, setQuickPasteResult] = useState<QuickPasteResult | null>(null);
   const [approveValidRows, setApproveValidRows] = useState(true);
@@ -622,7 +615,7 @@ export function AdminImportConsole() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h2 className="text-xl font-semibold">Batch history and review</h2>
-              <p className="mt-1 text-sm text-violet-100/65">Imported prospects do not publish automatically. Select records, review evidence, assign, then publish.</p>
+              <p className="mt-1 text-sm text-violet-100/65">Imported records are internal source candidates. Approving a record syncs only qualifying public signals into Opportunity Inventory; customer delivery happens exclusively through the Opportunity Engine.</p>
             </div>
             <button onClick={() => void refresh()} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10">Refresh</button>
           </div>
@@ -646,7 +639,7 @@ export function AdminImportConsole() {
             <table className="w-full min-w-[1400px] text-left text-xs">
               <thead className="bg-white/10 text-violet-100">
                 <tr>
-                  <th className="px-3 py-2">Select</th><th>Name</th><th>Title</th><th>Company</th><th>Location</th><th>Industry</th><th>Website</th><th>LinkedIn source</th><th>Fit</th><th>Intent</th><th>Evidence</th><th>Enrichment</th><th>Review</th><th>Assigned</th><th>Delivery</th>
+                  <th className="px-3 py-2">Select</th><th>Name</th><th>Title</th><th>Company</th><th>Location</th><th>Industry</th><th>Website</th><th>LinkedIn source</th><th>Fit</th><th>Intent</th><th>Evidence</th><th>Enrichment</th><th>Review</th><th>Historical assignment</th><th>Historical delivery</th>
                 </tr>
               </thead>
               <tbody>
@@ -676,7 +669,7 @@ export function AdminImportConsole() {
             </table>
           </div>
 
-          <div className="mt-5 grid gap-4 xl:grid-cols-[1fr_1.2fr]">
+          <div className="mt-5 grid gap-4 xl:grid-cols-2">
             <div className="rounded-lg border border-white/10 bg-black/20 p-4">
               <h3 className="font-semibold">Selected actions</h3>
               <p className="mt-1 text-sm text-violet-100/65">{selectedIds.length} selected · {evidenceCounts.profileOnly} profile-only · {evidenceCounts.website} website-verified · {evidenceCounts.publicSignal} public-signal-verified · {evidenceCounts.noIntent} without intent evidence</p>
@@ -690,24 +683,11 @@ export function AdminImportConsole() {
             </div>
 
             <div className="rounded-lg border border-white/10 bg-black/20 p-4">
-              <h3 className="font-semibold">Assign and publish</h3>
-              <div className="mt-4 grid gap-3 md:grid-cols-2">
-                <input value={assignment.customerEmail} onChange={(event) => setAssignment({ ...assignment, customerEmail: event.target.value })} placeholder="Customer billing email" className="rounded-lg border border-white/10 bg-[#13071f] px-3 py-2 text-sm outline-none" />
-                <select value={assignment.productCode} onChange={(event) => setAssignment({ ...assignment, productCode: event.target.value })} className="rounded-lg border border-white/10 bg-[#13071f] px-3 py-2 text-sm">
-                  {productOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                </select>
-                <input value={assignment.count} onChange={(event) => setAssignment({ ...assignment, count: event.target.value })} placeholder="Number of opportunities" className="rounded-lg border border-white/10 bg-[#13071f] px-3 py-2 text-sm outline-none" />
-                <input value={assignment.adminNotes} onChange={(event) => setAssignment({ ...assignment, adminNotes: event.target.value })} placeholder="Internal delivery note" className="rounded-lg border border-white/10 bg-[#13071f] px-3 py-2 text-sm outline-none" />
-              </div>
-              <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={assignment.adminConfirmedCustomer} onChange={(event) => setAssignment({ ...assignment, adminConfirmedCustomer: event.target.checked })} /> Administrator-confirmed customer record</label>
-              <label className="mt-2 flex items-center gap-2 text-sm"><input type="checkbox" checked={assignment.includeProfileOnly} onChange={(event) => setAssignment({ ...assignment, includeProfileOnly: event.target.checked })} /> Include profile-only records in delivery</label>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button onClick={() => void action("/api/admin/import/assign", { ids: selectedIds.slice(0, Number(assignment.count) || selectedIds.length), ...assignment }, "Selected records assigned.")} className="rounded-lg border border-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/10">Assign selected</button>
-                <button onClick={() => void action("/api/admin/import/publish", { ids: selectedIds.slice(0, Number(assignment.count) || selectedIds.length), ...assignment }, "Publish attempted. Delivery recorded only if the server completed every step.")} className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-500 px-3 py-2 text-sm font-bold text-white hover:brightness-110">
-                  {busy === "/api/admin/import/publish" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  Publish to customer
-                </button>
-              </div>
+              <h3 className="font-semibold">Customer delivery separation</h3>
+              <p className="mt-2 text-sm leading-6 text-violet-100/65">
+                Direct assignment and publishing from imported rows is retired. Profile-only, website-audit, and legacy lead records remain internal. A record reaches a customer only after it becomes a qualified Opportunity Inventory item and is matched to a paid search profile.
+              </p>
+              <a href="/admin/opportunity-engine" className="mt-4 inline-flex rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-500 px-4 py-2 text-sm font-bold text-white hover:brightness-110">Open Opportunity Engine</a>
             </div>
           </div>
         </section>

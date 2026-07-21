@@ -86,6 +86,8 @@ const AUTO_FULFILLMENT_MINIMUMS: Record<PremiumProductCode, number> = {
   growth_desk: 15,
 };
 
+const LEGACY_IMPORTED_CUSTOMER_DELIVERY_RETIRED = true;
+
 const AUTO_MATCH_STOP_WORDS = new Set([
   "and",
   "are",
@@ -645,6 +647,9 @@ export async function publishProspects({
   includeProfileOnly: boolean;
   onboardingId?: string | null;
 }) {
+  if (LEGACY_IMPORTED_CUSTOMER_DELIVERY_RETIRED) {
+    throw new Error("Direct imported-prospect delivery is retired. Use qualified Opportunity Inventory assignments.");
+  }
   const supabase = supabaseOrThrow();
   const email = normalizedEmail(customerEmail);
   await assertCanAssignCustomer(email, adminConfirmedCustomer);
@@ -765,6 +770,18 @@ export async function autoFulfillImportedProspectsForOnboarding({
   idealBuyer?: string;
   quantity?: number;
 }) {
+  if (LEGACY_IMPORTED_CUSTOMER_DELIVERY_RETIRED) {
+    return {
+      ok: true,
+      status: "retired" as const,
+      customerEmail: normalizedEmail(customerEmail),
+      productCode,
+      matchedProspects: 0,
+      targetQuantity: 0,
+      minimumQuantity: 0,
+      replacement: "verified_opportunity_engine",
+    };
+  }
   const supabase = supabaseOrThrow();
   const email = normalizedEmail(customerEmail);
   const targetQuantity = Math.max(1, Math.min(100, Math.floor(quantity || AUTO_FULFILLMENT_TARGETS[productCode])));
@@ -862,6 +879,18 @@ export async function autoFulfillImportedProspectsForOnboarding({
 }
 
 export async function autoFulfillPendingImportedProspectOnboardings({ limit = 20 }: { limit?: number } = {}) {
+  if (LEGACY_IMPORTED_CUSTOMER_DELIVERY_RETIRED) {
+    return {
+      ok: true,
+      attempted: 0,
+      delivered: 0,
+      awaitingSupply: 0,
+      failed: 0,
+      retired: true,
+      replacement: "verified_opportunity_engine",
+      results: [],
+    };
+  }
   const supabase = supabaseOrThrow();
   const { data, error } = await supabase
     .from("premium_onboarding")

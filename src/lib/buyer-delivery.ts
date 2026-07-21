@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import { addContactToMarketVibeList, addOrUpdateContact, scheduleBuyerSequence, sendTransactionalEmail } from "./brevo";
+import { addContactToMarketVibeList, addOrUpdateContact, sendTransactionalEmail } from "./brevo";
 import {
   isLegacyProductCode,
   isPremiumProductCode,
@@ -7,30 +7,28 @@ import {
   onboardingPathForProduct,
   premiumProductLabel,
   premiumProducts,
-  type CheckoutProductCode,
   type PremiumProductCode,
 } from "./premium-products";
 import {
   recordCompletedPremiumOrder,
-  recordPaidSampleRequestFromSession,
   upsertPremiumEntitlement,
 } from "./premium-persistence";
 import { appendCustomerAccessParams, createCustomerAccessToken } from "./customer-access";
+import { stopSalesFollowUps } from "./sales-pipeline";
 
-export type MarketVibeProduct = CheckoutProductCode;
+export type MarketVibeProduct = PremiumProductCode;
 
 type DeliveryInput = {
   email: string;
   product: PremiumProductCode;
-  requestedProduct?: CheckoutProductCode;
+  requestedProduct?: PremiumProductCode;
   leadSlug?: string;
   sessionId?: string;
 };
 
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.marketvibe1.com";
 
-function accessUrl(product: PremiumProductCode, requestedProduct?: CheckoutProductCode, leadSlug?: string, sessionId?: string, email?: string) {
-  if (requestedProduct === "audit" && leadSlug) return `${baseUrl}/audit/${leadSlug}?unlocked=1`;
+function accessUrl(product: PremiumProductCode, sessionId?: string, email?: string) {
   if (product === "proof_pack") return `${baseUrl}${onboardingPathForProduct("proof_pack", sessionId, email)}`;
   if (product === "radar") return `${baseUrl}${onboardingPathForProduct("radar", sessionId, email)}`;
   if (product === "growth_desk") return `${baseUrl}${onboardingPathForProduct("growth_desk", sessionId, email)}`;
@@ -51,16 +49,17 @@ export function classifyStripeSession(session: Stripe.Checkout.Session): Premium
   return "proof_pack";
 }
 
-export function requestedProductFromSession(session: Stripe.Checkout.Session): CheckoutProductCode {
+export function requestedProductFromSession(session: Stripe.Checkout.Session): PremiumProductCode {
   const requested = session.metadata?.requested_product || session.metadata?.product || session.metadata?.plan;
-  if (isPremiumProductCode(requested) || isLegacyProductCode(requested)) return requested;
+  if (isPremiumProductCode(requested)) return requested;
+  if (isLegacyProductCode(requested)) return legacyProductMap[requested];
   return classifyStripeSession(session);
 }
 
 export async function sendBuyerDeliveryEmail({ email, product, requestedProduct, leadSlug, sessionId }: DeliveryInput) {
   const normalizedEmail = email.trim().toLowerCase();
   const label = premiumProductLabel(product);
-  const access = accessUrl(product, requestedProduct, leadSlug, sessionId, normalizedEmail);
+  const access = accessUrl(product, sessionId, normalizedEmail);
   const pricingUrl = `${baseUrl}/pricing`;
   const supportUrl = `${baseUrl}/contact`;
   const accessToken = createCustomerAccessToken(normalizedEmail);
@@ -127,7 +126,6 @@ MarketVibe`;
     htmlContent,
     textContent,
   });
-  await scheduleBuyerSequence(normalizedEmail);
 }
 
 export async function deliverStripeSession(session: Stripe.Checkout.Session) {
@@ -139,9 +137,6 @@ export async function deliverStripeSession(session: Stripe.Checkout.Session) {
   const leadSlug = session.metadata?.leadSlug || session.metadata?.lead_slug || session.client_reference_id || undefined;
 
   await recordCompletedPremiumOrder(session);
-  if (product === "proof_pack") {
-    await recordPaidSampleRequestFromSession(session);
-  }
   await upsertPremiumEntitlement({
     email,
     productCode: product,
@@ -149,6 +144,12 @@ export async function deliverStripeSession(session: Stripe.Checkout.Session) {
     stripeCustomerId: typeof session.customer === "string" ? session.customer : undefined,
     stripeSubscriptionId: typeof session.subscription === "string" ? session.subscription : undefined,
     metadata: session.metadata || {},
+  });
+
+  await stopSalesFollowUps({
+    email,
+    reason: `purchase:${product}`,
+    stage: product === "proof_pack" ? "proof_pack_purchased" : "subscriber",
   });
 
   await sendBuyerDeliveryEmail({

@@ -64,7 +64,6 @@ function badgeClasses(value: string) {
   if (value === "Medium") return "border-amber-300/30 bg-amber-300/15 text-amber-100";
   return "border-slate-300/20 bg-slate-300/10 text-slate-200";
 }
-
 function riskClasses(value: string) {
   if (value === "Low") return "border-emerald-300/30 bg-emerald-300/15 text-emerald-100";
   if (value === "Medium") return "border-amber-300/30 bg-amber-300/15 text-amber-100";

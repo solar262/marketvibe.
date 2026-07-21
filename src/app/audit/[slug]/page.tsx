@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { Download, HelpCircle, LockKeyhole } from "lucide-react";
-import { CheckoutButton } from "@/components/CheckoutButton";
 import { findLeadBySlug } from "@/lib/lead-engine";
 import { getAuditBySlugFromSupabase } from "@/lib/lead-persistence";
 
@@ -158,17 +157,17 @@ export default async function AuditPage({
         {!isUnlocked ? (
           <section className="mt-8 rounded-lg border border-slate-200 bg-slate-950 p-6 text-white">
             <LockKeyhole className="h-7 w-7 text-emerald-300" />
-            <h2 className="mt-4 text-2xl font-semibold">Validate this market with a Proof Pack</h2>
+            <h2 className="mt-4 text-2xl font-semibold">Legacy website-audit preview</h2>
             <p className="mt-2 max-w-2xl text-slate-300">
-              MarketVibe now sells Proof Pack, Radar, and Growth Desk. The Proof Pack is a one-off €99 buyer-intent sample built from source-backed signals where available.
+              This archived website-audit format is not included in current Proof Pack, Radar, or Growth Desk delivery. Current products use verified opportunity inventory and source-backed buyer-intent signals.
             </p>
             <div className="mt-5 rounded-md border border-white/10 bg-white/5 p-4 text-sm leading-6 text-slate-200">
               <strong className="text-white">How buyers can use it:</strong> review source-backed opportunities, context notes, and fit guidance before committing to recurring Radar delivery. MarketVibe does not guarantee replies, clients, income, or sales.
             </div>
             <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <CheckoutButton product="proof_pack" leadSlug={lead.slug} className="inline-flex items-center justify-center gap-2 rounded-md bg-white px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-slate-100">
-                Buy Proof Pack €99
-              </CheckoutButton>
+              <Link href="/pricing" className="inline-flex items-center justify-center gap-2 rounded-md bg-white px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-slate-100">
+                View current MarketVibe plans
+              </Link>
               <Link href="/faq" className="inline-flex items-center justify-center gap-2 rounded-md border border-white/20 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10">
                 <HelpCircle className="h-4 w-4" /> Read Buyer Q&amp;A
               </Link>
@@ -176,7 +175,7 @@ export default async function AuditPage({
                 Terms
               </Link>
             </div>
-            <p className="mt-3 text-xs leading-5 text-slate-400">By continuing to Stripe, the buyer agrees to the MarketVibe Terms of Service.</p>
+            <p className="mt-3 text-xs leading-5 text-slate-400">No current MarketVibe purchase is fulfilled from this archived audit record.</p>
           </section>
         ) : (
           <section className="mt-8 grid gap-6">

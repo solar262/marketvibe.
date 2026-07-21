@@ -4,7 +4,7 @@ import { join } from "node:path";
 import Stripe from "stripe";
 import { buildCheckoutSessionParams } from "../src/lib/premium-checkout";
 import { classifyStripeSession, requestedProductFromSession } from "../src/lib/buyer-delivery";
-import { normalizeCheckoutProduct, premiumProducts } from "../src/lib/premium-products";
+import { isAutonomousCheckoutProduct, normalizeCheckoutProduct, premiumProducts } from "../src/lib/premium-products";
 import { createCustomerAccessToken, verifyCustomerAccessToken } from "../src/lib/customer-access";
 import { resolveProofPackPrice } from "../src/lib/proof-pack-pricing";
 import { sampleRequestRowFromStripeSession } from "../src/lib/premium-persistence";
@@ -68,17 +68,15 @@ assert.equal(radar.line_items?.[0]?.price_data?.unit_amount, 29900);
 assert.deepEqual(radar.line_items?.[0]?.price_data?.recurring, { interval: "month" });
 assert.equal(radar.subscription_data?.metadata?.product_code, "radar");
 
-const growthDesk = buildCheckoutSessionParams({
+assert.equal(isAutonomousCheckoutProduct("proof_pack"), true);
+assert.equal(isAutonomousCheckoutProduct("radar"), true);
+assert.equal(isAutonomousCheckoutProduct("growth_desk"), false);
+assert.throws(() => buildCheckoutSessionParams({
   product: "growth_desk",
   customer: { email: "buyer@example.com" },
   returnOrigin: origin,
   order: "MV-TEST-GROWTH",
-});
-
-assert.equal(growthDesk.mode, "subscription");
-assert.equal(growthDesk.metadata?.product_code, "growth_desk");
-assert.equal(growthDesk.line_items?.[0]?.price_data?.unit_amount, 75000);
-assert.deepEqual(growthDesk.line_items?.[0]?.price_data?.recurring, { interval: "month" });
+}), /autonomous delivery/);
 
 const legacyAudit = buildCheckoutSessionParams({
   product: "audit",
@@ -88,9 +86,10 @@ const legacyAudit = buildCheckoutSessionParams({
 });
 
 assert.equal(legacyAudit.metadata?.product_code, "proof_pack");
-assert.equal(legacyAudit.metadata?.requested_product, "audit");
-assert.equal(legacyAudit.metadata?.legacy_product, "audit");
+assert.equal(legacyAudit.metadata?.requested_product, "proof_pack");
+assert.equal(legacyAudit.metadata?.legacy_product, undefined);
 assert.equal(legacyAudit.__marketvibe.premiumProduct, "proof_pack");
+assert.equal(legacyAudit.line_items?.[0]?.price_data?.product_data?.name, "MarketVibe Proof Pack");
 
 assert.equal(normalizeCheckoutProduct("audit"), "proof_pack");
 assert.equal(normalizeCheckoutProduct("starter"), "radar");
@@ -117,7 +116,7 @@ assert.equal(
 );
 assert.equal(
   requestedProductFromSession(fakeSession({ mode: "payment", metadata: { requested_product: "audit", product_code: "proof_pack" } })),
-  "audit",
+  "proof_pack",
 );
 
 const paidSampleRequest = sampleRequestRowFromStripeSession(fakeSession({
@@ -170,6 +169,8 @@ assert.match(radarEmailSource, /SENDGRID_DAILY_RADAR_TEMPLATE_ID/, "Daily Radar 
 const checkoutRouteSource = readFileSync(join(process.cwd(), "src", "app", "api", "checkout", "route.ts"), "utf8");
 assert.match(checkoutRouteSource, /Checkout is temporarily unavailable/, "Production checkout must fail closed when Stripe is not configured.");
 assert.match(checkoutRouteSource, /process\.env\.NODE_ENV === "production"/, "Demo checkout fallback must not run in production.");
+assert.match(checkoutRouteSource, /Choose a current MarketVibe product/, "Public checkout must reject retired legacy product codes.");
+assert.match(checkoutRouteSource, /Growth Desk is not available for purchase/, "Growth Desk must not be sold before autonomous delivery is complete.");
 const autopilotCronSource = readFileSync(join(process.cwd(), "src", "app", "api", "cron", "autopilot", "route.ts"), "utf8");
 assert.match(autopilotCronSource, /requireCron/, "Autopilot cron route must be protected by cron authentication.");
 const vercelConfigSource = readFileSync(join(process.cwd(), "vercel.json"), "utf8");

@@ -38,8 +38,6 @@ export default async function MarketVibeOperationsPage() {
     meetingsRequested,
     activeCustomers,
     exceptions,
-    providerBlocked,
-    providerDegraded,
   ] = await Promise.all([
     countRows("marketvibe_buyer_companies", [{ kind: "in", column: "buyer_status", values: ["qualified", "active"] }, { kind: "eq", column: "is_test_data", value: false }]),
     countRows("opportunities", [{ kind: "eq", column: "inventory_status", value: "IN_INVENTORY" }, { kind: "eq", column: "is_test_data", value: false }]),
@@ -51,25 +49,27 @@ export default async function MarketVibeOperationsPage() {
     countRows("marketvibe_outreach_drafts", [{ kind: "eq", column: "outreach_status", value: "meeting_requested" }]),
     countRows("marketvibe_customer_profiles", [{ kind: "eq", column: "active", value: true }]),
     countRows("marketvibe_exceptions", [{ kind: "eq", column: "status", value: "open" }]),
-    countRows("marketvibe_provider_configurations", [{ kind: "eq", column: "health_status", value: "Blocked" }]),
-    countRows("marketvibe_provider_configurations", [{ kind: "eq", column: "health_status", value: "Degraded" }]),
   ]);
 
-  const health = !supabaseStatus.serverWritesEnabled
+  const productionConfigurationReady = Boolean(
+    process.env.NEXT_PUBLIC_APP_URL
+    && process.env.CRON_SECRET
+    && process.env.CUSTOMER_ACCESS_SECRET
+    && process.env.BREVO_API_KEY
+    && process.env.BREVO_SENDER_EMAIL
+    && process.env.STRIPE_SECRET_KEY
+    && process.env.STRIPE_WEBHOOK_SECRET
+    && process.env.OPPORTUNITY_RSS_FEEDS,
+  );
+  const health = !supabaseStatus.serverWritesEnabled || !productionConfigurationReady
     ? "Blocked"
-    : providerBlocked && providerBlocked > 0
-      ? "Blocked"
-      : providerDegraded && providerDegraded > 0
-        ? "Degraded"
-        : "Operational";
+    : "Operational";
   const healthCopy = health === "Operational"
     ? "Automation health is operational for configured modules."
-    : health === "Degraded"
-      ? "Some providers need attention, but healthy modules can continue."
-      : "Core persistence or required providers need setup before full automation can run.";
+    : "Core persistence or required providers need setup before full automation can run.";
 
   const cards = [
-    ["Qualified buyers", metric(qualifiedBuyers), Users],
+    ["Qualified company candidates", metric(qualifiedBuyers), Users],
     ["Qualified opportunities", metric(qualifiedOpportunities), BriefcaseBusiness],
     ["High-score matches", metric(highScoreMatches), HeartHandshake],
     ["Proof packs ready", metric(proofPacksReady), FileText],
@@ -100,7 +100,7 @@ export default async function MarketVibeOperationsPage() {
         </div>
       </div>
 
-      <section className={`mt-6 rounded-lg border p-4 text-sm font-semibold ${health === "Operational" ? "border-emerald-200 bg-emerald-50 text-emerald-950" : health === "Degraded" ? "border-amber-200 bg-amber-50 text-amber-950" : "border-red-200 bg-red-50 text-red-950"}`}>
+      <section className={`mt-6 rounded-lg border p-4 text-sm font-semibold ${health === "Operational" ? "border-emerald-200 bg-emerald-50 text-emerald-950" : "border-red-200 bg-red-50 text-red-950"}`}>
         {healthCopy}
       </section>
 

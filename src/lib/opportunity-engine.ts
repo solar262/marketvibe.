@@ -39,41 +39,6 @@ type SourceCandidate = OpportunityInput & {
   raw_payload?: Record<string, unknown>;
 };
 
-type NavigatorProspectOpportunityRow = {
-  id: string;
-  first_name?: string | null;
-  last_name?: string | null;
-  full_name?: string | null;
-  job_title?: string | null;
-  company_name?: string | null;
-  company_domain?: string | null;
-  company_website?: string | null;
-  linkedin_profile_url?: string | null;
-  company_linkedin_url?: string | null;
-  location?: string | null;
-  country?: string | null;
-  city?: string | null;
-  industry?: string | null;
-  company_size?: string | null;
-  public_email?: string | null;
-  public_phone?: string | null;
-  public_signal_url?: string | null;
-  public_signal_text?: string | null;
-  source_note?: string | null;
-  raw_row?: Record<string, unknown> | null;
-  fit_score?: number | null;
-  intent_score?: number | null;
-  evidence_status?: string | null;
-  evidence_summary?: string | null;
-  enrichment_status?: string | null;
-  review_status?: string | null;
-  inventory_status?: string | null;
-  is_test_data?: boolean | null;
-  website_scan?: Record<string, unknown> | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-};
-
 const QUICK_PASTE_PROFILE_NAME = "Property Pipeline Buyers";
 const QUICK_PASTE_PROFILE_KEYWORDS = [
   "high-end builder",
@@ -101,7 +66,6 @@ const QUICK_PASTE_OPPORTUNITY_SIGNAL_KEYWORDS = [
 ];
 const QUICK_PASTE_BUYER_TYPE = "High-ticket property, construction, and real estate service businesses";
 const QUICK_PASTE_MAX_URLS = 500;
-const NAVIGATOR_QUALIFYING_SIGNAL_PATTERN = /\b(expanding|expansion|hiring|recruiting|new project|project launch|planning|planning application|permit|opening|launching|funding|raised|growth|pipeline|customers|leads|manual|delay|broken|switching|tender|rfp|request for proposal|procurement|quote request|looking for|need(?:s|ed)?|seeking|help with|outsourc(?:e|ing)|contract awarded|land acquired|site acquired|portfolio growth|new homes?)\b/i;
 
 export type QuickPasteImportInput = {
   urls: string;
@@ -939,98 +903,6 @@ async function ensureQuickPasteDefaultSearchProfile(supabase: SupabaseClient) {
   return profileFromRow(data as Record<string, unknown>);
 }
 
-function navigatorOpportunityProfile(): CustomerSearchProfile {
-  return {
-    ...defaultQuickPasteProfileRow(),
-    id: "navigator-visible-card-profile",
-    niche: QUICK_PASTE_PROFILE_NAME,
-    target_service: QUICK_PASTE_BUYER_TYPE,
-    minimum_fit_score: 50,
-    minimum_intent_score: 80,
-    minimum_evidence_score: 65,
-    maximum_record_age_days: 60,
-    metadata: {
-      created_by: "sales_navigator_visible_card_bridge",
-      source_policy: "visible_card_only_no_private_fetch",
-    },
-  };
-}
-
-function navigatorProspectHasQualifiedSignal(prospect: NavigatorProspectOpportunityRow) {
-  if (prospect.review_status !== "approved") return false;
-  if (prospect.is_test_data || prospect.inventory_status === "rejected") return false;
-  if (prospect.evidence_status === "profile_only") return false;
-  const signalText = [
-    prospect.public_signal_text,
-    prospect.evidence_summary,
-    prospect.source_note,
-  ].filter(Boolean).join(" ");
-  return NAVIGATOR_QUALIFYING_SIGNAL_PATTERN.test(signalText);
-}
-
-function navigatorProspectSourceUrl(prospect: NavigatorProspectOpportunityRow) {
-  return normalizeUrl(prospect.public_signal_url)
-    || normalizeUrl(prospect.linkedin_profile_url)
-    || normalizeUrl(prospect.company_linkedin_url)
-    || normalizeUrl(prospect.company_website);
-}
-
-function navigatorProspectToCandidate(prospect: NavigatorProspectOpportunityRow): SourceCandidate | null {
-  if (!navigatorProspectHasQualifiedSignal(prospect)) return null;
-  const companyName = String(prospect.company_name || "").trim();
-  if (!companyName) return null;
-  const sourceUrl = navigatorProspectSourceUrl(prospect);
-  if (!sourceUrl) return null;
-
-  const location = [prospect.city, prospect.location].filter(Boolean).join(", ") || prospect.location || "";
-  const title = [prospect.company_name, prospect.job_title || prospect.full_name, "visible Navigator signal"].filter(Boolean).join(" - ");
-  const sourceText = [
-    prospect.public_signal_text,
-    prospect.evidence_summary,
-    prospect.source_note,
-  ].filter(Boolean).join(" ");
-
-  return {
-    company_name: companyName,
-    company_domain: normalizeDomain(prospect.company_domain || domainFromUrl(prospect.company_website)),
-    company_website: normalizeUrl(prospect.company_website),
-    company_location: location || null,
-    company_country: prospect.country || null,
-    company_industry: prospect.industry || QUICK_PASTE_PROFILE_NAME,
-    company_size: prospect.company_size || null,
-    company_description: prospect.evidence_summary || null,
-    contact_first_name: prospect.first_name || null,
-    contact_last_name: prospect.last_name || null,
-    contact_full_name: prospect.full_name || [prospect.first_name, prospect.last_name].filter(Boolean).join(" ") || null,
-    contact_job_title: prospect.job_title || null,
-    public_email: normalizeEmail(prospect.public_email),
-    public_phone: normalizePhone(prospect.public_phone),
-    source_type: "sales_navigator_visible_card",
-    source_name: "MarketVibe Sales Navigator Companion",
-    source_url: sourceUrl,
-    source_title: title.slice(0, 220),
-    source_text: sourceText,
-    captured_at: prospect.created_at || nowIso(),
-    last_verified_at: prospect.updated_at || prospect.created_at || nowIso(),
-    evidence_status: "public_signal_verified",
-    niche: QUICK_PASTE_PROFILE_NAME,
-    target_location: [prospect.city, prospect.country].filter(Boolean).join(", ") || prospect.location || null,
-    is_test_data: Boolean(prospect.is_test_data),
-    raw_payload: {
-      imported_prospect_id: prospect.id,
-      source: "sales_navigator_visible_card",
-      linkedin_profile_url: prospect.linkedin_profile_url || null,
-      company_linkedin_url: prospect.company_linkedin_url || null,
-      enrichment_status: prospect.enrichment_status || null,
-      imported_fit_score: prospect.fit_score ?? null,
-      imported_intent_score: prospect.intent_score ?? null,
-      raw_row: prospect.raw_row || {},
-      no_private_fetch: true,
-      visible_card_only: true,
-    },
-  };
-}
-
 function opportunityInsertRow(candidate: SourceCandidate, profile: CustomerSearchProfile, scores: OpportunityScores, qualification: ReturnType<typeof qualifyOpportunity>) {
   const dedupeKey = buildOpportunityDedupeKey(candidate);
   return {
@@ -1193,61 +1065,21 @@ export async function syncApprovedNavigatorProspectsToOpportunities({
     idempotencyKey: runIdempotencyKey("navigator-import", trigger, prospectIds?.length ? prospectIds.slice().sort().join(",").slice(0, 120) : "approved"),
   });
   const counters: RunCounters = { records_discovered: 0, records_rejected: 0, records_qualified: 0, records_added_to_inventory: 0, duplicate_count: 0, stale_records: 0, customer_shortages: 0, source_failures: [] };
-
-  try {
-    let query = supabase
-      .from("premium_imported_prospects")
-      .select("*")
-      .eq("review_status", "approved")
-      .eq("is_test_data", false)
-      .neq("inventory_status", "rejected")
-      .neq("evidence_status", "profile_only")
-      .order("updated_at", { ascending: false })
-      .limit(Math.max(1, Math.min(1000, Math.floor(limit))));
-    if (prospectIds?.length) query = query.in("id", prospectIds);
-
-    const { data, error } = await query;
-    if (error) throw error;
-
-    const profile = navigatorOpportunityProfile();
-    const candidates = ((data || []) as NavigatorProspectOpportunityRow[])
-      .map((prospect) => navigatorProspectToCandidate(prospect))
-      .filter(Boolean) as SourceCandidate[];
-    counters.records_discovered = candidates.length;
-
-    const existing = await existingDedupeKeys(supabase, candidates.map((candidate) => buildOpportunityDedupeKey(candidate)));
-    for (const candidate of candidates) {
-      const dedupeKey = buildOpportunityDedupeKey(candidate);
-      if (!dedupeKey || existing.has(dedupeKey)) {
-        counters.duplicate_count += 1;
-        continue;
-      }
-
-      const scores = calculateOpportunityScores(candidate, profile);
-      const qualification = qualifyOpportunity(candidate, scores, profile);
-      if (qualification.qualified) counters.records_qualified += 1;
-      else counters.records_rejected += 1;
-      if (qualification.inventory_status === "IN_INVENTORY") counters.records_added_to_inventory += 1;
-
-      const { error: insertError } = await supabase.from("opportunities").insert(opportunityInsertRow(candidate, profile, scores, qualification));
-      if (insertError?.code === "23505") {
-        counters.duplicate_count += 1;
-        existing.add(dedupeKey);
-        continue;
-      }
-      if (insertError) throw insertError;
-      existing.add(dedupeKey);
-    }
-
-    await finishRun(supabase, runId, "completed", counters, {
-      source: "sales_navigator_visible_card",
-      candidate_filter: "approved_non_test_non_profile_only_with_qualified_signal",
-    });
-    return { ok: true, runId, ...counters };
-  } catch (error) {
-    await finishRun(supabase, runId, "failed", counters, { message: error instanceof Error ? error.message : "Navigator opportunity sync failed." });
-    throw error;
-  }
+  await finishRun(supabase, runId, "skipped", counters, {
+    source: "sales_navigator_visible_card",
+    reason: "navigator_bridge_disabled_for_new_model",
+    policy: "internal_research_only",
+    requested_prospect_count: prospectIds?.length || null,
+    requested_limit: Math.max(1, Math.min(1000, Math.floor(limit))),
+  });
+  return {
+    ok: true,
+    skipped: true,
+    reason: "navigator_bridge_disabled_for_new_model",
+    policy: "internal_research_only",
+    runId,
+    ...counters,
+  };
 }
 
 export async function createOrUpdateSearchProfileFromOnboarding(input: {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdminJson, safeApiError } from "@/lib/admin-api";
 import { runOutboundAutopilot } from "@/lib/outbound-autopilot";
+import { salesOutboundRunLimit } from "@/lib/sales-pipeline";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -41,6 +42,7 @@ export async function POST(request: Request) {
         sent: 0,
         skipped: 0,
         failed: 0,
+        dailyRunLimit: salesOutboundRunLimit(),
         note: "Email sending runs separately through the email cron.",
       },
     });

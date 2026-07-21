@@ -135,6 +135,14 @@ export async function upsertPremiumEntitlement({
   return { saved: true };
 }
 
+export async function releaseStripeEventForRetry(eventId: string) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { released: false, skipped: true };
+  const { error } = await supabase.from("processed_stripe_events").delete().eq("id", eventId);
+  if (error) throw error;
+  return { released: true, skipped: false };
+}
+
 function stripeCustomerId(session: Stripe.Checkout.Session) {
   return typeof session.customer === "string" ? session.customer : null;
 }

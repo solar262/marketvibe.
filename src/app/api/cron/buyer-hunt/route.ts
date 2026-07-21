@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { runBuyerHunt } from "@/lib/buyer-hunt";
+import { requireCron } from "@/lib/cron-auth";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -11,6 +12,8 @@ function safeNumber(value: string | null, fallback: number, min: number, max: nu
 }
 
 export async function GET(request: Request) {
+  const unauthorized = requireCron(request);
+  if (unauthorized) return unauthorized;
   const url = new URL(request.url);
   const markets = safeNumber(url.searchParams.get("markets"), 1, 1, 5);
   const leads = safeNumber(url.searchParams.get("leads"), 5, 1, 10);

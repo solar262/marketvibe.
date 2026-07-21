@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { NextResponse } from "next/server";
 import { buildCheckoutSessionParams, checkoutOrigin } from "@/lib/premium-checkout";
+import { isAutonomousCheckoutProduct } from "@/lib/premium-products";
 import { recordCheckoutStarted, sendCheckoutStartedEmail } from "@/lib/revenue-automation";
 
 export const runtime = "nodejs";
@@ -20,9 +21,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid checkout request." }, { status: 400 });
   }
 
+  const cart = Array.isArray(payload.cart) ? payload.cart : [];
+  if (payload.product === "growth_desk") {
+    return NextResponse.json({ error: "Growth Desk is not available for purchase until delivery is fully autonomous." }, { status: 409 });
+  }
+  if (cart.length === 0 && !isAutonomousCheckoutProduct(payload.product)) {
+    return NextResponse.json({ error: "Choose a current MarketVibe product." }, { status: 400 });
+  }
+
   const returnOrigin = checkoutOrigin(request);
   const params = buildCheckoutSessionParams({
-    cart: Array.isArray(payload.cart) ? payload.cart : [],
+    cart,
     customer: payload.customer,
     product: payload.product,
     niche: String(payload.niche || ""),

@@ -122,6 +122,7 @@ for (const sequenceType of salesEmailSequenceTypes) {
 }
 
 const coldSequence = buildSalesEmailSequence("cold_outbound", emailLead);
+assert.equal(coldSequence.length, 3, "Cold outreach must contain one initial email and no more than two follow-ups.");
 assert.match(coldSequence[0].htmlContent, /MarketVibe/);
 assert.match(coldSequence[0].htmlContent, /utm_source=cold_outbound/);
 assert.match(coldSequence[0].htmlContent, /marketvibe-email-preview\.png/);
@@ -162,6 +163,7 @@ const csv = buildSalesPipelineCsv([{
   cold_outbound_approved_at: null,
   cold_outbound_approved_by: null,
   outbound_sequence_status: "not_started",
+  metadata: {},
   lost_reason: null,
   next_task_at: null,
   last_contacted_at: null,

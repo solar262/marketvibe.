@@ -1,6 +1,8 @@
 export type PremiumProductCode = "proof_pack" | "radar" | "growth_desk";
 export type LegacyProductCode = "audit" | "starter" | "pro";
-export type CheckoutProductCode = PremiumProductCode | LegacyProductCode;
+// Public checkout accepts only the current buyer-intent products. Legacy codes
+// remain available below solely to classify historical Stripe sessions.
+export type CheckoutProductCode = PremiumProductCode;
 
 export type PremiumEntitlement = "proof_pack" | "radar" | "growth_desk";
 
@@ -62,6 +64,10 @@ export const legacyProductLabels: Record<LegacyProductCode, string> = {
 
 export function isPremiumProductCode(value: unknown): value is PremiumProductCode {
   return value === "proof_pack" || value === "radar" || value === "growth_desk";
+}
+
+export function isAutonomousCheckoutProduct(value: unknown): value is Exclude<PremiumProductCode, "growth_desk"> {
+  return value === "proof_pack" || value === "radar";
 }
 
 export function isLegacyProductCode(value: unknown): value is LegacyProductCode {

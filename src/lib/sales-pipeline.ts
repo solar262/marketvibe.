@@ -959,8 +959,6 @@ export function buildSalesEmailSequence(
     const sourceText = lead.source_url ? `\n\nSource reference: ${lead.source_url}` : "";
     const sampleIntroUrl = trackedMarketVibeUrl("/sample", "intro_redacted_example");
     const proofPackUrlCold = trackedMarketVibeUrl("/sample", "proof_pack_cta");
-    const pricingUrlCold = trackedMarketVibeUrl("/pricing", "radar_pricing");
-
     return [
       makeEmail(
         sequenceType,
@@ -988,15 +986,6 @@ export function buildSalesEmailSequence(
         addDays(now, 7),
         coldFooter,
         proofPackUrlCold,
-      ),
-      makeEmail(
-        sequenceType,
-        "Closing this here",
-        `<p>Hi ${firstName},</p><p>I will close this here. I contacted you because of this signal: ${signal}.</p><p>If pipeline research becomes a priority, MarketVibe can test one market without a recurring commitment.</p>${emailButton(pricingUrlCold, "Compare Proof Pack and Radar")}<p>MarketVibe</p>`,
-        `Hi ${textName},\n\nI will close this here. I contacted you because of this signal: ${signalText}.\n\nIf pipeline research becomes a priority, MarketVibe can test one market without a recurring commitment.\n\nCompare Proof Pack and Radar: ${pricingUrlCold}\n\nMarketVibe`,
-        addDays(now, 12),
-        coldFooter,
-        pricingUrlCold,
       ),
     ];
   }
@@ -1585,6 +1574,46 @@ export async function unsubscribeSalesLead(input: { email: string; token?: strin
     failure_reason: "unsubscribed",
   }).eq("normalized_email", normalizedEmail).eq("status", "queued");
   return { ok: true };
+}
+
+export async function stopSalesFollowUps(input: {
+  email: string;
+  reason: string;
+  stage?: SalesPipelineStage;
+}) {
+  const normalizedEmail = normalizeSalesEmail(input.email);
+  if (!isEmail(normalizedEmail)) return { stopped: 0, leads: 0, skipped: "invalid_email" };
+  const supabase = getSupabaseAdmin();
+  if (!supabase) throw new Error("Supabase is not configured.");
+
+  const queued = await supabase
+    .from("sales_email_events")
+    .update({ status: "skipped", failure_reason: input.reason })
+    .eq("normalized_email", normalizedEmail)
+    .eq("status", "queued")
+    .select("id");
+  if (queued.error && !isMissingSalesTableError(queued.error)) throw new Error(queued.error.message);
+
+  const leadResult = await supabase.from("sales_leads").select("*").eq("normalized_email", normalizedEmail);
+  if (leadResult.error) throw new Error(leadResult.error.message);
+  let metadataStopped = 0;
+  for (const rawLead of leadResult.data || []) {
+    const lead = hydrateSalesLeadRow(rawLead);
+    const queuedEmails = metadataQueuedEmails(lead).map((email) => {
+      if (email.status !== "queued") return email;
+      metadataStopped += 1;
+      return { ...email, status: "skipped" as const, failureReason: input.reason };
+    });
+    const update: Record<string, unknown> = {
+      metadata: withOutboundMetadata(lead, { queued_emails: queuedEmails, outbound_sequence_status: "stopped" }),
+      outbound_sequence_status: "stopped",
+      last_activity_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    if (input.stage) update.stage = input.stage;
+    await supabase.from("sales_leads").update(update).eq("id", lead.id);
+  }
+  return { stopped: (queued.data?.length || 0) + metadataStopped, leads: leadResult.data?.length || 0 };
 }
 
 export async function queueInactiveSubscriberEmails(limit = 25) {

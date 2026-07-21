@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx tests/premium-products.test.ts && tsx tests/sales-navigator-import.test.ts && tsx tests/opportunity-lifecycle.test.ts",
+    "test": "tsx tests/premium-products.test.ts && tsx tests/product-model-separation.test.ts && tsx tests/imported-prospect-fulfillment.test.ts && tsx tests/sales-navigator-import.test.ts && tsx tests/sales-navigator-breaks.test.ts && tsx tests/opportunity-lifecycle.test.ts && tsx tests/sales-pipeline.test.ts && tsx tests/operations-automation.test.ts && tsx tests/nerve-center-outbox.test.ts",
     "test:reddit-radar": "node scripts/test-reddit-radar.mjs",
     "test:facebook-radar": "node scripts/test-facebook-radar.mjs",
     "smoke:cron-routes": "node scripts/smoke-cron-routes.mjs",
@@ -35,5 +35,8 @@
     "tailwindcss": "^4",
     "tsx": "^4.23.0",
     "typescript": "^5"
+  },
+  "overrides": {
+    "postcss": "^8.5.19"
   }
 }

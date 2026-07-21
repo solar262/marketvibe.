@@ -720,7 +720,7 @@ export default function FacebookRadarPage() {
                       <Copy className="mr-2 inline h-4 w-4" />Copy Search
                     </button>
                   </div>
-                  <p className="mt-2 text-xs font-semibold text-slate-400">Use Posts first to find conversations. Use Groups only to find places to join.</p>
+                  <p className="mt-2 text-xs font-semibold text-slate-400">Use Posts first to find leads. Use Groups only to find places to join.</p>
                 </div>
                   );
                 })()

@@ -137,9 +137,9 @@ export default function PricingPage() {
                   </p>
                 ))}
               </div>
-              <CheckoutButton product="growth_desk" className={buyButton}>
-                Start Growth Desk
-              </CheckoutButton>
+              <p className="mt-6 rounded-xl border border-amber-300/30 bg-amber-300/10 px-5 py-3.5 text-center text-sm font-bold text-amber-100">
+                Not available for purchase while autonomous delivery is being completed
+              </p>
             </article>
           </section>
         </div>

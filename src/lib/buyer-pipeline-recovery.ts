@@ -5,6 +5,8 @@ type SupabaseClient = NonNullable<ReturnType<typeof getSupabaseAdmin>>;
 type RecoverableBuyerCompany = {
   id: string;
   buyer_status: string;
+  contact_status?: string | null;
+  last_verified_date?: string | null;
 };
 
 type ExistingPipelineJob = {
@@ -20,6 +22,8 @@ const RECOVERABLE_BUYER_STATES = [
   "website_verification_queued",
   "retry_scheduled",
   "refresh_queued",
+  "qualified",
+  "contact_unresolved",
 ] as const;
 
 const REQUEUEABLE_JOB_STATES = new Set(["completed", "failed", "permanent_failure"]);
@@ -37,15 +41,20 @@ export async function ensureBuyerPipelineJobs({
 }) {
   const { data: companies, error: companiesError } = await supabase
     .from("marketvibe_buyer_companies")
-    .select("id,buyer_status")
+    .select("id,buyer_status,contact_status,last_verified_date")
     .eq("is_test_data", false)
+    .is("source_imported_prospect_id", null)
     .in("buyer_status", [...RECOVERABLE_BUYER_STATES])
     .order("created_at", { ascending: true })
     .limit(limit);
 
   if (companiesError) throw companiesError;
 
-  const recoverableCompanies = (companies || []) as RecoverableBuyerCompany[];
+  const staleBefore = Date.now() - 30 * 86_400_000;
+  const recoverableCompanies = ((companies || []) as RecoverableBuyerCompany[]).filter((company) => {
+    if (company.contact_status !== "resolved") return true;
+    return !company.last_verified_date || Date.parse(company.last_verified_date) < staleBefore;
+  });
   if (recoverableCompanies.length === 0) {
     return { examined: 0, queued: 0, reactivated: 0, alreadyActive: 0 };
   }

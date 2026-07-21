@@ -1,17 +1,24 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ADMIN_COOKIE, adminCredentials, adminSessionValue, isAdminLoginConfigured } from "@/lib/auth";
+import { ADMIN_COOKIE, adminCredentials, adminSessionValue, isAdminAuthenticated, isAdminLoginConfigured } from "@/lib/auth";
 import { inputClass } from "@/lib/ui";
+
+function safeAdminNext(value: unknown) {
+  const next = String(value || "").trim();
+  if (!next.startsWith("/admin") || next.startsWith("//") || next.includes("\\")) return "/admin";
+  return next;
+}
 
 async function login(formData: FormData) {
   "use server";
   const email = String(formData.get("email") || "").trim().toLowerCase();
   const password = String(formData.get("password") || "").trim();
+  const next = safeAdminNext(formData.get("next"));
   const credentials = adminCredentials();
 
   if (!credentials.email || !credentials.password) {
-    redirect("/login?error=config");
+    redirect(`/login?error=config&next=${encodeURIComponent(next)}`);
   }
 
   if (email === credentials.email && password === credentials.password) {
@@ -23,10 +30,10 @@ async function login(formData: FormData) {
       path: "/",
       maxAge: 60 * 60 * 8,
     });
-    redirect("/admin");
+    redirect(next);
   }
 
-  redirect("/login?error=1");
+  redirect(`/login?error=1&next=${encodeURIComponent(next)}`);
 }
 
 export default async function LoginPage({
@@ -34,14 +41,18 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{
     error?: string;
+    next?: string;
   }>;
 }) {
   const params = await searchParams;
   const configured = isAdminLoginConfigured();
+  const next = safeAdminNext(params.next);
+  if (await isAdminAuthenticated()) redirect(next);
 
   return (
     <main className="mx-auto max-w-md px-4 py-12 sm:px-6 lg:px-8">
       <form action={login} className="rounded-lg border border-stone-200 bg-white p-6 shadow-sm">
+        <input name="next" type="hidden" value={next} />
         <h1 className="text-2xl font-semibold text-slate-950">Admin login</h1>
         <p className="mt-2 text-sm text-slate-600">Admin access is private. Demo credentials are disabled.</p>
         {!configured && (

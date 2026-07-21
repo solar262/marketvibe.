@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { requireCron } from "@/lib/cron-auth";
-import { sendDailyRadarEmail } from "@/lib/radar-email";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -10,6 +9,10 @@ export async function GET(request: Request) {
   const unauthorized = requireCron(request);
   if (unauthorized) return unauthorized;
 
-  const result = await sendDailyRadarEmail();
-  return NextResponse.json(result);
+  return NextResponse.json({
+    ok: true,
+    skipped: true,
+    reason: "legacy_lead_vault_radar_email_retired",
+    replacement: "/api/cron/opportunity-delivery",
+  });
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireAdminApi } from "@/lib/auth";
 import { scoreImportedFacebookPosts, type ImportedFacebookPost } from "@/lib/facebook-radar-import";
 
 type ImportPayload = {
@@ -35,6 +36,7 @@ export async function OPTIONS() {
 }
 
 export async function GET() {
+  if (await requireAdminApi()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   return NextResponse.json(
     latestImport || {
       source: "facebook-visible-import",
@@ -48,6 +50,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  if (await requireAdminApi()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const payload = (await request.json()) as ImportPayload;
     const scored = scoreImportedFacebookPosts({

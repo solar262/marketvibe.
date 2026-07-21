@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireAdminApi } from "@/lib/auth";
 import {
   buildReplyOptions,
   buildSuggestedReply,
@@ -443,6 +444,7 @@ async function searchReddit(queryText: string) {
 }
 
 export async function GET(request: Request) {
+  if (await requireAdminApi()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { searchParams } = new URL(request.url);
   const keywords = clean(searchParams.get("keywords"));
   const niche = clean(searchParams.get("niche"));

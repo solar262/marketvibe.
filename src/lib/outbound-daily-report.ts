@@ -54,8 +54,19 @@ export function outboundDailyReportRecipient() {
   return cleanString(process.env.SALES_OUTBOUND_REPORT_EMAIL || process.env.ADMIN_EMAIL || "");
 }
 
-async function countRows(supabase: NonNullable<ReturnType<typeof getSupabaseAdmin>>, table: string, applyQuery: (query: any) => any): Promise<CountResult> {
-  const result = await applyQuery(supabase.from(table).select("id", { count: "exact", head: true }));
+type ReportQuery = {
+  eq(column: string, value: unknown): ReportQuery;
+  gte(column: string, value: unknown): ReportQuery;
+  order(column: string, options?: { ascending?: boolean }): ReportQuery;
+  limit(value: number): ReportQuery;
+  error: { message: string } | null;
+  count: number | null;
+  data: unknown[] | null;
+};
+
+async function countRows(supabase: NonNullable<ReturnType<typeof getSupabaseAdmin>>, table: string, applyQuery: (query: ReportQuery) => ReportQuery): Promise<CountResult> {
+  const query = supabase.from(table).select("id", { count: "exact", head: true }) as unknown as ReportQuery;
+  const result = await applyQuery(query);
   if (result.error) {
     if (missingTableMessage(result.error)) return { value: 0, error: result.error.message };
     throw new Error(result.error.message);
@@ -63,8 +74,9 @@ async function countRows(supabase: NonNullable<ReturnType<typeof getSupabaseAdmi
   return { value: result.count || 0 };
 }
 
-async function selectRows<T>(supabase: NonNullable<ReturnType<typeof getSupabaseAdmin>>, table: string, columns: string, applyQuery: (query: any) => any): Promise<T[]> {
-  const result = await applyQuery(supabase.from(table).select(columns));
+async function selectRows<T>(supabase: NonNullable<ReturnType<typeof getSupabaseAdmin>>, table: string, columns: string, applyQuery: (query: ReportQuery) => ReportQuery): Promise<T[]> {
+  const query = supabase.from(table).select(columns) as unknown as ReportQuery;
+  const result = await applyQuery(query);
   if (result.error) {
     if (missingTableMessage(result.error)) return [];
     throw new Error(result.error.message);

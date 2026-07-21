@@ -1,4 +1,5 @@
 import type { getSupabaseAdmin } from "@/lib/supabase";
+import { enrichBuyerCompanyRecord } from "@/lib/operations-enrichment";
 import {
   buildDedupeKey,
   domainFromUrl,
@@ -670,6 +671,8 @@ export async function runBuyerPipelineWorker({ supabase, limit = 50, workerId = 
 
   let processed = 0;
   let failed = 0;
+  let contactsInserted = 0;
+  let contactsVerified = 0;
   try {
     const { data: jobs, error } = await supabase
       .from("marketvibe_job_queue")
@@ -713,6 +716,36 @@ export async function runBuyerPipelineWorker({ supabase, limit = 50, workerId = 
           locked_at: null,
           updated_at: nowIso(),
         }).eq("id", job.id);
+        continue;
+      }
+
+      if (company.source_imported_prospect_id) {
+        const timestamp = nowIso();
+        await supabase.from("marketvibe_buyer_companies").update({
+          buyer_status: "quarantined",
+          contact_status: "not_required",
+          rejection_reason: "legacy_lead_stock_not_new_model_opportunity",
+          updated_at: timestamp,
+        }).eq("id", company.id);
+        await supabase.from("marketvibe_job_queue").update({
+          queue_status: "completed",
+          last_error: null,
+          locked_by: null,
+          locked_at: null,
+          updated_at: timestamp,
+        }).eq("id", job.id);
+        await supabase.from("marketvibe_audit_events").insert({
+          event_type: "legacy_lead_stock_quarantined",
+          actor_type: "system",
+          related_record_type: "buyer_company",
+          related_record_id: company.id,
+          source_state: company.buyer_status,
+          destination_state: "quarantined",
+          reason: "Imported Navigator and historical lead stock is owner-only research and cannot enter the new customer opportunity model.",
+          job_run_id: run.id,
+          retry_count: Number(job.retry_count || 0),
+        });
+        processed += 1;
         continue;
       }
 
@@ -766,6 +799,74 @@ export async function runBuyerPipelineWorker({ supabase, limit = 50, workerId = 
         job_run_id: run.id,
         retry_count: Number(job.retry_count || 0),
       });
+      let enrichment;
+      try {
+        enrichment = await enrichBuyerCompanyRecord({
+          supabase,
+          company: {
+            ...company,
+            overall_buyer_score: score.overall,
+            buyer_status: destinationState,
+          },
+        });
+      } catch (enrichmentError) {
+        failed += 1;
+        const retryCount = Number(job.retry_count || 0) + 1;
+        const permanent = retryCount >= 3;
+        const failureMessage = enrichmentError instanceof Error ? enrichmentError.message : "Buyer enrichment failed.";
+        await supabase.from("marketvibe_job_queue").update({
+          queue_status: permanent ? "permanent_failure" : "retry_scheduled",
+          retry_count: retryCount,
+          run_after: new Date(Date.now() + Math.min(24, 2 ** retryCount) * 60 * 60_000).toISOString(),
+          last_error: failureMessage,
+          locked_by: null,
+          locked_at: null,
+          updated_at: nowIso(),
+        }).eq("id", job.id);
+        await supabase.from("marketvibe_audit_events").insert({
+          event_type: permanent ? "buyer_company_enrichment_permanent_failure" : "buyer_company_enrichment_retry_scheduled",
+          actor_type: "system",
+          related_record_type: "buyer_company",
+          related_record_id: company.id,
+          source_state: destinationState,
+          destination_state: permanent ? "quarantined" : "retry_scheduled",
+          reason: failureMessage,
+          job_run_id: run.id,
+          retry_count: retryCount,
+        });
+        if (permanent) {
+          await supabase.from("marketvibe_exceptions").insert({
+            category: "buyer_enrichment",
+            title: `Buyer enrichment failed for ${String(company.company_name || "company")}`,
+            explanation: failureMessage,
+            affected_record_type: "buyer_company",
+            affected_record_id: company.id,
+            supporting_evidence: { retry_count: retryCount, worker_id: workerId },
+            recommended_action: "Review the public source, provider availability, and contact provenance before retrying.",
+            commercial_impact: "Company cannot enter active MarketVibe outreach without a verified business contact route.",
+            severity: "high",
+          });
+        }
+        continue;
+      }
+      contactsInserted += enrichment.insertedContacts;
+      contactsVerified += enrichment.verifiedEmails;
+      await supabase.from("marketvibe_audit_events").insert({
+        event_type: "buyer_company_enrichment_completed",
+        actor_type: "system",
+        related_record_type: "buyer_company",
+        related_record_id: company.id,
+        source_state: destinationState,
+        destination_state: enrichment.destinationState,
+        reason: enrichment.verifiedEmails > 0
+          ? `${enrichment.verifiedEmails} public business email address(es) passed company-domain and MX verification.`
+          : enrichment.namedContacts > 0
+            ? `${enrichment.namedContacts} named public or licensed contact(s) were resolved without a verified email.`
+            : "No verified business contact route was resolved; the company remains out of active outreach.",
+        job_run_id: run.id,
+        retry_count: Number(job.retry_count || 0),
+        event_payload: enrichment,
+      });
       await supabase.from("marketvibe_job_queue").update({
         queue_status: "completed",
         locked_by: null,
@@ -782,8 +883,12 @@ export async function runBuyerPipelineWorker({ supabase, limit = 50, workerId = 
       records_attempted: (jobs || []).length,
       records_succeeded: processed,
       records_failed: failed,
+      error_summary: {
+        contacts_inserted: contactsInserted,
+        contacts_verified: contactsVerified,
+      },
     }).eq("id", run.id);
-    return { ok: true, skipped: false, processed, failed, runId: run.id as string };
+    return { ok: true, skipped: false, processed, failed, contactsInserted, contactsVerified, runId: run.id as string };
   } finally {
     await supabase.from("marketvibe_job_locks").delete().eq("job_name", "website_verification").eq("locked_by", workerId);
   }

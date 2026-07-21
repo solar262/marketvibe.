@@ -3,13 +3,9 @@ import { hydrateCart, orderNumber } from "@/lib/checkout";
 import { resolveProofPackPrice } from "@/lib/proof-pack-pricing";
 import type { CartItem } from "@/lib/types";
 import {
-  isLegacyProductCode,
-  isPremiumProductCode,
-  legacyProductLabels,
-  normalizeCheckoutProduct,
+  isAutonomousCheckoutProduct,
   premiumProducts,
   type CheckoutProductCode,
-  type LegacyProductCode,
   type PremiumProductCode,
 } from "@/lib/premium-products";
 
@@ -21,7 +17,7 @@ export function checkoutOrigin(request: Request) {
 }
 
 export function isCheckoutProduct(value: unknown): value is CheckoutProductCode {
-  return isPremiumProductCode(value) || isLegacyProductCode(value);
+  return isAutonomousCheckoutProduct(value);
 }
 
 export type BuildCheckoutInput = {
@@ -47,13 +43,14 @@ export function buildCheckoutSessionParams({
     premiumProduct: PremiumProductCode;
     requestedProduct: CheckoutProductCode;
     orderNumber: string;
-    legacyProduct?: LegacyProductCode;
   };
 } {
   const items = hydrateCart(cart || []);
+  if (product === "growth_desk") {
+    throw new Error("Growth Desk checkout is unavailable until autonomous delivery is enabled.");
+  }
   const requestedProduct: CheckoutProductCode = isCheckoutProduct(product) ? product : "proof_pack";
-  const legacyProduct = isLegacyProductCode(requestedProduct) ? requestedProduct : undefined;
-  const premiumProductCode = normalizeCheckoutProduct(requestedProduct);
+  const premiumProductCode = requestedProduct;
   const premiumProduct = premiumProducts[premiumProductCode];
 
   if (items.length > 0) {
@@ -80,7 +77,7 @@ export function buildCheckoutSessionParams({
       },
       success_url: `${returnOrigin}/payment-success?order=${order}&product=cart&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${returnOrigin}/cart`,
-      __marketvibe: { premiumProduct: premiumProductCode, requestedProduct, orderNumber: order, legacyProduct },
+      __marketvibe: { premiumProduct: premiumProductCode, requestedProduct, orderNumber: order },
     };
   }
 
@@ -99,7 +96,7 @@ export function buildCheckoutSessionParams({
         price_data: {
           currency: premiumProduct.currency,
           product_data: {
-            name: legacyProduct ? legacyProductLabels[legacyProduct] : premiumProduct.stripeName,
+            name: premiumProduct.stripeName,
             description: premiumProduct.description,
           },
           unit_amount: unitAmount,
@@ -113,7 +110,6 @@ export function buildCheckoutSessionParams({
       product: premiumProductCode,
       product_code: premiumProductCode,
       requested_product: requestedProduct,
-      legacy_product: legacyProduct || "",
       plan: premiumProductCode,
       entitlement: premiumProduct.entitlement,
       success_destination: successDestination,
@@ -137,7 +133,7 @@ export function buildCheckoutSessionParams({
         : undefined,
     success_url: successUrl,
     cancel_url: `${returnOrigin}/pricing`,
-    __marketvibe: { premiumProduct: premiumProductCode, requestedProduct, orderNumber: order, legacyProduct },
+    __marketvibe: { premiumProduct: premiumProductCode, requestedProduct, orderNumber: order },
   };
 }
 

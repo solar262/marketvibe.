@@ -50,7 +50,7 @@ export default async function AdminDashboard() {
     ["Replacements due", opportunitySummary ? displayCount(opportunitySummary.counts.replacementsDue) : "Check setup", RefreshCw, "/admin/opportunity-engine"],
     ["Failed payments", displayCount(failedPayments), AlertTriangle, "/admin/orders"],
     ["Incomplete onboarding", displayCount(incompleteOnboarding), Inbox, "/admin/fulfillment"],
-    ["Pending proof-pack rows", displayCount(pendingProofPacks), Inbox, "/admin/fulfillment"],
+    ["Legacy pack rows (archive)", displayCount(pendingProofPacks), Inbox, "/admin/autopilot"],
     ["Support requests", displayCount(supportRequests), Inbox, "/admin/orders"],
     ["Data requests", displayCount(dataRequests), Inbox, "/admin/orders"],
     ["Recent imports", displayCount(recentImports), FileUp, "/admin/import"],
