@@ -4,7 +4,7 @@
   const IMPORT_PANEL_ID = "marketvibe-sales-navigator-import-panel";
   const MARKETVIBE_IMPORT_URL = "https://www.marketvibe1.com/admin/import";
   const MARKETVIBE_AUTO_IMPORT_PATH = "/admin/import?navigatorAutoImport=1&navigatorAutoReturn=1";
-  const MARKETVIBE_AUTO_IMPORT_URL = `https://www.marketvibe1.com/login?next=${encodeURIComponent(MARKETVIBE_AUTO_IMPORT_PATH)}`;
+  const MARKETVIBE_AUTO_IMPORT_URL = `https://www.marketvibe1.com${MARKETVIBE_AUTO_IMPORT_PATH}`;
   const DEFAULT_WORK_DURATION_MINUTES = 15;
   const DEFAULT_BREAK_DURATION_MINUTES = 5;
   const CSV_HEADERS = [

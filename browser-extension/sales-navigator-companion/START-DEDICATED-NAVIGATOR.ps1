@@ -15,11 +15,12 @@ if (-not $edge) { throw "Microsoft Edge is not installed." }
 
 New-Item -ItemType Directory -Force -Path $profileRoot | Out-Null
 
-$profilePattern = [regex]::Escape("--user-data-dir=$profileRoot")
+$profilePattern = '--user-data-dir(?:=|\s+)"?' + [regex]::Escape($profileRoot)
 $running = Get-CimInstance Win32_Process -Filter "Name='msedge.exe'" -ErrorAction SilentlyContinue |
   Where-Object { $_.CommandLine -match $profilePattern } |
   Select-Object -First 1
 if ($running) {
+  & (Join-Path $PSScriptRoot "REFRESH-MARKETVIBE-ADMIN-COOKIE.ps1") -VerifyAdmin
   Write-Output "MarketVibe Navigator browser is already running (PID $($running.ProcessId))."
   exit 0
 }
@@ -27,7 +28,9 @@ if ($running) {
 $arguments = @(
   "--user-data-dir=$profileRoot",
   "--profile-directory=Default",
+  "--disable-extensions-except=$extensionRoot",
   "--load-extension=$extensionRoot",
+  "--remote-debugging-port=9223",
   "--no-first-run",
   "--no-default-browser-check"
 )
@@ -38,4 +41,6 @@ $arguments += @(
 )
 
 Start-Process -FilePath $edge -ArgumentList $arguments
-Write-Output "Started the isolated MarketVibe Navigator browser."
+Start-Sleep -Milliseconds 800
+& (Join-Path $PSScriptRoot "REFRESH-MARKETVIBE-ADMIN-COOKIE.ps1") -VerifyAdmin
+Write-Output "Started the isolated MarketVibe Navigator browser with an authenticated MarketVibe handoff."
