@@ -15,6 +15,17 @@ For a one-person operator. Keep it boring, repeatable, and safe.
    - recent imports
 3. If any card says `Check setup`, confirm Supabase credentials and migrations before relying on the count.
 
+## External Operator Setup (Nerve Network)
+
+1. Set `OPERATOR_NERVE_NETWORK_API_KEY` in the runtime environment.
+2. Keep the key outside browser localStorage; use server env vars and secure operator secrets.
+3. For operator API calls, send one of:
+   - `Authorization: ******`
+   - `X-MarketVibe-Internal-Key: <key>`
+   - `?internal_key=<key>`
+4. Verify connectivity with `POST /api/internal-marketing-leads/auth-status`.
+5. If response is `Missing key` or `Invalid key`, rotate/redeploy the key and retry.
+
 ## See New Customers
 
 - Open `/admin`.

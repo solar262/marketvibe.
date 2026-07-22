@@ -22,6 +22,35 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+## External nerve network operator
+
+Use a dedicated server key for external operator control of Buyer Radar internal APIs:
+
+- Set `OPERATOR_NERVE_NETWORK_API_KEY` (preferred) in your environment.
+- Fallback keys still supported: `BUYER_RADAR_INTERNAL_API_KEY`, `INTERNAL_MARKETING_API_KEY`, `LEAD_HUNT_INTERNAL_KEY`.
+
+Supported auth formats:
+
+- `Authorization: ******
+- `X-MarketVibe-Internal-Key: <key>`
+- `?internal_key=<key>`
+
+Operator endpoint surface:
+
+- `POST /api/internal-marketing-leads/auth-status` → key validation (`Connected`, `Missing key`, `Invalid key`)
+- `GET|POST /api/internal-marketing-leads`
+- `PATCH /api/internal-marketing-leads/:id`
+- `GET|POST /api/internal-marketing-leads/events`
+- `GET|POST /api/internal-marketing-leads/hunt-status`
+- `POST /api/internal-marketing-leads/test`
+- `POST /api/internal-marketing-leads/processed-url`
+- `GET /api/internal-marketing-leads/export`
+
+Failure handling:
+
+- Unauthorized requests return `401` with internal CORS headers.
+- In production, key-based auth is required unless an authenticated admin session is present.
+
 ## Stripe setup
 
 Add these values to `.env.local`:
