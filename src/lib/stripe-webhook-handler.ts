@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { getSupabaseAdmin } from "@/lib/supabase";
 import { track } from "@vercel/analytics/server";
 import { deliverStripeSession } from "@/lib/buyer-delivery";
 import {
@@ -63,6 +64,25 @@ export async function stripeWebhookResponse(request: Request) {
 
   try {
     const event = stripe.webhooks.constructEvent(await request.text(), signature, process.env.STRIPE_WEBHOOK_SECRET);
+    
+    // Persist raw event to Supabase for Business Nerve Center VM consumption
+    const supabase = getSupabaseAdmin();
+    if (supabase) {
+      await supabase.from("marketvibe_audit_events").insert({
+        event_type: "provider_webhook_received",
+        actor_type: "provider",
+        related_record_type: "stripe_webhook",
+        related_record_id: null,
+        reason: "Captured by Vercel Provider Gateway",
+        event_payload: {
+          component: "stripe_webhook",
+          event_id: event.id,
+          stripe_type: event.type,
+          data: event.data.object,
+        }
+      });
+    }
+
     const result = await handleVerifiedStripeEvent(event);
     return Response.json(result);
   } catch (error) {
