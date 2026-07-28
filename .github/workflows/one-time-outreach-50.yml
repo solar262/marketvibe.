@@ -1,0 +1,19 @@
+name: One-time MarketVibe outreach run
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  run-outreach:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for Vercel deployment
+        run: sleep 90
+      - name: Send up to 50 qualified outreach emails
+        run: |
+          set -euo pipefail
+          response=$(curl --fail --silent --show-error "https://www.marketvibe1.com/api/cron/outreach-50?token=mv-outreach-50-20260728-8e4c1a7f")
+          echo "$response"
+          echo "$response" | grep '"ok":true'
