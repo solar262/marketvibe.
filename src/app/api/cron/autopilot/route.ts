@@ -9,6 +9,7 @@ import {
   runBuyerPipelineWorker,
 } from "@/lib/operations-pipeline";
 import { getOpportunityEngineSummary } from "@/lib/opportunity-engine";
+import { runOutreachAutomation } from "@/lib/outreach-automation";
 import { sendPendingPremiumDeliveryEmails } from "@/lib/premium-delivery-email";
 import { runProfileAwareOpportunityVerification } from "@/lib/profile-aware-verification";
 import { runCustomerProfileOpportunityDiscovery } from "@/lib/public-opportunity-discovery";
@@ -147,6 +148,8 @@ export async function GET(request: Request) {
     const emailDelivery = await sendPendingPremiumDeliveryEmails({ limit: 100 });
     return { published, emailDelivery };
   }));
+
+  steps.push(await runStep("outreach-automation", () => runOutreachAutomation()));
 
   steps.push(await runStep("health-summary", () => getOpportunityEngineSummary()));
 
