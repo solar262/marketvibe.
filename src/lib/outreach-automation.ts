@@ -2,6 +2,10 @@ import { addContactToMarketVibeList } from "./brevo";
 import { queueOutreach, sendQueuedOutreach } from "./outreach";
 import { getSupabaseAdmin } from "./supabase";
 
+function brevoSyncFailed(brevo: Record<string, unknown>) {
+  return brevo.synced === false && typeof brevo.error === "string" && brevo.error.length > 0;
+}
+
 function boundedLimit(value: number, fallback: number) {
   if (!Number.isFinite(value)) return fallback;
   return Math.max(1, Math.min(Math.floor(value), 100));
@@ -90,7 +94,7 @@ export async function queueEligibleSavedLeads(limit = 25) {
     queued: results.filter((result) => result.queued).length,
     skipped: results.filter((result) => result.skipped).length,
     brevoSynced: results.filter((result) => result.brevo?.synced === true).length,
-    brevoFailed: results.filter((result) => result.brevo?.synced === false && result.brevo?.error).length,
+    brevoFailed: results.filter((result) => brevoSyncFailed(result.brevo)).length,
     results,
   };
 }
