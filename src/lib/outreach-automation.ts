@@ -1,5 +1,6 @@
 import { addContactToMarketVibeList } from "./brevo";
-import { queueOutreach, sendQueuedOutreach } from "./outreach";
+import { sendQueuedOutreachHardCapped } from "./outreach-hard-cap";
+import { queueOutreach } from "./outreach";
 import { getSupabaseAdmin } from "./supabase";
 
 function brevoSyncFailed(brevo: Record<string, unknown>) {
@@ -116,7 +117,7 @@ export async function runOutreachAutomation(options: { queueLimit?: number; send
   const sendLimit = boundedLimit(options.sendLimit ?? Number(process.env.OUTREACH_AUTOMATION_SEND_LIMIT || String(queueLimit)), queueLimit);
 
   const queue = await queueEligibleSavedLeads(queueLimit);
-  const delivery = await sendQueuedOutreach(sendLimit);
+  const delivery = await sendQueuedOutreachHardCapped(sendLimit);
 
   return {
     ok: queue.ok && !delivery.error,
