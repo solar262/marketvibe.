@@ -5,6 +5,10 @@
       "schedule": "30 9 * * *"
     },
     {
+      "path": "/api/cron/outreach-50",
+      "schedule": "45 9 * * *"
+    },
+    {
       "path": "/api/cron/opportunity-matching",
       "schedule": "30 6 * * *"
     },
