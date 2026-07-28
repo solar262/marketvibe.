@@ -150,7 +150,7 @@ export async function GET(request: Request) {
     return { published, emailDelivery };
   }));
 
-  steps.push(await runStep("live-lead-hunt", () => runLeadHunt({ markets: 4, leads: 8 })));
+  steps.push(await runStep("live-lead-hunt", () => runLeadHunt({ markets: 4, leads: 8, rotationOffset: 4 })));
   steps.push(await runStep("outreach-automation", () => runOutreachAutomation()));
   steps.push(await runStep("health-summary", () => getOpportunityEngineSummary()));
 
