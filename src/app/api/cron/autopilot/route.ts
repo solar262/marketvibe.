@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { runLeadHunt } from "@/lib/autopilot";
 import { sendTransactionalEmail } from "@/lib/brevo";
 import { ensureBuyerPipelineJobs } from "@/lib/buyer-pipeline-recovery";
 import { publishVerifiedBuyerIntentDeliveries } from "@/lib/buyer-intent-delivery";
@@ -149,8 +150,8 @@ export async function GET(request: Request) {
     return { published, emailDelivery };
   }));
 
+  steps.push(await runStep("live-lead-hunt", () => runLeadHunt({ markets: 4, leads: 8 })));
   steps.push(await runStep("outreach-automation", () => runOutreachAutomation()));
-
   steps.push(await runStep("health-summary", () => getOpportunityEngineSummary()));
 
   const failedSteps = steps.filter((step) => !step.ok);
@@ -163,7 +164,7 @@ export async function GET(request: Request) {
       ok,
       status: ok ? "healthy" : "degraded",
       message: ok
-        ? "Autonomous revenue and customer-delivery recovery completed."
+        ? "Autonomous revenue, live lead discovery, outreach, and customer-delivery recovery completed."
         : "Autopilot completed with failed stages; successful stages were not blocked.",
       startedAt,
       finishedAt,
