@@ -41,10 +41,11 @@ export type LeadHuntResult = {
   leads: BusinessLead[];
 };
 
-function rotatingMarkets(count: number) {
+function rotatingMarkets(count: number, rotationOffset = 0) {
   const safeCount = Math.max(1, Math.min(Math.floor(count), autopilotMarkets.length));
+  const safeOffset = Number.isFinite(rotationOffset) ? Math.max(0, Math.floor(rotationOffset)) : 0;
   const dayNumber = Math.floor(Date.now() / 86_400_000);
-  const start = (dayNumber * safeCount) % autopilotMarkets.length;
+  const start = (dayNumber * safeCount + safeOffset) % autopilotMarkets.length;
   return Array.from({ length: safeCount }, (_, index) => autopilotMarkets[(start + index) % autopilotMarkets.length]);
 }
 
@@ -102,9 +103,9 @@ async function huntMarket(market: LeadSearchInput, leadLimit: number): Promise<L
   }
 }
 
-export async function runLeadHunt({ markets = 4, leads = 8, customSearchTerm = "" }: { markets?: number; leads?: number; customSearchTerm?: string }): Promise<LeadHuntResult[]> {
+export async function runLeadHunt({ markets = 4, leads = 8, customSearchTerm = "", rotationOffset = 0 }: { markets?: number; leads?: number; customSearchTerm?: string; rotationOffset?: number }): Promise<LeadHuntResult[]> {
   const customTerm = normalizeCustomSearchTerm(customSearchTerm);
-  const selectedMarkets = rotatingMarkets(markets)
+  const selectedMarkets = rotatingMarkets(markets, rotationOffset)
     .map((market) => customTerm ? normalizeLeadSearchInput({ ...market, customSearchTerm: customTerm }) : market);
   const leadLimit = Math.max(1, Math.min(leads, 8));
   const results: LeadHuntResult[] = [];
