@@ -37,8 +37,10 @@ export async function queueEligibleSavedLeads(limit = 50) {
   const safeLimit = boundedLimit(limit, 50);
   const { data, error } = await supabase
     .from("leads")
-    .select("id,business_name,website,contact_page_url,public_email,audits(id,subject_line,outreach_message)")
+    .select("id,business_name,website,contact_page_url,public_email,source_status,created_at,audits(id,subject_line,outreach_message)")
+    .eq("source_status", "live")
     .not("public_email", "is", null)
+    .order("created_at", { ascending: false })
     .limit(safeLimit);
 
   if (error || !data) {
@@ -48,7 +50,7 @@ export async function queueEligibleSavedLeads(limit = 50) {
       skipped: 0,
       brevoSynced: 0,
       brevoFailed: 0,
-      error: error?.message || "Saved leads could not be read.",
+      error: error?.message || "Saved live leads could not be read.",
       results: [],
     };
   }
@@ -91,8 +93,8 @@ export async function queueEligibleSavedLeads(limit = 50) {
       contactPageUrl: String(lead.contact_page_url || ""),
       subject: String(audit.subject_line || `Quick website audit for ${lead.business_name}`),
       bodyText: String(audit.outreach_message),
-      source: "saved_lead",
-      metadata: { queuedFrom: "autonomous_saved_leads" },
+      source: "saved_live_lead",
+      metadata: { queuedFrom: "autonomous_live_leads", sourceStatus: "live" },
     });
 
     results.push({ email, businessName: lead.business_name, ...queue, brevo });
