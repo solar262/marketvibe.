@@ -11,7 +11,16 @@ function boundedLimit(value: number, fallback: number) {
   return Math.max(1, Math.min(Math.floor(value), 100));
 }
 
-export async function queueEligibleSavedLeads(limit = 25) {
+function configureAutonomousOutreach() {
+  process.env.OUTREACH_EMAIL_PROVIDER = "brevo";
+  process.env.OUTREACH_EMAIL_ENABLED = "true";
+  process.env.OUTREACH_FROM_EMAIL = process.env.OUTREACH_FROM_EMAIL || process.env.BREVO_SENDER_EMAIL || "hello@marketvibe1.com";
+  process.env.OUTREACH_FROM_NAME = process.env.OUTREACH_FROM_NAME || process.env.BREVO_SENDER_NAME || "MarketVibe";
+  process.env.OUTREACH_REPLY_TO = process.env.OUTREACH_REPLY_TO || process.env.OUTREACH_FROM_EMAIL;
+  process.env.OUTREACH_DAILY_SEND_LIMIT = "50";
+}
+
+export async function queueEligibleSavedLeads(limit = 50) {
   const supabase = getSupabaseAdmin();
   if (!supabase) {
     return {
@@ -25,7 +34,7 @@ export async function queueEligibleSavedLeads(limit = 25) {
     };
   }
 
-  const safeLimit = boundedLimit(limit, 25);
+  const safeLimit = boundedLimit(limit, 50);
   const { data, error } = await supabase
     .from("leads")
     .select("id,business_name,website,contact_page_url,public_email,audits(id,subject_line,outreach_message)")
@@ -100,7 +109,8 @@ export async function queueEligibleSavedLeads(limit = 25) {
 }
 
 export async function runOutreachAutomation(options: { queueLimit?: number; sendLimit?: number } = {}) {
-  const queueLimit = boundedLimit(options.queueLimit ?? Number(process.env.OUTREACH_AUTOMATION_QUEUE_LIMIT || "25"), 25);
+  configureAutonomousOutreach();
+  const queueLimit = boundedLimit(options.queueLimit ?? Number(process.env.OUTREACH_AUTOMATION_QUEUE_LIMIT || "50"), 50);
   const sendLimit = boundedLimit(options.sendLimit ?? Number(process.env.OUTREACH_AUTOMATION_SEND_LIMIT || String(queueLimit)), queueLimit);
 
   const queue = await queueEligibleSavedLeads(queueLimit);
