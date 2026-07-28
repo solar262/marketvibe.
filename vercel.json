@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/cron/lead-hunt",
+      "schedule": "30 5 * * *"
+    },
+    {
       "path": "/api/cron/autopilot",
       "schedule": "30 9 * * *"
     },
