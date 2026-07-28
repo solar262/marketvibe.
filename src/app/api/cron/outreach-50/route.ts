@@ -39,5 +39,5 @@ export async function GET(request: Request) {
     }).catch((error) => console.error("Outreach summary email failed", error));
   }
 
-  return NextResponse.json({ ok: result.ok, dailyLimit: 50, ...result }, { status: result.ok ? 200 : 500 });
+  return NextResponse.json({ dailyLimit: 50, ...result }, { status: result.ok ? 200 : 500 });
 }
