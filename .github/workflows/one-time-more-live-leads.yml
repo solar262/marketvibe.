@@ -1,0 +1,19 @@
+name: One-time expanded live lead run
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  find-and-send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for Vercel deployment
+        run: sleep 90
+      - name: Find more live leads and continue outreach
+        run: |
+          set -euo pipefail
+          response=$(curl --fail --silent --show-error "https://www.marketvibe1.com/api/system/more-live-leads?token=mv-more-live-leads-20260728-a91f6c2d")
+          echo "$response"
+          echo "$response" | grep '"ok":true'
