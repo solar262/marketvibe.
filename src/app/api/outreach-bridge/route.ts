@@ -1,23 +1,19 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getOutreachStats } from "@/lib/outreach";
 import { queueEligibleSavedLeads } from "@/lib/outreach-automation";
 import { sendQueuedOutreachHardCapped } from "@/lib/outreach-hard-cap";
 
-async function isAuthorized(request: Request) {
-  const supplied = request.headers.get("x-brevo-key") || "";
-  if (!supplied) return false;
+function expectedBridgeToken() {
+  const key = process.env.BREVO_API_KEY || "";
+  return key ? createHash("sha256").update(`marketvibe-bridge:${key}`).digest("hex") : "";
+}
 
-  try {
-    const response = await fetch("https://api.brevo.com/v3/senders", {
-      headers: { "api-key": supplied, accept: "application/json" },
-      cache: "no-store",
-    });
-    if (!response.ok) return false;
-    const data = (await response.json()) as { senders?: Array<{ email?: string; active?: boolean }> };
-    return Boolean(data.senders?.some((sender) => sender.email?.toLowerCase() === "hello@marketvibe1.com" && sender.active !== false));
-  } catch {
-    return false;
-  }
+function isAuthorized(request: Request) {
+  const expected = expectedBridgeToken();
+  const supplied = request.headers.get("x-marketvibe-bridge") || "";
+  if (!expected || supplied.length !== expected.length) return false;
+  return timingSafeEqual(Buffer.from(supplied), Buffer.from(expected));
 }
 
 function boundedLimit(value: unknown) {
@@ -27,7 +23,7 @@ function boundedLimit(value: unknown) {
 }
 
 export async function GET(request: Request) {
-  if (!(await isAuthorized(request))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const stats = await getOutreachStats();
   return NextResponse.json({
     ok: !stats.error,
@@ -42,7 +38,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!(await isAuthorized(request))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = (await request.json().catch(() => ({}))) as { action?: string; limit?: number };
   const limit = boundedLimit(body.limit);
 
