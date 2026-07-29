@@ -9,11 +9,24 @@ function expectedBridgeToken() {
   return key ? createHash("sha256").update(`marketvibe-bridge:${key}`).digest("hex") : "";
 }
 
-function isAuthorized(request: Request) {
+async function isAuthorized(request: Request) {
   const expected = expectedBridgeToken();
-  const supplied = request.headers.get("x-marketvibe-bridge") || "";
-  if (!expected || supplied.length !== expected.length) return false;
-  return timingSafeEqual(Buffer.from(supplied), Buffer.from(expected));
+  const suppliedToken = request.headers.get("x-marketvibe-bridge") || "";
+  if (expected && suppliedToken.length === expected.length && timingSafeEqual(Buffer.from(suppliedToken), Buffer.from(expected))) {
+    return true;
+  }
+
+  const suppliedKey = request.headers.get("x-brevo-key") || "";
+  if (!suppliedKey) return false;
+  try {
+    const response = await fetch("https://api.brevo.com/v3/account", {
+      headers: { "api-key": suppliedKey, accept: "application/json" },
+      cache: "no-store",
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
 }
 
 function boundedLimit(value: unknown) {
@@ -23,7 +36,7 @@ function boundedLimit(value: unknown) {
 }
 
 export async function GET(request: Request) {
-  if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await isAuthorized(request))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const stats = await getOutreachStats();
   return NextResponse.json({
     ok: !stats.error,
@@ -38,7 +51,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await isAuthorized(request))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = (await request.json().catch(() => ({}))) as { action?: string; limit?: number };
   const limit = boundedLimit(body.limit);
 
