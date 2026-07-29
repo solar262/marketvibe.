@@ -48,13 +48,10 @@ function boundedLimit(value: unknown) {
   return Math.max(1, Math.min(Math.floor(parsed), 10));
 }
 
-export async function GET(request: Request) {
-  const authorization = await authorize(request);
-  if (!authorization.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  applyMailerConfig(authorization.brevoKey);
+async function readiness() {
   const stats = await getOutreachStats();
-  return NextResponse.json({
-    ok: !stats.error,
+  return {
+    ok: !stats.error && Boolean(stats.config?.enabled),
     sendReady: Boolean(stats.config?.enabled),
     counts: stats.counts,
     latest: stats.latest.slice(0, 10).map((item: Record<string, unknown>) => ({
@@ -62,8 +59,15 @@ export async function GET(request: Request) {
       status: String(item.status || ""),
       subject: String(item.subject || ""),
     })),
-    error: stats.error || null,
-  });
+    error: stats.error || (stats.config?.enabled ? null : "Brevo sending is not fully configured."),
+  };
+}
+
+export async function GET(request: Request) {
+  const authorization = await authorize(request);
+  if (!authorization.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  applyMailerConfig(authorization.brevoKey);
+  return NextResponse.json(await readiness());
 }
 
 export async function POST(request: Request) {
@@ -72,6 +76,8 @@ export async function POST(request: Request) {
   applyMailerConfig(authorization.brevoKey);
   const body = (await request.json().catch(() => ({}))) as { action?: string; limit?: number };
   const limit = boundedLimit(body.limit);
+
+  if (body.action === "check") return NextResponse.json(await readiness());
 
   if (body.action === "prepare") {
     const stats = await getOutreachStats();
@@ -82,7 +88,7 @@ export async function POST(request: Request) {
   }
 
   if (body.action === "send") {
-    const result = await sendQueuedOutreachHardCapped(Math.min(limit, 5));
+    const result = await sendQueuedOutreachHardCapped(1);
     if (result.error) return NextResponse.json({ ok: false, error: result.error, delivery: result }, { status: 500 });
     return NextResponse.json({ ok: true, delivery: result });
   }
