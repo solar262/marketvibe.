@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getOutreachStats } from "@/lib/outreach";
-import { queueEligibleSavedLeads, runOutreachAutomation } from "@/lib/outreach-automation";
+import { queueEligibleSavedLeads } from "@/lib/outreach-automation";
+import { sendQueuedOutreachHardCapped } from "@/lib/outreach-hard-cap";
 
 async function isAuthorized(request: Request) {
   const supplied = request.headers.get("x-brevo-key") || "";
@@ -20,9 +21,9 @@ async function isAuthorized(request: Request) {
 }
 
 function boundedLimit(value: unknown) {
-  const parsed = Number(value || 50);
-  if (!Number.isFinite(parsed)) return 50;
-  return Math.max(1, Math.min(Math.floor(parsed), 50));
+  const parsed = Number(value || 25);
+  if (!Number.isFinite(parsed)) return 25;
+  return Math.max(1, Math.min(Math.floor(parsed), 25));
 }
 
 export async function GET(request: Request) {
@@ -46,13 +47,18 @@ export async function POST(request: Request) {
   const limit = boundedLimit(body.limit);
 
   if (body.action === "prepare") {
-    const result = await queueEligibleSavedLeads(limit);
+    const stats = await getOutreachStats();
+    const pending = Number(stats.counts.pending || 0);
+    if (pending > 0) {
+      return NextResponse.json({ ok: true, queued: 0, skipped: 0, existingPending: pending });
+    }
+    const result = await queueEligibleSavedLeads(Math.min(limit, 10));
     return NextResponse.json(result, { status: result.ok ? 200 : 500 });
   }
 
   if (body.action === "send") {
-    const result = await runOutreachAutomation({ queueLimit: limit, sendLimit: limit });
-    return NextResponse.json(result, { status: result.ok ? 200 : 500 });
+    const result = await sendQueuedOutreachHardCapped(limit);
+    return NextResponse.json({ ok: !result.error, delivery: result }, { status: result.error ? 500 : 200 });
   }
 
   return NextResponse.json({ error: "Unsupported action" }, { status: 400 });
