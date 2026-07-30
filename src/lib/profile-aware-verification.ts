@@ -87,7 +87,7 @@ function opportunityFromRow(row: Record<string, unknown>): OpportunityInput {
 async function createRun(supabase: SupabaseClient, trigger: Trigger) {
   const bucket = trigger === "cron" ? new Date().toISOString().slice(0, 13) : `${nowIso()}:${Math.random().toString(36).slice(2, 8)}`;
   const { data, error } = await supabase.from("opportunity_source_runs").insert({
-    run_type: "profile_aware_verification",
+    run_type: "verification",
     trigger_source: trigger,
     idempotency_key: `profile-aware-verification:${bucket}`,
   }).select("id").single();
