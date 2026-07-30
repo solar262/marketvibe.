@@ -339,7 +339,7 @@ async function automationPaused(supabase: SupabaseClient) {
 async function createRun(supabase: SupabaseClient, trigger: DiscoveryTrigger, profileId?: string) {
   const bucket = trigger === "cron" ? new Date().toISOString().slice(0, 13) : `${nowIso()}:${Math.random().toString(36).slice(2, 8)}`;
   const { data, error } = await supabase.from("opportunity_source_runs").insert({
-    run_type: "customer_profile_discovery",
+    run_type: "discovery",
     trigger_source: trigger,
     idempotency_key: `customer-profile-discovery:${profileId || "all"}:${bucket}`,
     search_profile_id: profileId || null,
