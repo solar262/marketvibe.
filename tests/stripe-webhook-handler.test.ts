@@ -1,4 +1,4 @@
-﻿import assert from "node:assert/strict";
+import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -48,6 +48,6 @@ assert.match(handlerSource, /customer\.subscription\.deleted/, "subscription.del
 
 // Idempotency guard must wrap all event handling
 assert.match(handlerSource, /markStripeEventProcessing/, "Webhook must use idempotency guard.");
-assert.match(handlerSource, /releaseStripeEventForRetry/, "Webhook must release idempotency on error so Stripe can retry.");
+assert.match(handlerSource, /releaseFailedStripeEvent/, "Webhook must release idempotency on error so Stripe can retry.");
 
 console.log("Stripe webhook handler tests passed.");
