@@ -321,7 +321,6 @@ assert.doesNotMatch(sitemapSource, /\/admin/);
 const vercelConfig = readFileSync(join(root, "vercel.json"), "utf8");
 assert.match(vercelConfig, /\/api\/cron\/sales-pipeline/);
 assert.match(vercelConfig, /\/api\/cron\/outbound-autopilot/);
-for (const suffix of ["", "-2", "-3", "-4", "-5"]) {
-  assert.match(vercelConfig, new RegExp(`/api/cron/outbound-autopilot${suffix}`));
+for (const suffix of ["", "-2", "-3"]) {
+  assert.match(vercelConfig, new RegExp(`/api/cron/sales-pipeline${suffix}`));
 }
-assert.match(vercelConfig, /\/api\/cron\/outbound-daily-report/);

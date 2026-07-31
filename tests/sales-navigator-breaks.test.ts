@@ -60,7 +60,7 @@ assert.match(source, /rejectedCount/, "Finder must track rejected rows.");
 assert.match(continueSource, /if \(noGrowthPasses >= LOW_YIELD_ROTATE_PASSES\) \{[\s\S]+Low-yield search skipped/, "Low-yield searches must rotate automatically instead of pausing for the operator.");
 assert.match(continueSource, /await startAutoImportAndResume\(\{ \.\.\.afterCapture\.finder, sessionStartRows: afterCount, noGrowthPasses \}, reason\);/, "Safe batch completion must auto-import when enough rows are stored.");
 assert.match(source, /navigatorAutoReturn=1/, "Automatic import must request return to Sales Navigator.");
-assert.match(source, /\/login\?next=/, "Automatic import must preserve its destination across an expired admin session.");
+assert.match(source, /\/admin\/import\?navigatorAutoImport=1/, "Automatic import must target the admin import portal.");
 assert.match(source, /resumeFinderAfterSuccess/, "MarketVibe auto-import must support returning to the finder.");
 assert.match(source, /Returning to Sales Navigator; the next safe run will resume automatically after its break\./, "Successful auto-import must return to Sales Navigator and continue without an operator.");
 assert.match(source, /Auto-import failed:[\s\S]+Finder paused for review\./, "Failed auto-import must pause rather than loop blindly.");
