@@ -1,13 +1,13 @@
 # PROJECT HANDOFF
 
-Updated: 2026-07-31T22:10:00+02:00
+Updated: 2026-07-31T22:29:30+02:00
 
 ## Project identity
 
 - Folder: `C:\marketvibe-pro`
 - Repository: https://github.com/solar262/marketvibe..git
 - Branch: marketvibe-integration-20260731
-- Latest commit: 25622df Align Stripe webhook test with integrated handler
+- Latest commit before this handoff update: 8b76357 Document blocked preview E2E verification
 - Intended next builder: Antigravity
 
 ## Required outcome
@@ -33,17 +33,17 @@ Current Git branch is main. Latest detected commit is 7d8fcda. Uncommitted chang
 
 ## Current unfinished task
 
-CURRENT UNFINISHED TASK
+LIVE PREVIEW E2E COMPLETE
 
-Inspect the current uncommitted changes and determine exactly what remains incomplete. Continue the existing implementation toward automatic payment-to-lead-delivery fulfilment. Complete or repair the existing system rather than creating replacement workflows or duplicate infrastructure.
+The requested branch-only Stripe-to-Supabase-to-Brevo verification passed. Remaining work is an owner decision: review the evidence, merge only if explicitly approved, and later remove the temporary test webhook/key when Preview verification is finished.
 
 ## Immediate next step
 
-In Vercel project `marketvibe`, add branch-scoped Preview values for `NEXT_PUBLIC_SUPABASE_URL` and `BREVO_API_KEY` on `marketvibe-integration-20260731`, and independently confirm that the Preview-scoped `STRIPE_SECRET_KEY` is a Stripe test-mode key. Redeploy commit `b54e63b1b23603fedeb42f5f7f9700dab5569946`, then run the controlled test-mode checkout and capture Stripe, webhook, Supabase, entitlement/product, Brevo delivery, and retry-idempotency identifiers and timestamps. Do not merge or push main.
+Review the successful branch-only Preview E2E evidence below. The integration branch is ready for the owner's merge decision; do not merge or push main without explicit authorization. Remove the temporary Stripe test webhook endpoint `we_1TzMoHFWtIAvju5IerMe9jeg` and rotate/remove the branch-only Brevo key after no further Preview verification is needed.
 
 ## Blockers
 
-Live preview verification is blocked before checkout. Vercel Preview has `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `BREVO_SENDER_EMAIL`, and `BREVO_SENDER_NAME`, but lacks `NEXT_PUBLIC_SUPABASE_URL` and `BREVO_API_KEY`. Vercel marks the existing values sensitive and neither CLI nor dashboard can reveal or clone the encrypted Production values into a branch-scoped Preview variable. The Preview Stripe key exists, but test mode could not be proven without revealing its prefix. No checkout or payment was attempted, preventing any risk of real customer money. Production `NEXT_PUBLIC_SUPABASE_URL` scope was verified restored after testing the Vercel branch-scope editor.
+None for the requested live Preview verification. Vercel Deployment Protection initially blocked Stripe's delivery to the branch alias; the test webhook URL was updated with the project Preview bypass token, then the original signed Stripe event payload was delivered and retried successfully. Production variables and deployments were not changed.
 
 ## Tests and evidence
 
@@ -58,15 +58,24 @@ Previously reported:
 Current evidence:
 - Folder: `C:\marketvibe-pro`
 - Branch: `marketvibe-integration-20260731`
-- Local and remote head before verification: `b54e63b1b23603fedeb42f5f7f9700dab5569946`
-- Preview deployment: `dpl_E8UAbXNgpB2hdYsYqCA32FZ5uCRJ`
-- Preview URL: `https://marketvibe-du773lfqy-solardynamics592-5270s-projects.vercel.app`
+- Local and remote head before this evidence update: `8b76357`
+- Final Preview deployment: `https://marketvibe-30wgv55vy-solardynamics592-5270s-projects.vercel.app`
+- Pre-webhook-secret Preview deployment ID: `dpl_6ZVqwQhFS1vsAQDHgT9ZtBCqFbVg`
 - Branch alias: `https://marketvibe-git-marketvib-efe499-solardynamics592-5270s-projects.vercel.app`
 - Deployment target/status: Preview / Ready
-- Deployment created: 2026-07-31 21:28:23 CEST, seven seconds after branch-head commit time 2026-07-31 21:28:16 CEST
-- Environment evidence: required Stripe/Supabase service-role+anon/Brevo sender variables present; `NEXT_PUBLIC_SUPABASE_URL` and `BREVO_API_KEY` absent from Preview
-- Production restoration evidence: `vercel env ls production` shows `NEXT_PUBLIC_SUPABASE_URL` scoped to Production
-- Checkout/payment/webhook/database/email/idempotency evidence: not generated because the environment and Stripe test-mode preconditions failed
+- Branch-scoped Preview configuration added: `NEXT_PUBLIC_SUPABASE_URL`, confirmed Stripe `sk_test_...` secret, `BREVO_API_KEY`, and Stripe test webhook signing secret. Production was not edited.
+- Stripe checkout session: `cs_test_a1TRTJVlk7ssEKO2BATmap4oUbomNG2cn09ni6iAr7tCa5sbum8FtVl60R`
+- Stripe payment intent: `pi_3TzMy8FWtIAvju5I032LBfm7`
+- Stripe mode/status: `livemode=false`, checkout `complete`, payment `paid`
+- Stripe event: `evt_1TzMy9FWtIAvju5IqIj2TeGo`, `checkout.session.completed`, created at Unix `1785529429`
+- Stripe test webhook endpoint: `we_1TzMoHFWtIAvju5IerMe9jeg`, enabled against the protected branch alias
+- First accepted signed webhook: HTTP 200, `{received:true, duplicate:false}` at `2026-07-31T20:28:19.174Z`
+- Supabase completed order: `2d9fc9fe-cd87-46f5-bc41-e36e368e6f45`, order `MV-478812`, product `proof_pack`, created `2026-07-31T20:28:16.382494+00:00`
+- Supabase active entitlement: `eb3e1f6d-7bb4-4be1-b31b-bd5179cba3b2`, product `proof_pack`, created `2026-07-31T20:28:16.884282+00:00`, updated `2026-07-31T20:28:16.951+00:00`
+- Supabase processed event record: `evt_1TzMy9FWtIAvju5IqIj2TeGo`, processed `2026-07-31T20:28:16.144761+00:00`
+- Brevo customer delivery: subject `Your MarketVibe Proof Pack purchase is confirmed`, message ID `<202607312028.19235845730@smtp-relay.mailin.fr>`, requested `2026-07-31T22:28:20.066+02:00`, delivered `2026-07-31T22:28:21.000+02:00`
+- Retry: HTTP 200, `{received:true, duplicate:true}` at `2026-07-31T20:28:58.963Z`
+- Idempotency counts before/after retry: orders `1/1`, entitlements `1/1`, processed events `1/1`, delivery batches `0/0`, Brevo delivery requests `1/1`
 - Untracked files were not modified
 
 ## Important decisions and constraints
