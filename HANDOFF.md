@@ -1,13 +1,13 @@
 # PROJECT HANDOFF
 
-Updated: 2026-07-31T16:20:20.015Z
+Updated: 2026-07-31T17:24:10.232Z
 
 ## Project identity
 
 - Folder: `C:\marketvibe-pro`
 - Repository: https://github.com/solar262/marketvibe..git
-- Branch: main
-- Latest commit: dfb6180 Align navigator and sales pipeline tests with current routes
+- Branch: antigravity-handoff-20260731
+- Latest commit: 62de23e Handle successful subscription invoice payments
 - Intended next builder: Antigravity
 
 ## Required outcome
@@ -43,7 +43,7 @@ Read HANDOFF.md and handoff.json, inspect the existing production payment-to-lea
 
 ## Blockers
 
-The corrected route tests are committed at dfb6180 and the full npm test suite passes. Untracked backup, log, ZIP and temporary files remain and must not be committed without inspection. No new production milestone was completed in the latest Antigravity run.
+The Stripe webhook milestone is committed and verified. The dedicated webhook test and full npm test suite pass. Untracked backup, ZIP, log and temporary files remain and must not be committed without inspection. No verified production blocker remains from this milestone.
 
 ## Tests and evidence
 
@@ -83,11 +83,11 @@ Update HANDOFF.md and handoff.json before ending every builder session.
 ## Current Git status
 
 ```text
+M HANDOFF.md
+ M handoff.json
 ?? .handoff-backups/
 ?? .playwright-cli/
-?? HANDOFF.md
 ?? browser-extension/marketvibe-sales-navigator-companion.zip
-?? handoff.json
 ?? logs.txt
 ?? matches.txt
 ?? src/app/api/proxy/stripe/route.ts
