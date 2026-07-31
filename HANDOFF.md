@@ -1,13 +1,13 @@
 # PROJECT HANDOFF
 
-Updated: 2026-07-31T16:20:20.015Z
+Updated: 2026-07-31T19:23:02.546Z
 
 ## Project identity
 
 - Folder: `C:\marketvibe-pro`
 - Repository: https://github.com/solar262/marketvibe..git
-- Branch: main
-- Latest commit: dfb6180 Align navigator and sales pipeline tests with current routes
+- Branch: marketvibe-integration-20260731
+- Latest commit: 25622df Align Stripe webhook test with integrated handler
 - Intended next builder: Antigravity
 
 ## Required outcome
@@ -39,11 +39,11 @@ Inspect the current uncommitted changes and determine exactly what remains incom
 
 ## Immediate next step
 
-Read HANDOFF.md and handoff.json, inspect the existing production payment-to-lead-delivery workflow, then implement one smallest missing production milestone. Preserve all untracked files, avoid environment files, run the relevant tests and update both handoff files before stopping.
+Commit and push the updated HANDOFF.md and handoff.json on marketvibe-integration-20260731. Then perform live end-to-end verification of Stripe payment -> Supabase subscription/access update -> lead delivery -> customer email/reporting. Do not merge into main until that production evidence passes.
 
 ## Blockers
 
-The corrected route tests are committed at dfb6180 and the full npm test suite passes. Untracked backup, log, ZIP and temporary files remain and must not be committed without inspection. No new production milestone was completed in the latest Antigravity run.
+Integration onto the latest origin/main is complete on branch marketvibe-integration-20260731. The Stripe webhook test and full npm test suite pass. Untracked backup, ZIP, log and temporary files remain untouched. The integration branch still needs its updated handoff committed and pushed before live production verification.
 
 ## Tests and evidence
 
@@ -83,14 +83,16 @@ Update HANDOFF.md and handoff.json before ending every builder session.
 ## Current Git status
 
 ```text
+M HANDOFF.md
+ M handoff.json
 ?? .handoff-backups/
+?? .next-dev-3000.log
 ?? .playwright-cli/
-?? HANDOFF.md
+?? ADMIN-LOGIN-PRODUCTION.txt
 ?? browser-extension/marketvibe-sales-navigator-companion.zip
-?? handoff.json
 ?? logs.txt
 ?? matches.txt
-?? src/app/api/proxy/stripe/route.ts
+?? src/app/api/proxy/
 ?? src/lib/buyer-hunt.ts.before-intent-fix
 ?? src/lib/outbound-autopilot.ts.before-qualified-signal-fix
 ?? src/lib/outbound-autopilot.ts.before-qualified-signal-fix-2
@@ -124,7 +126,7 @@ CURRENT UNFINISHED TASK
 Inspect the current uncommitted changes and determine exactly what remains incomplete. Continue the existing implementation toward automatic payment-to-lead-delivery fulfilment. Complete or repair the existing system rather than creating replacement workflows or duplicate infrastructure.
 
 Immediate next step:
-Read HANDOFF.md and handoff.json, inspect the existing production payment-to-lead-delivery workflow, then implement one smallest missing production milestone. Preserve all untracked files, avoid environment files, run the relevant tests and update both handoff files before stopping.
+Commit and push the updated HANDOFF.md and handoff.json on marketvibe-integration-20260731. Then perform live end-to-end verification of Stripe payment -> Supabase subscription/access update -> lead delivery -> customer email/reporting. Do not merge into main until that production evidence passes.
 
 Preserve all completed work. Make only relevant changes, run the smallest useful tests, update HANDOFF.md and handoff.json before finishing, and return evidence of completion.
 ```
