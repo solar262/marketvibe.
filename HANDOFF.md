@@ -1,6 +1,6 @@
 # PROJECT HANDOFF
 
-Updated: 2026-07-31T19:23:02.546Z
+Updated: 2026-07-31T22:10:00+02:00
 
 ## Project identity
 
@@ -39,11 +39,11 @@ Inspect the current uncommitted changes and determine exactly what remains incom
 
 ## Immediate next step
 
-Commit and push the updated HANDOFF.md and handoff.json on marketvibe-integration-20260731. Then perform live end-to-end verification of Stripe payment -> Supabase subscription/access update -> lead delivery -> customer email/reporting. Do not merge into main until that production evidence passes.
+In Vercel project `marketvibe`, add branch-scoped Preview values for `NEXT_PUBLIC_SUPABASE_URL` and `BREVO_API_KEY` on `marketvibe-integration-20260731`, and independently confirm that the Preview-scoped `STRIPE_SECRET_KEY` is a Stripe test-mode key. Redeploy commit `b54e63b1b23603fedeb42f5f7f9700dab5569946`, then run the controlled test-mode checkout and capture Stripe, webhook, Supabase, entitlement/product, Brevo delivery, and retry-idempotency identifiers and timestamps. Do not merge or push main.
 
 ## Blockers
 
-Integration onto the latest origin/main is complete on branch marketvibe-integration-20260731. The Stripe webhook test and full npm test suite pass. Untracked backup, ZIP, log and temporary files remain untouched. The integration branch still needs its updated handoff committed and pushed before live production verification.
+Live preview verification is blocked before checkout. Vercel Preview has `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `BREVO_SENDER_EMAIL`, and `BREVO_SENDER_NAME`, but lacks `NEXT_PUBLIC_SUPABASE_URL` and `BREVO_API_KEY`. Vercel marks the existing values sensitive and neither CLI nor dashboard can reveal or clone the encrypted Production values into a branch-scoped Preview variable. The Preview Stripe key exists, but test mode could not be proven without revealing its prefix. No checkout or payment was attempted, preventing any risk of real customer money. Production `NEXT_PUBLIC_SUPABASE_URL` scope was verified restored after testing the Vercel branch-scope editor.
 
 ## Tests and evidence
 
@@ -56,12 +56,18 @@ Previously reported:
 - Lead ingestion, qualification, outreach and scheduled-processing modules exist.
 
 Current evidence:
-- Folder: C:\marketvibe-pro
-- Branch: main
-- Latest commit: 7d8fcda
-- Uncommitted changes present
-
-Re-run relevant tests before claiming completion.
+- Folder: `C:\marketvibe-pro`
+- Branch: `marketvibe-integration-20260731`
+- Local and remote head before verification: `b54e63b1b23603fedeb42f5f7f9700dab5569946`
+- Preview deployment: `dpl_E8UAbXNgpB2hdYsYqCA32FZ5uCRJ`
+- Preview URL: `https://marketvibe-du773lfqy-solardynamics592-5270s-projects.vercel.app`
+- Branch alias: `https://marketvibe-git-marketvib-efe499-solardynamics592-5270s-projects.vercel.app`
+- Deployment target/status: Preview / Ready
+- Deployment created: 2026-07-31 21:28:23 CEST, seven seconds after branch-head commit time 2026-07-31 21:28:16 CEST
+- Environment evidence: required Stripe/Supabase service-role+anon/Brevo sender variables present; `NEXT_PUBLIC_SUPABASE_URL` and `BREVO_API_KEY` absent from Preview
+- Production restoration evidence: `vercel env ls production` shows `NEXT_PUBLIC_SUPABASE_URL` scoped to Production
+- Checkout/payment/webhook/database/email/idempotency evidence: not generated because the environment and Stripe test-mode preconditions failed
+- Untracked files were not modified
 
 ## Important decisions and constraints
 
