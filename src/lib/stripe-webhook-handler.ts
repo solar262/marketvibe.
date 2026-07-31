@@ -38,6 +38,15 @@ export async function handleVerifiedStripeEvent(event: Stripe.Event) {
     );
   }
 
+  if (event.type === "invoice.payment_succeeded") {
+    const invoice = event.data.object as Stripe.Invoice & { subscription?: string | Stripe.Subscription | null; billing_reason?: string };
+    const subscriptionId = typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id;
+    // Only act on subscription renewals, not the initial checkout invoice
+    if (subscriptionId && invoice.billing_reason !== "subscription_create") {
+      await updateEntitlementStatusBySubscriptionId(subscriptionId, "active");
+    }
+  }
+
   if (event.type === "invoice.payment_failed") {
     const invoice = event.data.object as Stripe.Invoice & { subscription?: string | Stripe.Subscription | null };
     const subscriptionId = typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id;
